@@ -19,7 +19,7 @@ Python 3.10 이상과 표준 라이브러리만 필요하다. `rewind_data`는 �
 | `rewind_data/windows.py` | Field별 snapshot과 causal offline/streaming window 조립 |
 | `rewind_data/window_fixture.py`, `tests/test_windows.py` | 데이터 없는 합성 window 실행·검증 |
 
-프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이 세션은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다.
+프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이전 검증은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다. 아래 데이터 의존 명령은 추출된 JSON 디렉터리와 준비된 sample 산출물용이다. Archive 또는 분할 압축 파일을 `--input`으로 직접 읽지 않으며, 압축 결합·추출 기능은 아직 미구현이다.
 
 ```sh
 python -m rewind_data --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --dataset-version UnrealEgo2_train_val_pose_unverified --provenance data/sample_source.json --output outputs/m0_sample
@@ -34,7 +34,7 @@ Exit code는 0(필수 수치·sequence 검사 오류 없음, 의미 검증은 �
 
 ## 데이터 준비와 출처
 
-첫 검증에서 사용한 로컬 sample 경로는 아래와 같다. 이후 2026-10-13 사용자가 데이터셋 재다운로드를 알렸으므로 현재 가용성은 가정하지 않는다. 데이터 의존 명령은 sample과 provenance가 다시 준비된 뒤 실행한다. 원본과 산출물은 `.gitignore`의 `data/`, `outputs/` 아래에 보관한다. 새 checkout에는 포함되지 않으므로 사용자가 확보한 subset을 별도로 준비해야 한다. 자동 다운로드·전체 데이터 확장은 제공하지 않는다.
+2026-10-13 오케스트레이션이 Drive 압축파일 목록을 확인했다. 내부 무결성·추출·프레임 검증은 미실행이며 현재 다운로드 완료를 보장하지 않는다. 아래 경로와 18프레임 결과는 이전 검증 이력으로, 현재 가용성을 가정하지 않는다. 기존 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행한다. 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춘다. 로컬 추출본과 생성 산출물은 `.gitignore`의 `data/`, `outputs/` 아래에 두며 Git에 포함하지 않는다.
 
 ```text
 data/raw/unrealego2_sample/
@@ -46,7 +46,7 @@ outputs/m0_sample/audit_report.json
 outputs/m0_sample/viewer.html
 ```
 
-출처는 [지정 Drive JSON 폴더](https://drive.google.com/drive/folders/16ON8vzZDJ2yligsM_OmkwEA2MjJPnohv)다. Provenance 파일은 입력 root에 대한 상대 경로를 키로 하는 `files` 사전과 선택적인 폴더 inventory를 담는다. 인증 정보·임시 서명 URL을 쓰지 않으며 canonical Drive URL만 허용한다.
+이전 18프레임 검증의 출처는 [지정 Drive JSON 폴더](https://drive.google.com/drive/folders/16ON8vzZDJ2yligsM_OmkwEA2MjJPnohv)다. 현재 Provenance 파일은 입력 root에 대한 상대 경로를 키로 하는 `files` 사전과 선택적인 폴더 inventory를 담는다. 인증 정보·임시 서명 URL을 쓰지 않으며 canonical Drive URL만 허용한다. 아래 schema는 기존 파일용이며 archive/추출 manifest 확장은 미구현이다.
 
 ```json
 {
@@ -60,6 +60,21 @@ outputs/m0_sample/viewer.html
 ```
 
 `dataset_sample`은 실제로 가져온 dataset 파일이라는 뜻이며 실세계 촬영이라는 뜻이 아니다. UnrealEgo2는 합성 데이터다. `synthetic_fixture`는 코드 검사에서 만든 인위적 fixture를 의미한다. `observed_folder_inventory`는 그때 관측한 다운로드 폴더 목록이며 원본 motion 전체 길이를 보장하지 않는다.
+
+## 압축 원본 준비 계획(미구현)
+
+**2026-10-13 사용자 운영 결정:** Drive 압축 원본을 보존하고, 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스만 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료·추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. 저장 용량·GPU·학습 예산은 별도로 미정이며, 현재 도구에 압축 준비 기능이 추가된 것은 아니다.
+
+준비 흐름은 필요한 환경의 분할 파일 목록·크기·무결성 확인 → 번호순 스트림 결합·선택 시퀀스 추출 → 좌우 RGB/pose/frame 및 train/validation/test 소속 검사 → 추출 JSON 디렉터리의 `--input` 연결이다. Gzip은 원하는 멤버까지 앞부분을 순차 해제해야 할 수 있어 작은 subset도 읽기·준비 시간이 든다. 불필요한 전체 추출·결합본 중복 저장을 피하고 공간 예산·추출/전처리 시간을 계획한다. 일부 분할 파일의 존재만으로 archive 전체 또는 내부 frame 무결성을 확인했다고 기록하지 않는다.
+
+추출 manifest에는 다음 항목을 남기고 기존 JSON 파일 manifest와 연결하는 설계가 필요하다. **현재 자동 기록·검증 기능은 미구현**이며 위 Provenance 예제가 이 항목을 지원하는 것은 아니다.
+
+- Archive ID와 분할 파일 이름·번호 순서·크기
+- 확인한 hash의 알고리즘·값과 그 검사 범위(어느 분할 파일/스트림 범위/추출 파일을 검사했는지), 미확인 항목
+- 추출 목록, sequence/frame, train/validation/test 소속 및 확인 상태
+- 추출·전처리 버전과 원본 archive 출처의 연결
+
+현재 명령은 추출 디렉터리만 처리한다. 압축 준비용 미구현 명령을 새로 안내하지 않으며, 압축 원본 목록 관측과 이전 샘플 검증을 이번 추출·검증 완료로 해석하지 않는다. 관측한 준비 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
 
 ## 로더·관절·mask 계약
 

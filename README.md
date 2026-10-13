@@ -7,8 +7,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 ## 현재 상태
 
 - 프로젝트 로드맵 v0.2의 첫 구현 묶음인 M0 사전 JSON 감사·공통 로더·로컬 HTML viewer를 구현했습니다. 전체 완료 범위와 예산은 계속 검토 중입니다.
-- 지정 Drive 폴더의 UnrealEgo2 pose JSON `frame_0`~`frame_17` 18개에서 87관절의 필수 배열 수치 검사를 통과했습니다. 단위·축·회전·시간·calibration·분할·공식 skeleton 검증은 남아 있으며 M0 전체 완료가 아닙니다.
-- 2026-10-13 사용자 안내에 따라 데이터셋을 처음부터 다시 다운로드 중이며 당분간 실제 데이터 확인은 보류합니다. 위 결과는 재다운로드 전 샘플의 검증 기록이며, 현재 파일의 존재나 다운로드 완료를 보장하지 않습니다.
+- 이전 M0에서 지정 Drive 폴더의 UnrealEgo2 pose JSON `frame_0`~`frame_17` 18개, 각 87관절의 필수 배열 수치 검사를 통과했습니다. 이는 이전 검증 이력이며 단위·축·회전·시간·calibration·분할·공식 skeleton 검증은 남아 있습니다.
+- 2026-10-13 오케스트레이션이 Drive 압축파일 목록을 확인했습니다. 내부 무결성·추출·프레임 검증은 미실행이며 현재 다운로드 완료를 보장하지 않습니다. 사용자는 Drive 압축 원본을 보존하고 사용할 때 필요한 시퀀스만 런타임 임시 디스크에 추출하는 운영 방식을 결정했습니다. 압축 준비 기능은 아직 미구현이며 M0 전체 완료가 아닙니다.
 - 데이터 없이 공식 규격 근거와 M1 준비용 causal window 조립·streaming API를 추가했습니다. 합성 테스트 40개(기존 17 + window 23)와 fixture 실행을 통과했으며 실제 데이터 검증·모델 학습은 포함하지 않습니다.
 - 모델 구현과 학습·평가는 아직 시작하지 않았습니다.
 - Python 표준 라이브러리로 실행하며 설치할 추가 Python 패키지는 없습니다. 합성 테스트와 실제 sample smoke 결과는 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 기록합니다. 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
@@ -53,9 +53,9 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 
 ## 개발과 실험 환경
 
-- 주 학습 환경은 Google Colab GPU를 계획하고 있습니다. 실제 GPU, 저장 공간과 학습 예산은 미정입니다.
-- 기존 초기 데이터 후보는 UnrealEgo입니다. 현재 확보된 UnrealEgo2 JSON으로 사전 검증을 제안하며, 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
-- 데이터셋의 용량이 매우 크므로, 로컬 파일이 아닌 클라우드 위에 데이터셋을 올려서 학습합니다.
+- 주 학습 환경은 Google Colab GPU를 계획하고 있습니다. 실제 GPU, 저장 용량과 학습 예산은 미정입니다.
+- 기존 초기 데이터 후보는 UnrealEgo입니다. 이전 UnrealEgo2 JSON으로 사전 도구를 검증했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
+- **2026-10-13 운영 결정:** Drive에는 압축 원본을 보존하고 필요한 시퀀스를 Colab/runtime 임시 디스크에 추출해 읽습니다. 같은 런타임에서는 검증된 추출본을 재사용하며 세션 종료·추출본 소실 후 다시 추출합니다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관합니다.
 - 작은 데이터의 입출력 검증과 과적합 테스트를 통과한 뒤 학습 규모를 늘립니다.
 - Notebook은 실행 진입점으로 사용하고 핵심 로직은 Python 모듈로 분리할 계획입니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
@@ -70,7 +70,9 @@ python -m unittest discover -s tests -v
 python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --provenance data/sample_source.json --expected-frames 18 --expected-joints 87
 ```
 
-위 데이터 의존 명령은 sample과 provenance가 다시 준비된 뒤 실행합니다. 기존 검증에 사용한 파일은 Git에 포함되지 않으며 현재 가용성을 가정하지 않습니다. 합성 fixture 단위 테스트는 데이터셋 없이 실행할 수 있습니다. 일반 데이터에는 `--input`을 바꾸고 `--provenance`를 생략할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 로컬 브라우저에서 열도록 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. 자세한 데이터 준비·선택 규칙은 [도구 안내](docs/M0_JSON_TOOLS.md)를 확인합니다.
+위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 필요한 환경의 분할 파일 목록·크기·무결성 확인 → 번호순 스트림 결합·선택 시퀀스 추출 → 좌우 RGB/pose/frame 및 split 소속 검사 → 기존 loader 연결이 준비 계획이며, 이 압축 준비 기능은 아직 미구현입니다. Gzip은 원하는 멤버까지 순차 해제가 필요할 수 있어 작은 subset도 읽기·준비 시간이 듭니다. 불필요한 전체 추출·결합본 중복 저장을 피하고 공간 예산·전처리 시간을 계획합니다.
+
+기존 18프레임 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행하며, 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춥니다. 일반 데이터에는 `--provenance`를 생략할 수 있습니다. 기존 파일은 Git에 포함되지 않고 현재 가용성을 가정하지 않습니다. 합성 fixture 테스트는 데이터셋 없이 실행할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. Archive 출처·확인한 hash와 범위·추출 manifest 요구 및 실행 전제는 [도구 안내](docs/M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)를 확인합니다.
 
 ## 데이터 없이 causal window 계약 실행
 

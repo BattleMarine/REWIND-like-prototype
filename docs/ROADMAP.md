@@ -32,7 +32,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-13 현재 상태와 우선 실행 계획
 
-**최신 데이터 상태:** 사용자가 데이터셋을 처음부터 다시 다운로드 중이라고 알렸다. 당분간 실제 데이터 확인·데이터 의존 실행은 보류하며, 아래 18프레임 결과는 재다운로드 전 샘플 검증 이력으로 유지한다. 현재 파일의 존재나 다운로드 완료를 가정하지 않는다. 그동안 코드 검토·합성 fixture 검증·공개 규격 조사는 진행할 수 있으며, 데이터 재확보 후 manifest와 파일 hash부터 다시 확인한다.
+**최신 데이터 상태(2026-10-13):** 오케스트레이션이 Drive 압축파일 목록을 확인했다. 내부 무결성·추출·프레임 검증은 미실행이며 목록 관측만으로 현재 다운로드 완료를 보장하지 않는다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. 사용자는 Drive 압축 원본 보존과 사용 시 필요한 시퀀스만 런타임에 추출하는 운영 방식을 결정했다. 압축 준비 기능은 아직 미구현이며, 추출 후 manifest/hash·좌우 RGB/pose/frame·split 검사를 거쳐 기존 디렉터리 loader에 연결한다.
 
 **2026-10-13 데이터 없는 후속 묶음 결과**
 
@@ -85,13 +85,24 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 첫 구현 범위는 위 1~2번인 JSON 감사·공통 로더·정답 시각화로 둔다. 다음 묶음에서 3번 진단 학습을 추가한다. 모듈은 `data`(읽기·관절·좌표), `evaluation`(지표), `models`, `training`으로 역할을 나누고 notebook은 실행 진입점으로 둔다. 구체적인 패키지 경로와 의존성은 구현 시 확정한다.
 
-데이터는 클라우드 원본을 보존하고 필요한 subset만 Colab 런타임 디스크로 옮겨 읽는 방식을 제안한다. Colab 세션 밖에도 manifest·설정·checkpoint·결과를 보관한다. 현재 다운로드 작업은 이 계획 작성으로 중단하거나 변경하지 않는다.
+데이터 보관·추출 방식은 아래의 2026-10-13 운영 결정에 따른다. Drive 압축 원본과 영구 저장할 manifest·설정·checkpoint·결과를 런타임 추출본과 분리한다. 문서 반영으로 현재 다운로드 작업을 중단하거나 변경하지 않는다.
 
 장시간 학습 전에 D2의 실제 GPU·세션 길이·영구 저장 공간·총 예산을 정하고, pilot의 step 시간·VRAM·입출력 시간을 측정한다. 일정은 고정 날짜 대신 위 완료 조건으로 관리한다. D1·D3·D4·D5는 미결정으로 유지하며, JSON 개발에 UnrealEgo2를 활용하는 것과 최종 baseline 데이터셋을 확정하는 것을 구분한다.
 
 ### M0 데이터 확보와 공통 규격
 
-기존 데이터 시작안은 UnrealEgo의 손 annotation이 포함된 시퀀스로 시작하고 UnrealEgo2로 확장하는 것이다. 현재 확보된 UnrealEgo2 JSON은 위 사전 검증 계획에 먼저 활용하되, 최종 baseline 데이터셋·버전·split은 검증 후 결정한다. 전체 다운로드 전에 sample archive를 확인한다. 공식 안내의 UnrealEgo2 저장 공간은 약 3TB이므로 RGB와 pose를 필요한 범위만 확보하고 depth는 초기 필수 입력에서 제외한다. [3]
+기존 데이터 시작안은 UnrealEgo의 손 annotation이 포함된 시퀀스로 시작하고 UnrealEgo2로 확장하는 것이다. 이전 UnrealEgo2 JSON은 사전 도구 검증에 사용했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정한다. 공식 안내의 전체 UnrealEgo2 저장 공간은 약 3TB이므로 RGB와 pose를 필요한 범위만 추출하고 depth는 초기 필수 입력에서 제외한다. [3]
+
+**압축 준비 계획 — 아직 미구현**
+
+1. 필요한 환경의 archive ID와 분할 파일 목록·번호 순서·크기·무결성을 확인한다. 일부 파일 목록만으로 전체 archive가 준비됐다고 판단하지 않는다.
+2. 분할 파일을 번호순 스트림으로 결합해 선택 시퀀스를 런타임 임시 디스크에 추출한다. Gzip은 원하는 멤버까지 앞부분을 순차 해제해야 할 수 있으므로 작은 subset에도 읽기·준비 시간이 들 수 있다. 불필요한 전체 추출과 결합본 중복 저장을 피하며 필요한 공간·추출/전처리 시간을 계획한다.
+3. 추출 목록과 좌우 RGB/pose/frame의 대응·누락, sequence 경계 및 train/validation/test 소속을 검사한다.
+4. 검증한 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 기존 CLI는 archive 직접 읽기·결합·추출 기능을 제공하지 않는다.
+
+추출 manifest에는 archive ID, 분할 파일 이름·순서·크기, 확인한 hash의 알고리즘·값·검사 범위, 추출 목록·sequence/frame/split, 추출·전처리 버전을 남기고 기존 파일 manifest와 연결하는 설계가 필요하다. 확인하지 않은 hash/범위는 미확인으로 표시한다. 이 확장은 미구현이며 파일 목록 확인이나 문서 작성으로 M0 완료 상태를 올리지 않는다. 준비 절차의 세부 경계는 [M0 도구 안내](M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)에 기록한다.
+
+직전 목록 관측은 train_val_pose 15개 약 18.02GB, test_pose 15개 약 1.97GB였다. 첫 준비 후보는 ArchVis RGB `000`~`004`(공식 5개) 약 52.44GB와 pose 약 368MB다. CityPark RGB `000`~`003`은 공식 17개 중 4개(약 42.95GB)만 관측했다. 이는 확인 시점의 목록·크기이며 현재 다운로드 완료, 내부 무결성 또는 최종 baseline 선택을 뜻하지 않는다. 오케스트레이션이 확인한 근거: [Drive 압축 원본 폴더](https://drive.google.com/drive/folders/1GIWTYCaHxz7YeBCabpZrUyioHwXVUo6O), [공식 RGB 분할 목록 스크립트](https://unrealego.mpi-inf.mpg.de/data/download_unrealego2_train_val_rgb.sh).
 
 | 데이터 단계 | 제안 규모 | 목적 |
 | --- | --- | --- |
@@ -220,7 +231,11 @@ Validation에서 clean 정확도, failure 성능, latency를 함께 비교한다
 
 Colab notebook은 환경 준비·학습·평가의 진입점으로 두고, 핵심 코드는 data, models, diffusion, training, evaluation 모듈로 분리한다. 각 실험에는 config, 코드 revision, 데이터 manifest hash, front-end 버전, seed, checkpoint, 지표와 실패 예시를 함께 저장한다.
 
-데이터는 가능한 한 런타임 로컬 저장소에서 읽고 Drive에는 checkpoint와 결과를 주기적으로 동기화한다. Model·optimizer·scheduler·AMP scaler·RNG·학습 위치를 저장하고 실제 중단/재개 테스트를 한다. 저장 주기는 pilot의 step 시간과 허용 손실량으로 정한다.
+데이터는 필요한 시퀀스의 런타임 추출본에서 읽고, 실험 결과·checkpoint·manifest는 압축 원본과 분리해 영구 저장소에 보관한다. Model·optimizer·scheduler·AMP scaler·RNG·학습 위치를 저장하고 실제 중단/재개 테스트를 한다. 저장 주기는 pilot의 step 시간과 허용 손실량으로 정한다.
+
+### 확정된 데이터 운영 결정
+
+**2026-10-13 사용자 결정 — D2 중 보관·추출 운영 방식만 확정:** Drive 압축 원본을 보존하고 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스를 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료 또는 추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. GPU 종류·세션 길이·저장 용량·총 예산과 D1/D3/D4/D5는 계속 미정이다. 압축 준비 기능의 구현·실행 완료를 의미하지 않는다.
 
 M0–M4는 순차적인 필수 경로다. M5는 GPU 예산에 맞춰 E1–E3부터 선택하고 M6에서 통합한다. 일정은 고정 날짜 대신 단계별 완료 조건으로 관리한다. Pilot 후 step당 시간 × 예정 update 수 × 실험 횟수로 GPU 시간을 추산하고 평가·중단 여유를 별도로 잡는다.
 
