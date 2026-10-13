@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M0 · Pose JSON 검사</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101820;color:#e5edf3}
+*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1500px;margin-inline:auto}
+h1{font-size:25px;margin:0 0 8px}p{line-height:1.6;margin:8px 0}small,.muted{color:#afbfce}
+.notice{padding:12px 16px;background:#302a1d;border:1px solid #76613d;border-radius:8px;color:#ffdda1}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;margin-top:18px}
+.panel{border:1px solid #344455;background:#15212d;border-radius:10px;padding:16px;min-width:0}
+label{display:block;font-size:13px;color:#afbfce;margin-bottom:12px}select,button,input{font:inherit}
+select,button{background:#243648;color:#edf3f8;border:1px solid #506579;padding:8px;border-radius:5px}
+select{width:100%;margin-top:5px}button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}canvas{width:100%;height:530px;display:block;touch-action:none;background:#0e1923;border-radius:8px}
+input[type=range]{width:100%}#frameLabel{font-size:18px;font-weight:600;margin:12px 0}
+.path{word-break:break-all;font-size:12px;line-height:1.6}.error{color:#ffb8ac;white-space:pre-wrap;max-height:240px;overflow:auto;font-size:12px}
+#hover{min-height:22px;font-size:12px;color:#a5d4ff}#bounds{font:12px monospace;white-space:pre-wrap}
+details{margin:14px 0;font-size:13px}summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-word}
+a{color:#91c7ff}.legend{font-size:12px;color:#afbfce;margin-top:8px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}canvas{height:440px}body{padding:14px}}
+</style>
+</head>
+<body>
+<h1>M0 · Pose JSON 검사</h1>
+<p id="dataset" class="muted"></p>
+<div class="notice">원본 <b>device_pts3d</b> · 단위/축 의미/회전/FPS/calibration/split 미검증.<br>
+점선 연결은 개발용 가정입니다. 재생 간격은 미리보기 속도이며 실제 motion 시간이나 FPS가 아닙니다.</div>
+<div class="layout">
+<div class="panel">
+<div class="row"><button id="xy">XY</button><button id="xz">XZ</button><button id="yz">YZ</button><button id="orbit">입체 보기 초기화</button><span class="muted">드래그: 보기 회전</span></div>
+<p id="frameLabel"></p>
+<canvas id="pose" aria-label="원본 3D 관절, 마우스 드래그로 보기 회전"></canvas>
+<div class="legend">Body: 파랑 · 왼손: 주황 · 오른손: 초록 · 나머지 원본 관절: 회색 · 수치 invalid는 그리지 않음</div>
+<p id="hover"></p>
+<input id="frameSlider" type="range" min="0" value="0" step="1" aria-label="frame 선택">
+<div class="row"><button id="prev">이전</button><button id="play">재생</button><button id="next">다음</button>
+<label style="margin:0">미리보기 간격 <select id="interval" style="width:auto"><option value="100">100 ms</option><option value="200" selected>200 ms</option><option value="500">500 ms</option></select></label></div>
+</div>
+<div class="panel">
+<label>Sequence (부모 폴더 경계)<select id="sequence"></select></label>
+<label>관절 선택<select id="group"><option value="all">전체 원본 관절</option></select></label>
+<p id="stats"></p>
+<p class="muted">축과 scale은 sequence 전체의 유효한 원본 좌표 범위로 고정합니다. Frame 전환에 맞춰 확대·정규화하지 않습니다.</p>
+<pre id="bounds"></pre>
+<p id="source" class="path"></p>
+<p id="origin" class="path"></p>
+<div id="issues" class="error" role="status"></div>
+<details><summary>관절 선택/연결 근거</summary><pre id="skeletonInfo"></pre></details>
+<details><summary>감사 요약과 미검증 항목</summary><pre id="auditInfo"></pre></details>
+</div>
+</div>
+<script id="pose-data" type="application/json">__POSE_JSON__</script>
+<script>
+"use strict";
+const DATA=JSON.parse(document.getElementById('pose-data').textContent);
+const el=id=>document.getElementById(id), canvas=el('pose'), ctx=canvas.getContext('2d');
+let sequenceIndex=0, framePosition=0, timer=null, yaw=.55, pitch=-.35, pointsOnScreen=[], drag=null;
+const groups=DATA.skeleton.groups;
+const colors={body:'#75b9ff',left_hand:'#ffb875',right_hand:'#82d7b0',other:'#8799ab'};
+const sets=Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,new Set(v)]));
+el('dataset').textContent=`데이터 선언: ${DATA.dataset_version_declared} · 출처 구분: ${DATA.data_kind} · ${DATA.sequences.length} sequence`;
+el('skeletonInfo').textContent=JSON.stringify({id:DATA.skeleton.id,status:DATA.skeleton.status,groups:Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,v.length])),evidence:DATA.skeleton.evidence},null,2);
+el('auditInfo').textContent=JSON.stringify({summary:DATA.audit_summary,verification_state:DATA.verification_state},null,2);
+DATA.sequences.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.id;el('sequence').append(o);});
+Object.keys(groups).forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=`${g} (${groups[g].length}, 개발용)`;el('group').append(o);});
+function seq(){return DATA.sequences[sequenceIndex];}
+function frame(){return seq()?.frames[framePosition];}
+function stop(){if(timer)clearInterval(timer);timer=null;el('play').textContent='재생';}
+function bounds(s){
+  const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];let found=false;
+  for(const f of s.frames)for(const p of f.points)if(p){found=true;for(let k=0;k<3;k++){lo[k]=Math.min(lo[k],p[k],0);hi[k]=Math.max(hi[k],p[k],0);}}
+  if(!found)return {lo:[-1,-1,-1],hi:[1,1,1],center:[0,0,0],span:2,empty:true};
+  return {lo,hi,center:lo.map((v,k)=>v/2+hi[k]/2),span:Math.max(1e-8,...hi.map((v,k)=>v-lo[k])),empty:false};
+}
+const allBounds=DATA.sequences.map(bounds);
+function project(p,b,w,h){
+  const [x,y,z]=p.map((v,k)=>(v-b.center[k])/b.span);
+  const rx=Math.cos(yaw)*x+Math.sin(yaw)*z, rz=-Math.sin(yaw)*x+Math.cos(yaw)*z;
+  const ry=Math.cos(pitch)*y-Math.sin(pitch)*rz;
+  return [w/2+rx*Math.min(w,h)*.75,h/2-ry*Math.min(w,h)*.75];
+}
+function groupOf(n){return sets.left_hand?.has(n)?'left_hand':sets.right_hand?.has(n)?'right_hand':sets.body?.has(n)?'body':'other';}
+function draw(){
+  const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+  const w=rect.width,h=rect.height;ctx.clearRect(0,0,w,h);pointsOnScreen=[];
+  const s=seq(),f=frame();if(!s||!f){ctx.fillStyle='#afbfce';ctx.fillText('표시할 frame 없음. 감사 보고서를 확인하세요.',25,35);return;}
+  const b=allBounds[sequenceIndex],selection=el('group').value,visible=n=>selection==='all'||sets[selection].has(n);
+  const pointMap=new Map(s.joint_names.map((n,i)=>[n,f.points[i]]));
+  const axisSpan=b.span*.35;
+  const origin=project([0,0,0],b,w,h);
+  ['x','y','z'].forEach((name,k)=>{const tip=[0,0,0];tip[k]=axisSpan;const to=project(tip,b,w,h);ctx.strokeStyle=['#d77979','#89c191','#969be8'][k];ctx.lineWidth=1;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(...origin);ctx.lineTo(...to);ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.font='13px system-ui';ctx.fillText(name+' (raw)',to[0]+5,to[1]);});
+  ctx.setLineDash([5,4]);ctx.lineWidth=2;
+  for(const [a,c] of DATA.skeleton.edges){if(!visible(a)||!visible(c))continue;const p=pointMap.get(a),q=pointMap.get(c);if(!p||!q)continue;ctx.strokeStyle=colors[groupOf(c)]||colors.other;ctx.beginPath();ctx.moveTo(...project(p,b,w,h));ctx.lineTo(...project(q,b,w,h));ctx.stroke();}
+  ctx.setLineDash([]);
+  s.joint_names.forEach((n,i)=>{const p=f.points[i];if(!visible(n)||!p)return;const at=project(p,b,w,h);ctx.fillStyle=colors[groupOf(n)]||colors.other;ctx.beginPath();ctx.arc(at[0],at[1],3.5,0,Math.PI*2);ctx.fill();pointsOnScreen.push({name:n,p,at});});
+}
+function update(){
+  const s=seq(),f=frame();if(!s||!f){el('stats').textContent='표시할 frame 없음';el('play').disabled=true;el('frameSlider').disabled=true;draw();return;}
+  el('frameSlider').max=s.frames.length-1;el('frameSlider').value=framePosition;
+  el('frameLabel').textContent=`Frame ${f.frame_index??'번호 없음'} · ${framePosition+1} / ${s.frames.length}`;
+  el('prev').disabled=framePosition===0;el('next').disabled=framePosition===s.frames.length-1;
+  const valid=f.points.filter(Boolean).length;
+  el('stats').textContent=`원본/선택 이름 ${s.joint_names.length}개 · device 3D 수치 유효 ${valid}개 · 누락/invalid ${s.joint_names.length-valid}개 · visibility/confidence unknown`;
+  const b=allBounds[sequenceIndex];el('bounds').textContent=b.empty?'유효한 3D 좌표 없음':['x','y','z'].map((v,k)=>`${v}: ${b.lo[k].toFixed(3)} ~ ${b.hi[k].toFixed(3)} (원본 단위)`).join('\n');
+  el('source').textContent=`원본: ${f.file}`;el('origin').replaceChildren();
+  const uri=f.source_uri||DATA.source_root_uri;
+  if(uri){const a=document.createElement('a');a.href=uri;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Drive 출처';el('origin').append(a);}else el('origin').textContent='외부 출처 unknown';
+  const issues=[...s.issues,...f.issues];el('issues').textContent=issues.length?issues.map(i=>`${i.code} · ${i.location}\n${i.detail}`).join('\n\n'):'이 frame의 필수 배열 수치 검사 통과. 좌표·시간 의미와 전체 sequence 완전성은 미검증.';
+  el('hover').textContent='관절에 마우스를 올리면 이름과 원본 좌표를 확인할 수 있습니다.';draw();
+}
+function step(offset){const s=seq();if(!s)return;framePosition=Math.max(0,Math.min(s.frames.length-1,framePosition+offset));update();}
+el('sequence').onchange=()=>{stop();sequenceIndex=Number(el('sequence').value);framePosition=0;update();};
+el('group').onchange=draw;
+el('frameSlider').oninput=()=>{stop();framePosition=Number(el('frameSlider').value);update();};
+el('prev').onclick=()=>{stop();step(-1);};el('next').onclick=()=>{stop();step(1);};
+el('play').onclick=()=>{if(timer){stop();return;}const s=seq();if(!s||!s.frames.length)return;if(framePosition===s.frames.length-1)framePosition=0;update();el('play').textContent='일시 정지';timer=setInterval(()=>{if(framePosition>=s.frames.length-1){stop();return;}step(1);if(framePosition===s.frames.length-1)stop();},Number(el('interval').value));};
+el('interval').onchange=stop;
+el('xy').onclick=()=>{yaw=0;pitch=0;draw();};el('xz').onclick=()=>{yaw=0;pitch=-Math.PI/2;draw();};el('yz').onclick=()=>{yaw=Math.PI/2;pitch=0;draw();};el('orbit').onclick=()=>{yaw=.55;pitch=-.35;draw();};
+canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY,yaw,pitch];canvas.setPointerCapture(e.pointerId);};
+canvas.onpointerup=()=>{drag=null;};canvas.onpointercancel=()=>{drag=null;};
+canvas.onpointermove=e=>{if(drag){yaw=drag[2]+(e.clientX-drag[0])*.007;pitch=drag[3]+(e.clientY-drag[1])*.007;draw();return;}const r=canvas.getBoundingClientRect();let closest=null,best=12;for(const p of pointsOnScreen){const d=Math.hypot(e.clientX-r.left-p.at[0],e.clientY-r.top-p.at[1]);if(d<best){closest=p;best=d;}}el('hover').textContent=closest?`${closest.name} · [${closest.p.map(v=>v.toFixed(4)).join(', ')}] 원본 단위`:'관절에 마우스를 올리면 이름과 원본 좌표를 확인할 수 있습니다.';};
+new ResizeObserver(draw).observe(canvas);update();
+</script>
+</body>
+</html>

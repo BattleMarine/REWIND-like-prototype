@@ -1,0 +1,8 @@
+# 원본 데이터와 생성 산출물은 코드와 분리한다.
+/data/
+/outputs/
+/checkpoints/
+__pycache__/
+*.py[cod]
+.venv/
+.coverage

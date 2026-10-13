@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.1   |   2026년 10월 12일
+검토 초안 v0.2   |   2026년 10월 13일
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -30,9 +30,61 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-13 현재 상태와 우선 실행 계획
+
+**최신 데이터 상태:** 사용자가 데이터셋을 처음부터 다시 다운로드 중이라고 알렸다. 당분간 실제 데이터 확인·데이터 의존 실행은 보류하며, 아래 18프레임 결과는 재다운로드 전 샘플 검증 이력으로 유지한다. 현재 파일의 존재나 다운로드 완료를 가정하지 않는다. 그동안 코드 검토·합성 fixture 검증·공개 규격 조사는 진행할 수 있으며, 데이터 재확보 후 manifest와 파일 hash부터 다시 확인한다.
+
+전체 다운로드를 기다리지 않고, 확보된 pose JSON으로 데이터 감사와 학습 경로의 진단을 먼저 진행하는 계획이다. 아래 순서는 실행 제안이며 D1~D5의 범위·예산 확정을 대신하지 않는다. 2026-10-13 첫 구현 지시로 1~2번의 사전 도구를 구현했다. 모델 구현·학습은 아직 시작하지 않았다.
+
+**2026-10-13 첫 구현 묶음 결과**
+
+- `rewind_data` 모듈과 CLI에 숫자 frame 정렬·부모 폴더별 sequence 분리·필수 배열/누락/중복 검사·관절 선택·manifest·감사 보고서·로컬 HTML viewer를 구현했다. 원본 좌표 변환과 시간 보간은 하지 않는다.
+- 지정 `Jump__3_/json` 폴더의 0~17번 18개 파일(총 1,540,663 bytes)을 소량 sample로 사용했다. 각 파일의 원본 87관절 및 SHA-256을 보존했고 필수 배열 shape·유한값 검사 오류는 0건이다. 음수 2D 관측 109개를 수치 유효 annotation으로 유지했다. Drive에서 관측한 18개 목록과의 일치는 전체 원본 sequence의 완전성을 의미하지 않는다.
+- 개발용 선택은 body 22개·왼손 21개·오른손 21개이며 양쪽 손목이 body와 겹쳐 고유 관절은 62개다. 관절 이름은 실제 sample에서 확인했으나 선택 및 61개 연결은 시각화용 미검증 가정으로 명시했다. 공식 skeleton 부모 관계나 REWIND 평가 관절 규격으로 확정하지 않았다.
+- 합성 fixture 테스트 17개, 실제 sample smoke, 브라우저 없는 JavaScript DOM/canvas mock 검사 7개를 통과했다. Canvas mock의 그리기 명령을 정적 그림으로 확인했으나 실제 브라우저 화면·조작 검사는 `file://` URL 보안 정책 차단으로 미실행이다.
+- 단위·축·회전·FPS/timestamp·calibration·split·RGB 정합성은 미검증이다. M0/M1 전체 완료와 D1~D5 확정을 선언하지 않는다. 실행법과 데이터 계약은 [M0 JSON 도구 안내](M0_JSON_TOOLS.md)에 기록한다.
+
+**첫 구현 전 샘플 확인 이력과 당시 미확인 범위**
+
+- 사용자는 데이터셋 다운로드를 진행 중이다. 앞선 Drive 읽기에서 확인한 폴더는 `UnrealEgoData2_train_val_pose`이며, 기존 UnrealEgo 우선 시작안과 데이터 버전이 다르다.
+- `Lab_Scene/Day/rp_sophia_rigged_003_ue4/SKM_MenReadingGlasses_Shape_01/001/Jump__3_/json` 목록에 `frame_0.json`~`frame_17.json` 18개가 있었다. 이 중 0·1·17번 파일만 내용을 검사했다. 전체 시퀀스의 다운로드 완료 여부는 확인하지 않았다.
+- 검사한 3개 파일에는 각각 관절 항목 87개와 이름 기준 손가락 항목 40개가 있었다. 각 관절에 좌우 `camera_*_pts2d`, `camera_*_pts3d`, `device_pts3d`가 있으며 해당 배열의 차원 오류·null·NaN·무한대는 발견하지 못했다.
+- 카메라와 device의 위치·회전 필드는 존재하지만, 명시적인 timestamp·visibility·confidence 필드는 없었다. 단위·축·회전 표현·FPS·calibration은 미검증이다. `open3d_rot`도 camera와 device에서 같은 단위라고 가정하지 않는다.
+- 이는 한 시퀀스의 제한적인 구조 확인 결과다. 관절 매핑, 재투영, split, 다른 시퀀스와의 일관성, RGB 확보 상태는 아직 검증하지 않았다. M0 완료나 성능 검증으로 간주하지 않는다.
+
+샘플 근거: [Drive pose 폴더](https://drive.google.com/drive/folders/1hpABBbMVxiH5wFZx3_pTfhu3Xs2d2iYB), [검사한 frame_0.json](https://drive.google.com/file/d/1CAcEjI2YML4kQPuKRRLpWrvOwJzKoHID/view).
+
+| 순서·연결 단계 | 작업과 산출물 | 완료·진입 조건 |
+| --- | --- | --- |
+| 1 · M0 사전 감사 | 소량 JSON 목록과 출처·hash를 담은 manifest, 필드·관절·누락 검사 보고서 | 데이터 버전과 sequence 식별, 파싱 가능 여부와 미확인 필드를 기록한다. 현재 샘플로 시작하고 가능한 경우 서로 다른 5~10개 시퀀스로 확인 범위를 넓힌다. |
+| 2 · M0 로더와 시각화 | 공통 sample 로더, 이름 기반 skeleton 매핑, 3D 정답 재생 | 원본 87개 항목을 보존하면서 모델용 body/hand 관절을 명시적으로 선택한다. 부모 관계·단위·축을 근거와 대조하고, frame 순서·누락·짧은 clip 처리를 검증한다. |
+| 3 · M1 사전 진단 | GT 2D → device-relative 3D의 작은 단일 프레임 regression, 평가·checkpoint 코드 | 1~4개 train clip에서 loss·gradient·과적합·중단/재개를 확인한다. 단위 확인 후 mm 지표를 보고한다. 이 결과는 GT 입력 진단이며 M1 완료가 아니다. |
+| 4 · M0 완료와 M1 baseline | 대응 RGB·calibration·split 확인, 재투영, 2D front-end와 예측 특징 캐시, causal temporal regression | 영상·관절·프레임 정합성 및 분할 중복 검사를 통과한다. 예측 2D로 train/validation 평가를 실행하고 front-end 버전을 고정한다. 전체 RGB 다운로드 완료는 요구하지 않는다. |
+| 5 · M2 | 작은 causal body diffusion teacher에서 시작해 baseline 비교 | 위치 loss의 과적합, 미래 입력 변경 시 과거 출력 불변성, sequence reset을 검증한다. 같은 예측 입력·split에서 regression과 비교한 뒤 규모를 늘린다. |
+| 6 · M3 | Body → hand cascade와 손목 결합 | 조건 없음·GT 상체·예측 상체를 분리 평가하고, 실제 body 예측으로 whole-body 평가를 완료한다. |
+| 7 · M4 | One-step student, 비증류 student 비교, streaming | 동일 noise의 offline causal/streaming 일치와 재시작을 검사한다. 정확도 및 지정 GPU의 모델 단독·전체 pipeline 지연을 측정한다. |
+| 8 · M5~M6 | E1~E3 중 예산에 맞는 단일 변경 실험, 최종 통합 | Validation으로 후보를 선택한 후 고정 test 평가와 새 환경에서의 재현을 수행한다. E4~E8은 선행 결과와 예산을 보고 선택한다. |
+
+**RGB 확보 전의 검증 경계**
+
+- JSON만으로 파싱·관절 매핑·3D 재생·GT 2D 입력 학습 경로를 준비할 수 있다. 완전히 합성한 입력은 shape·mask·gradient 등의 코드 검사에만 사용하고 실제 데이터 결과와 분리한다.
+- GT 입력에는 `input_source=gt_2d` 같은 출처를 기록한다. Confidence가 없는 경우 진단용 입력 처리 규칙을 명시하며, 임의 상수를 예측 confidence나 실제 visibility로 해석하지 않는다. 정답의 수치 유효성과 관측 visibility를 구분한다.
+- 18프레임 목록을 근거로 FPS나 완전한 시퀀스를 가정하지 않는다. 실제 관측 길이에 맞는 짧은 window를 쓰고 padding이 필요하면 mask를 적용한다. 반복 복제로 50프레임짜리 실제 motion을 만들지 않으며 sequence 경계를 넘어 window를 구성하지 않는다.
+- FPS·timestamp 확인 전에는 물리적 시간 단위의 velocity/acceleration loss와 지표를 보류한다. Calibration과 단위가 확인되면 저장된 2D 좌표와 수치 재투영을 비교할 수 있지만, 영상 위 정합성 검증에는 대응 RGB가 필요하다.
+- RGB가 없으면 2D front-end 학습·실제 예측 입력 평가·전체 pipeline 성능 검증은 완료할 수 없다. GT 2D에 주입한 오류도 실제 front-end 오류를 대체하는 성능 근거로 삼지 않는다.
+- 하나의 짧은 시퀀스를 프레임별로 나누어 일반화 성능을 보고하지 않는다. 공식 split 소속을 확인하고 train 진단용 sample을 선택한다. Test sample로 overfit이나 threshold 튜닝을 하지 않는다.
+
+**첫 구현 묶음과 운영 제안**
+
+첫 구현 범위는 위 1~2번인 JSON 감사·공통 로더·정답 시각화로 둔다. 다음 묶음에서 3번 진단 학습을 추가한다. 모듈은 `data`(읽기·관절·좌표), `evaluation`(지표), `models`, `training`으로 역할을 나누고 notebook은 실행 진입점으로 둔다. 구체적인 패키지 경로와 의존성은 구현 시 확정한다.
+
+데이터는 클라우드 원본을 보존하고 필요한 subset만 Colab 런타임 디스크로 옮겨 읽는 방식을 제안한다. Colab 세션 밖에도 manifest·설정·checkpoint·결과를 보관한다. 현재 다운로드 작업은 이 계획 작성으로 중단하거나 변경하지 않는다.
+
+장시간 학습 전에 D2의 실제 GPU·세션 길이·영구 저장 공간·총 예산을 정하고, pilot의 step 시간·VRAM·입출력 시간을 측정한다. 일정은 고정 날짜 대신 위 완료 조건으로 관리한다. D1·D3·D4·D5는 미결정으로 유지하며, JSON 개발에 UnrealEgo2를 활용하는 것과 최종 baseline 데이터셋을 확정하는 것을 구분한다.
+
 ### M0 데이터 확보와 공통 규격
 
-UnrealEgo의 손 annotation이 포함된 시퀀스로 시작하고 UnrealEgo2로 확장한다. 전체 다운로드 전에 sample archive를 확인한다. 공식 안내의 UnrealEgo2 저장 공간은 약 3TB이므로 RGB와 pose를 필요한 범위만 확보하고 depth는 초기 필수 입력에서 제외한다. [3]
+기존 데이터 시작안은 UnrealEgo의 손 annotation이 포함된 시퀀스로 시작하고 UnrealEgo2로 확장하는 것이다. 현재 확보된 UnrealEgo2 JSON은 위 사전 검증 계획에 먼저 활용하되, 최종 baseline 데이터셋·버전·split은 검증 후 결정한다. 전체 다운로드 전에 sample archive를 확인한다. 공식 안내의 UnrealEgo2 저장 공간은 약 3TB이므로 RGB와 pose를 필요한 범위만 확보하고 depth는 초기 필수 입력에서 제외한다. [3]
 
 | 데이터 단계 | 제안 규모 | 목적 |
 | --- | --- | --- |
