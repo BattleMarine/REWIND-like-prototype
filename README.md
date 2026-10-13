@@ -9,6 +9,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - 프로젝트 로드맵 v0.2의 첫 구현 묶음인 M0 사전 JSON 감사·공통 로더·로컬 HTML viewer를 구현했습니다. 전체 완료 범위와 예산은 계속 검토 중입니다.
 - 지정 Drive 폴더의 UnrealEgo2 pose JSON `frame_0`~`frame_17` 18개에서 87관절의 필수 배열 수치 검사를 통과했습니다. 단위·축·회전·시간·calibration·분할·공식 skeleton 검증은 남아 있으며 M0 전체 완료가 아닙니다.
 - 2026-10-13 사용자 안내에 따라 데이터셋을 처음부터 다시 다운로드 중이며 당분간 실제 데이터 확인은 보류합니다. 위 결과는 재다운로드 전 샘플의 검증 기록이며, 현재 파일의 존재나 다운로드 완료를 보장하지 않습니다.
+- 데이터 없이 공식 규격 근거와 M1 준비용 causal window 조립·streaming API를 추가했습니다. 합성 테스트 40개(기존 17 + window 23)와 fixture 실행을 통과했으며 실제 데이터 검증·모델 학습은 포함하지 않습니다.
 - 모델 구현과 학습·평가는 아직 시작하지 않았습니다.
 - Python 표준 라이브러리로 실행하며 설치할 추가 Python 패키지는 없습니다. 합성 테스트와 실제 sample smoke 결과는 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 기록합니다. 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 
@@ -19,6 +20,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [프로젝트 로드맵](docs/ROADMAP.md) | 단계별 목표, 완료 기준, 실험 계획과 검토할 결정 사항 |
 | [에이전트 작업 지침](AGENTS.md) | 구현·실험·검증·문서 수정 시 지켜야 할 원칙 |
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
+| [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
+| [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 
 프로젝트 계획은 `docs/ROADMAP.md`를 기준으로 관리합니다. 이후 변경은 문서에 반영합니다. 로드맵의 미결정 항목 D1~D5와 잠정 목표는 확정된 요구사항과 구분합니다.
 
@@ -68,6 +71,17 @@ python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton confi
 ```
 
 위 데이터 의존 명령은 sample과 provenance가 다시 준비된 뒤 실행합니다. 기존 검증에 사용한 파일은 Git에 포함되지 않으며 현재 가용성을 가정하지 않습니다. 합성 fixture 단위 테스트는 데이터셋 없이 실행할 수 있습니다. 일반 데이터에는 `--input`을 바꾸고 `--provenance`를 생략할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 로컬 브라우저에서 열도록 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. 자세한 데이터 준비·선택 규칙은 [도구 안내](docs/M0_JSON_TOOLS.md)를 확인합니다.
+
+## 데이터 없이 causal window 계약 실행
+
+현재·과거만 조립하고 gap·sequence 경계에서 history를 초기화합니다. 중복/역순과 구조 오류는 거부하며, 부족한 과거는 `None` + `time_valid`로 표시합니다. Field별 mask와 unknown visibility를 보존하고, FPS나 실제 시간을 만들지 않습니다. 실제 데이터나 기존 sample 산출물이 필요하지 않습니다.
+
+```sh
+python -m unittest discover -s tests -v
+python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_windows.json
+```
+
+Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 길이 정의, 명시적 container 경계의 streaming reset, 관절·단위·calibration 미확인 범위와 다음 진입 조건은 [데이터·window 계약](docs/DATA_CONTRACT.md)에 기록합니다. 기존 개발용 skeleton은 미검증 설정으로 유지합니다.
 
 ## 평가 원칙
 

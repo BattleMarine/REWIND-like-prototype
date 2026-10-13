@@ -34,6 +34,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **최신 데이터 상태:** 사용자가 데이터셋을 처음부터 다시 다운로드 중이라고 알렸다. 당분간 실제 데이터 확인·데이터 의존 실행은 보류하며, 아래 18프레임 결과는 재다운로드 전 샘플 검증 이력으로 유지한다. 현재 파일의 존재나 다운로드 완료를 가정하지 않는다. 그동안 코드 검토·합성 fixture 검증·공개 규격 조사는 진행할 수 있으며, 데이터 재확보 후 manifest와 파일 hash부터 다시 확인한다.
 
+**2026-10-13 데이터 없는 후속 묶음 결과**
+
+- 사용자 승인 범위로 [데이터 규격 근거](DATA_CONTRACT.md)와 M1 준비용 causal window 조립 모듈을 추가했다. 공식 안내의 16관절 평가/32+40 annotation, 과거 raw 87 이력, dev 62를 구분하고 저자 코드 revision·논문 페이지를 기록했다. 실제 archive 검증과 공식 자료 설명을 구분하며 skeleton·단위·회전·시간을 확정하지 않았다.
+- `CausalWindowStream`과 `offline_windows`는 현재·과거 snapshot만 조립하고 부족한 과거는 None/time_valid로 구분한다. Gap·새 sequence·명시적 container 경계에서 history를 분리하며 중복/역순과 구조 오류는 거부한다. 선택 밖 미래-only 관절 union의 issue를 과거 window에 복사하지 않는다. Field mask/unknown visibility와 snapshot 격리를 유지한다.
+- Python 합성 테스트 40개(기존 17 + window 23)와 6개 window fixture의 offline/streaming 일치 검증을 통과했다. 실제 데이터·Drive·이전 실제 sample 산출물 접근, smoke_sample 재실행, 모델·학습·projection 구현은 하지 않았다.
+- M0/M1 전체 완료 및 D1~D5 확정은 보류한다. 다음 진입 조건은 재다운로드 subset의 manifest/hash·관절·split 재감사와 좌표·단위·FPS/timestamp·calibration 대조다. 이후 GT 2D 진단 학습은 별도 지시 범위로 진행한다.
+
 전체 다운로드를 기다리지 않고, 확보된 pose JSON으로 데이터 감사와 학습 경로의 진단을 먼저 진행하는 계획이다. 아래 순서는 실행 제안이며 D1~D5의 범위·예산 확정을 대신하지 않는다. 2026-10-13 첫 구현 지시로 1~2번의 사전 도구를 구현했다. 모델 구현·학습은 아직 시작하지 않았다.
 
 **2026-10-13 첫 구현 묶음 결과**

@@ -16,6 +16,8 @@ Python 3.10 이상과 표준 라이브러리만 필요하다. `rewind_data`는 �
 | `tests/test_data.py` | 합성 fixture의 정상·오류 경로 검증 |
 | `tests/smoke_sample.py` | 실제 dataset sample의 보존·선택·mask 검사 |
 | `tests/test_viewer.cjs` | 브라우저 없는 JavaScript DOM/canvas mock 검사 |
+| `rewind_data/windows.py` | Field별 snapshot과 causal offline/streaming window 조립 |
+| `rewind_data/window_fixture.py`, `tests/test_windows.py` | 데이터 없는 합성 window 실행·검증 |
 
 프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이 세션은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다.
 
@@ -61,7 +63,7 @@ outputs/m0_sample/viewer.html
 
 ## 로더·관절·mask 계약
 
-- `frame_<정수>.json`을 숫자 번호로 정렬한다. 입력 root에 상대적인 각 부모 폴더가 하나의 sequence다. 중첩 폴더를 합치거나 경계를 넘어 window를 만들지 않는다. Window/padding/시간 보간은 이번 구현 범위에 없다.
+- `frame_<정수>.json`을 숫자 번호로 정렬한다. 입력 root에 상대적인 각 부모 폴더가 하나의 sequence다. 중첩 폴더를 합치거나 경계를 넘어 window를 만들지 않는다. 감사 CLI는 window/padding/시간 보간을 하지 않는다. 후속 window 모듈의 None padding 계약은 아래에 별도로 설명한다.
 - 원본 `joints` 전체와 camera/device metadata를 `FrameSample.raw_document`에 보존한다. JSON 객체 내부 중복 key, JSON 오류, 예상하지 않은 파일 이름, `frame` 값과 파일 번호 불일치도 보고한다.
 - 필수 field는 좌우 `camera_*_pts2d`(2개), 좌우 `camera_*_pts3d`(3개), `device_pts3d`(3개)다. 숫자 배열의 길이·유한값을 검사하며 bool/null/string/중첩 배열을 유효 숫자로 취급하지 않는다.
 - 같은 sequence의 관측 관절 합집합 및 선택 설정의 관절을 기준으로 누락을 찾는다. 숫자 frame 중복은 파일을 삭제하거나 한쪽을 선택하지 않고 두 경로를 보고한다. 내부 frame gap은 inclusive 범위로 기록하며 임의의 처음/마지막 번호를 가정하지 않는다. Inventory가 있으면 로컬 범위와 비교한다.
@@ -79,7 +81,20 @@ Viewer는 좌표·설정을 HTML 안에 포함해 외부 라이브러리/서버/
 
 Invalid/missing 관절과 그 관절에 연결된 뼈는 그리지 않는다. 연결은 미검증을 나타내는 점선이다. 재생은 관측 frame 순서만 따르고 gap을 메우지 않으며 sequence 끝에서 정지한다. 100/200/500ms는 미리보기 간격이며 데이터 FPS·실제 timestamp가 아니다. Sequence를 바꾸면 재생을 멈추고 첫 frame으로 돌아간다.
 
-## 2026-10-13 검증 결과와 제한
+## 데이터 없는 후속 window 묶음
+
+2026-10-13 재다운로드 중 진행한 후속 묶음은 공개 자료 조사와 causal 데이터 window 조립에 한정했다. [데이터·window 계약](DATA_CONTRACT.md)에 자료 URL/revision, 16·72·raw 87 이력·dev 62 구분, 단위·회전·시간·calibration 검증 경계와 전체 API 정책을 기록했다. 이 조사로 원본 감사 도구의 `unknown` 상태나 개발용 skeleton을 검증 완료로 올리지 않았다.
+
+```sh
+python -m unittest discover -s tests -v
+python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_windows.json
+```
+
+합성 테스트 40개(기존 17 + window 23)가 통과했고 fixture는 offline/streaming이 같은 6 windows를 생성했다. 현재를 포함한 총 길이로 왼쪽 None padding을 하고, 실제 관측 slot과 `time_valid`로 구분한다. Gap은 reset, 중복/역순은 rejection이다. 새 sequence ID는 자동 reset하며 같은 ID의 별도 container/빈 clip 경계는 streaming 호출자도 명시적으로 reset해야 한다. 선택 joint/field snapshot은 원본과 cache의 일치를 확인하고 nested tuple로 격리한다. Annotation 누락은 해당 field의 None/false mask로 유지하며 구조 오류는 상태 변경 전에 거부한다.
+
+이번 검증은 Drive·기존 raw·이전 실제 sample 산출물에 접근하지 않았다. 기존 sample smoke·viewer JS 검증을 재실행하지 않았으며 아래 표는 이전 묶음의 이력이다. 합성 fixture는 annotation 경로의 코드 계약만 검증하며 모델 정확도·projection·실제 FPS·실시간성 결과가 아니다.
+
+## 첫 묶음의 2026-10-13 검증 이력과 제한
 
 | 검사 | 실제 실행 결과 |
 | --- | --- |
