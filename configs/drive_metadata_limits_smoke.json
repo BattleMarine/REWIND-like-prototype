@@ -1,0 +1,9 @@
+{
+  "max_files": 8,
+  "max_requests": 8,
+  "max_response_bytes": 16384,
+  "max_transfer_bytes": 131072,
+  "max_elapsed_seconds": 30.0,
+  "request_timeout_seconds": 5.0,
+  "io_chunk_bytes": 4096
+}

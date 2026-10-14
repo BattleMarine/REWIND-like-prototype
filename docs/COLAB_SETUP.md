@@ -4,9 +4,11 @@
 
 오케스트레이션 검토에서는 노트북의 환경 확인·테스트·합성 학습·재개·평가·캐시 셀을 Windows CPU에서 실행했습니다. 59개 테스트가 통과했고, 결과 17개 파일의 로컬 복사·SHA-256 일치를 확인했습니다. 업로드·Drive 인증 셀은 실행하지 않았으며 로컬 복사 검증을 실제 Drive 전송 성공으로 해석하지 않습니다.
 
-후속 압축 준비 구현까지 포함한 최신 Python 회귀검사는 83개가 통과했습니다(기존 59개 + 압축 준비 24개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 전송을 검증한 수치는 아닙니다.
+후속 압축 준비·metadata/pilot 구현까지 포함한 최신 Python 회귀검사는 93개가 통과했습니다(기존 59개 + 압축 준비 24개 + metadata/pilot 10개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 전송을 검증한 수치는 아닙니다.
 
 압축 준비 노트북은 별도 로컬 ZIP·임시 폴더에서 코드 추출·커널 import와 합성 추출/재사용/매칭을 실행해 RGB 8개·pose 4개, 대응 triplet 4개를 확인했습니다. 업로드 UI는 모의 호출했고 실제 Drive 분기는 비활성으로 검사했습니다. 노트북 구문 검증과 로컬 실행 결과를 실제 Colab 인증 성공으로 해석하지 않습니다.
+
+새 metadata·pilot 활성 분기도 모의 인증/session으로 검사해 pose 4개 추출, 보고서 일치, 선택 변경 거부와 실패 시 이전 결과 폐기를 확인했습니다. 별도로 requests 2.34.2·urllib3 2.8.0·google-auth 2.62.0의 실제 전송 코드를 익명 자격과 로컬 서버로 대조했습니다. 실제 Google API·계정 인증은 호출하지 않았으므로 Colab의 버전·인증·응답 조건은 첫 실행에서 확인해야 합니다.
 
 ## 준비할 파일과 실행 범위
 
@@ -88,7 +90,7 @@ Drive 마운트와 Drive API를 통한 부분 읽기는 별개입니다. `drive.
 
 ## 5. 실제 데이터로 넘어가기 전
 
-먼저 `archive_prepare.ipynb`를 별도로 업로드하고 같은 revision의 소스 ZIP을 가져옵니다. CPU에서 합성 archive 진단을 실행한 뒤, [부분 압축 준비 안내](ARCHIVE_PREPARATION.md)에 따라 Drive 파일 ID·크기·버전을 담은 manifest와 작은 읽기 상한을 준비합니다. 실제 Drive 읽기에는 노트북의 Colab 계정 인증과 `AuthorizedSession`이 필요합니다. 결과 저장용 `drive.mount()`와 원본의 HTTP Range 읽기는 서로 다른 연결입니다.
+먼저 `archive_prepare.ipynb`를 별도로 업로드하고 같은 revision의 소스 ZIP을 가져옵니다. CPU에서 합성 archive 진단을 실행한 뒤, [부분 압축 준비 안내](ARCHIVE_PREPARATION.md)에 따라 읽을 Drive 파일을 선택합니다. 아래 metadata 단계가 인증된 API에서 크기·버전을 확인해 manifest를 생성하므로 이 값을 직접 채우지 않습니다. 실제 Drive 읽기에는 노트북의 Colab 계정 인증과 `AuthorizedSession`이 필요합니다. 결과 저장용 `drive.mount()`와 원본의 HTTP Range 읽기는 서로 다른 연결입니다.
 
 구현은 `000`부터 이어지는 조각을 작은 바이트 범위로 읽고 gzip/tar를 순차 해제합니다. 중간 조각만 독립 해제하거나 전체 조각을 합친 파일을 만들지 않습니다. 필요한 파일의 위치가 뒤쪽이면 선택하지 않은 앞부분도 읽어야 하므로, 작은 추출본이 작은 전송량을 보장하지 않습니다. 기본 상한·중단 이유·지원하는 응답 조건은 부분 압축 준비 안내를 따릅니다. 상한에 도달하면 보고서를 확인하고 다음 실행의 비용을 판단합니다.
 
@@ -99,6 +101,18 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 로컬 검토에서는 이전에 확보한 공식 서버 RGB 2 MiB·pose 256 KiB 구간을 새 추출기로 재생해 PNG 2개·JSON 16개의 기존 SHA-256 일치를 확인했습니다. 이 구간에서는 좌우 RGB·pose가 모두 대응하는 프레임이 0개입니다. 이는 사용자 Drive 복사본, 실제 Colab 인증·전송, 전체 archive 무결성 또는 학습 sample 확보를 검증한 결과가 아닙니다.
 
 특히 `train_val` 폴더명만으로 train 소속을 확정하거나, unknown 단위·좌표를 임의로 검증 완료 표시하지 않습니다. 준비된 small sample과 명시적 계약을 얻은 뒤 GT 입력 진단, 예측 입력 baseline 순서로 진행합니다. 한 시퀀스를 프레임별로 나누어 일반화 성능을 보고하지 않습니다.
+
+### Drive 파일 선택부터 소량 읽기까지
+
+1. **CPU 런타임**에서 준비 노트북의 환경·소스 ZIP·사전 테스트 34개·합성 진단을 실행합니다.
+2. 선택 입력에 `archive_id`, `dataset_version`, `kind`(`rgb` 또는 `pose`), 원본의 `total_parts`, 읽을 조각의 `index`·`name`·`file_id`를 넣습니다. `drive_part_selection_v1` JSON을 업로드하거나 노트북에서 직접 입력할 수 있습니다. 파일 공유 URL의 `/d/` 뒤 식별자가 file ID이며, 폴더 ID와 혼동하지 않습니다. 목록은 `000`부터 연속해야 합니다. `total_parts`는 현재 다운로드된 개수가 아니라 공식 배포 목록 등으로 확인한 원본 조각 수입니다.
+3. `INPUT_MODE`를 직접 입력이면 `"dict"`, 선택 JSON 업로드이면 `"json_upload"`로 정합니다. **`RUN_DRIVE_METADATA = True`만 활성화**해 계정을 인증합니다. 파일 ID·이름·유형·다운로드 가능 여부·크기·version·modifiedTime을 검사하고, 모두 통과한 경우에만 `archive_manifest.json`과 `metadata_report.json`을 만듭니다. 이 단계는 압축 본문을 읽지 않습니다. 실패하면 보고서의 중단 이유를 확인합니다.
+4. manifest와 읽기 상한을 확인하고, `SELECTED_MEMBER_GLOBS`에 저장할 member glob을 입력한 뒤 **`RUN_DRIVE_PILOT = True`를 별도로 활성화**합니다. 원본 내부 시퀀스 경로를 아직 모르면 작은 조사 목적의 glob을 명시적으로 선택할 수 있지만, 기존 전송·시간·파일 수 상한을 유지합니다. 실패·0개 추출 시 자동으로 범위를 늘리거나 재시도하지 않습니다. Glob만 바꿀 때는 별도 셀에서 해당 변수만 설정합니다. 입력 셀 전체를 다시 실행하면 metadata 결과가 초기화되므로 metadata부터 다시 실행합니다.
+5. `pilot_report.json`에서 완전 파일 수, 재사용 검사, 전송량·시간, 중단 이유와 gzip CRC 상태를 확인합니다. 추출 manifest·metadata 보고서·pilot 보고서를 함께 보관합니다. `train_ready=false`는 유지되며 한 archive의 읽기 성공만으로 좌우 RGB·pose 대응이나 학습 준비가 완료되지 않습니다.
+
+Metadata 기본값은 최대 8개 파일·8회 요청·응답당 16 KiB·누적 본문 128 KiB·30초입니다. 이후 압축 준비 기본값은 별도로 본문 8 MiB·60초이며 두 단계 비용은 합쳐서 판단합니다. 이 값은 개발용 시작점이며 실제 Colab에서 측정한 처리량이나 운영 예산이 아닙니다. 최초 인증, transport 내부 처리와 원본을 앞에서부터 다시 읽는 비용도 고려합니다.
+
+Metadata 조회와 media 읽기는 모두 기본 비활성입니다. 같은 커널에서 이전 실행 결과가 남아 있더라도 선택 입력을 바꿨다면 metadata부터 다시 생성합니다. 셀 실패 이후의 오래된 manifest를 그대로 사용하지 않습니다.
 
 ## 6. 세션 종료와 재시작
 

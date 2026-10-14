@@ -34,12 +34,18 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 이후 `rewind_archive`로 저장된 공식 prefix를 로컬 재생해 PNG 2개·JSON 16개의 hash를 대조했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 과거 18프레임 sample과 이번 prefix의 16 pose 파일은 다른 검증 이력이다. 원본 압축을 보존하고 필요한 파일만 런타임에 추출하는 운영 결정을 유지한다. 제한된 준비 기능과 별도 합성 notebook을 구현했으며 조사·합성/부분 실행으로 M0/M1 완료를 선언하지 않는다.
 
+**2026-10-14 Colab pilot 진입 준비 후속 묶음 — 실제 실행 대기**
+
+- 명시한 동일 archive의 연속 part ID·기대 이름·total_parts에서 metadata-only manifest를 생성한다. API의 실제 size/version/modifiedTime·파일 유형·trashed·canDownload를 검사하고 빈/누락/불일치 값·중복·혼합 archive를 거부한다. 검색·media·자동 재시도 없이 metadata 상한과 실패 report를 기록하며 실패 시 유효 manifest를 남기지 않는다.
+- 준비 notebook을 선택 dict/JSON → 별도 기본 비활성 metadata/auth → 별도 기본 비활성 bounded pilot/verify/report로 연결했다. 선택 변경·metadata 재실행 실패는 이전 결과를 폐기하고 pilot을 차단한다. 한 archive만의 준비 진단이며 stereo pair·M1 학습 완료가 아니다. Metadata 기본 128KiB/30초와 준비 기본8MiB/60초는 별도 개발 상한이다.
+- 전체 **93개** 테스트와 fresh ZIP notebook의 기본 auth0·합성 triplet4, mock metadata/pilot·선택 변경·실패 재실행·JSON 업로드를 확인했다. 실제 requests/urllib3/google-auth는 AnonymousCredentials+loopback에서 metadata3요청672bytes(media0) → 준비9요청1756bytes → pose4/verify/persist 일치를 확인했다. 실제 Google 요청·인증0이며 Colab/Drive 준비 비용·완전한 실제 clip·운영 예산과 D1~D5는 미확정이다. [사용자 입력과 보고서](ARCHIVE_PREPARATION.md#drive-metadata에서-manifest와-pilot으로)를 따른다.
+
 **2026-10-14 M0/M1 실제 입력 준비 기반 묶음 — 부분 구현**
 
 - `rewind_archive`에 명시적 source/part manifest와 상한 config, 연속 000-prefix의 local/HTTP Range 읽기, bounded gzip/tar 선택 추출을 구현했다. 정확한 206·범위·길이·원본 validator를 검사하고 200 본문 전체를 읽지 않는다. GNU LongName/PAX metadata도 제한하고 unsafe 경로·link/special·중복을 거부한다. 전송 body·협력적 시간·해제/IO buffer·파일/disk·metadata/range 수와 중단 사유를 기록한다. 프로세스 RSS·DNS/auth/OS 전체 hard limit을 보장하지 않는다.
 - 완전 regular payload+padding만 남기고 잘린 파일은 제거한다. Gzip EOF/CRC와 tar 종료, 개별 완전 파일을 구분한다. CRC 오류·원본 변경·unsafe 실패는 추출 전체를 unusable로 기록하고 reuse/match에서 거부한다. 실제 운영 예산은 미정이며 `archive_limits_smoke.json`은 개발용 기본값이다.
 - 이름 기반 좌우 RGB/pose의 sequence·숫자 frame 매칭, 관측 gap·누락·완전 triplet 수와 개별 hash 재사용 검사를 제공한다. Split은 unknown, 원본 motion은 unverified이며 triplet만으로 train_ready를 올리지 않는다.
-- 최신 전체 Python 회귀 **83개**(기존 59+archive 24)를 CPU 환경에서 통과했다. 실제 HTTP는 로컬 loopback이고 Drive session은 모의 계약 검사다. 기존 공식 prefix 로컬 재생은 PNG 2·JSON16의 과거 18개 SHA 일치, 마지막 payload 잘림·CRC false·partial 잔여0·verify 통과를 확인했다. 서로 다른 2 sequence라 triplet0/incomplete frame18이며 전체 archive/사용자 Drive 검증이 아니다.
+- 당시 전체 Python 회귀 **83개**(기존 59+archive 24)를 CPU 환경에서 통과했다. 실제 HTTP는 로컬 loopback이고 Drive session은 초기 모의 계약 검사다. 기존 공식 prefix 로컬 재생은 PNG 2·JSON16의 과거 18개 SHA 일치, 마지막 payload 잘림·CRC false·partial 잔여0·verify 통과를 확인했다. 서로 다른 2 sequence라 triplet0/incomplete frame18이며 전체 archive/사용자 Drive 검증이 아니다.
 - [준비 notebook](../notebooks/archive_prepare.ipynb)의 별도 ZIP/임시 checkout 로컬 실행을 확인했다. 합성 RGB8+pose4→triplet4/train_ready=false, source 추출·커널 import·기본 disabled Drive 분기를 확인했고 모든 code cell 문법·빈 출력 상태를 검사했다. 실제 Colab 업로드·Drive 인증/API·준비 비용·운영 상한과 실제 좌우+pose clip은 미검증이다.
 - 자세한 계약·측정 범위·지원 포맷은 [압축 준비 안내](ARCHIVE_PREPARATION.md)를 따른다. M0/M1 전체 완료와 D1~D5 확정, 실제 RGB loader·좌표 변환·EfficientNet/M2 구현은 이 묶음에 포함하지 않는다.
 

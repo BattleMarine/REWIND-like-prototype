@@ -78,7 +78,7 @@ outputs/m0_sample/viewer.html
 
 `rewind_data --input`은 여전히 추출 JSON 디렉터리만 처리한다. 준비 CLI의 `output/files/<sequence>/json` 아래 원하는 디렉터리를 선택해 기존 감사에 전달할 수 있으나, 감사 오류·단위·좌표·calibration·시간·공식 split을 확인해야 한다. 추출/이름 매칭만으로 M1 실제 입력을 만들거나 train_ready=true로 올리지 않는다.
 
-최신 Python 전체 83개 테스트(기존 59+archive 24)를 통과했다. 오케스트레이션의 기존 공식 prefix 로컬 재생은 RGB 2MiB의 PNG 2개·pose256KiB의 JSON16개, 이전 18개 SHA 일치·잘린 마지막 payload·CRC false·triplet0을 확인했다. 공식 서버 재다운로드·사용자 Drive 실행·Colab 인증/API·운영 비용 검증은 아니다. 새 준비 notebook의 실제 Colab 경로도 미검증이다. 압축 원본 목록 관측과 과거 sample 이력을 전체 archive 검증으로 해석하지 않는다. 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
+압축 준비 코어 구현 당시 Python 전체 83개 테스트(기존 59+archive 24)를 통과했다. 후속 metadata/pilot을 포함한 최신 검증은 로드맵을 따른다. 오케스트레이션의 기존 공식 prefix 로컬 재생은 RGB 2MiB의 PNG 2개·pose256KiB의 JSON16개, 이전 18개 SHA 일치·잘린 마지막 payload·CRC false·triplet0을 확인했다. 공식 서버 재다운로드·사용자 Drive 실행·Colab 인증/API·운영 비용 검증은 아니다. 새 준비 notebook의 실제 Colab 경로도 미검증이다. 압축 원본 목록 관측과 과거 sample 이력을 전체 archive 검증으로 해석하지 않는다. 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
 
 ## 로더·관절·mask 계약
 

@@ -8,6 +8,7 @@ from rewind_data.audit import read_json
 from .contracts import Limits, PreparationError, canonical
 from .extraction import prepare
 from .matching import match_extractions, verify_extraction
+from .pilot import run_pilot
 
 
 def read_bounded_json(path, maximum=128*1024):
@@ -23,11 +24,12 @@ def read_bounded_json(path, maximum=128*1024):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="분할 archive의 bounded 준비; 실제 학습 준비 판정 없음")
     sub = parser.add_subparsers(dest="command",required=True)
-    extract = sub.add_parser("extract")
-    extract.add_argument("--manifest",type=Path,required=True)
-    extract.add_argument("--limits",type=Path,required=True)
-    extract.add_argument("--include",action="append",required=True,help="완전한 archive member path glob, 반복 가능")
-    extract.add_argument("--output",type=Path,required=True)
+    for command in ("extract","pilot"):
+        extract = sub.add_parser(command)
+        extract.add_argument("--manifest",type=Path,required=True)
+        extract.add_argument("--limits",type=Path,required=True)
+        extract.add_argument("--include",action="append",required=True,help="완전한 archive member path glob, 반복 가능")
+        extract.add_argument("--output",type=Path,required=True)
     match = sub.add_parser("match")
     match.add_argument("--extraction",type=Path,action="append",required=True)
     match.add_argument("--output",type=Path,required=True)
@@ -36,10 +38,11 @@ def main(argv=None):
     verify.add_argument("--manifest",type=Path,required=True,help="원본 manifest 동일성 검사; 네트워크는 읽지 않음")
     args = parser.parse_args(argv)
     try:
-        if args.command=="extract":
-            report = prepare(read_bounded_json(args.manifest),args.output,args.include,
+        if args.command in ("extract","pilot"):
+            operation=prepare if args.command=="extract" else run_pilot
+            report = operation(read_bounded_json(args.manifest),args.output,args.include,
                 Limits.from_dict(read_bounded_json(args.limits)),base=args.manifest.parent)
-            print(json.dumps({"stop_reason":report["stop_reason"],"complete_files":len(report["files"]),
+            print(json.dumps({"stop_reason":report["stop_reason"],"complete_files":len(report["files"]) if args.command=="extract" else report["complete_files"],
                 "inspection_candidates_usable":report["inspection_candidates_usable"],
                 "whole_archive_integrity_verified":report["whole_archive_integrity_verified"],"train_ready":False,"stats":report["stats"]},indent=2))
             return 0 if report["inspection_candidates_usable"] else 1
