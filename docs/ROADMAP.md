@@ -32,7 +32,16 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-14 현재 상태와 우선 실행 계획
 
-**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. Drive 압축 원본을 유지하고 필요한 시퀀스만 런타임에 추출하는 운영 결정은 유지한다. 압축 준비 기능은 아직 미구현이고 별도 합성 학습 notebook을 준비했다. 조사·합성 실행 결과만으로 M0/M1 완료를 선언하지 않는다.
+**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 이후 `rewind_archive`로 저장된 공식 prefix를 로컬 재생해 PNG 2개·JSON 16개의 hash를 대조했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 과거 18프레임 sample과 이번 prefix의 16 pose 파일은 다른 검증 이력이다. 원본 압축을 보존하고 필요한 파일만 런타임에 추출하는 운영 결정을 유지한다. 제한된 준비 기능과 별도 합성 notebook을 구현했으며 조사·합성/부분 실행으로 M0/M1 완료를 선언하지 않는다.
+
+**2026-10-14 M0/M1 실제 입력 준비 기반 묶음 — 부분 구현**
+
+- `rewind_archive`에 명시적 source/part manifest와 상한 config, 연속 000-prefix의 local/HTTP Range 읽기, bounded gzip/tar 선택 추출을 구현했다. 정확한 206·범위·길이·원본 validator를 검사하고 200 본문 전체를 읽지 않는다. GNU LongName/PAX metadata도 제한하고 unsafe 경로·link/special·중복을 거부한다. 전송 body·협력적 시간·해제/IO buffer·파일/disk·metadata/range 수와 중단 사유를 기록한다. 프로세스 RSS·DNS/auth/OS 전체 hard limit을 보장하지 않는다.
+- 완전 regular payload+padding만 남기고 잘린 파일은 제거한다. Gzip EOF/CRC와 tar 종료, 개별 완전 파일을 구분한다. CRC 오류·원본 변경·unsafe 실패는 추출 전체를 unusable로 기록하고 reuse/match에서 거부한다. 실제 운영 예산은 미정이며 `archive_limits_smoke.json`은 개발용 기본값이다.
+- 이름 기반 좌우 RGB/pose의 sequence·숫자 frame 매칭, 관측 gap·누락·완전 triplet 수와 개별 hash 재사용 검사를 제공한다. Split은 unknown, 원본 motion은 unverified이며 triplet만으로 train_ready를 올리지 않는다.
+- 최신 전체 Python 회귀 **83개**(기존 59+archive 24)를 CPU 환경에서 통과했다. 실제 HTTP는 로컬 loopback이고 Drive session은 모의 계약 검사다. 기존 공식 prefix 로컬 재생은 PNG 2·JSON16의 과거 18개 SHA 일치, 마지막 payload 잘림·CRC false·partial 잔여0·verify 통과를 확인했다. 서로 다른 2 sequence라 triplet0/incomplete frame18이며 전체 archive/사용자 Drive 검증이 아니다.
+- [준비 notebook](../notebooks/archive_prepare.ipynb)의 별도 ZIP/임시 checkout 로컬 실행을 확인했다. 합성 RGB8+pose4→triplet4/train_ready=false, source 추출·커널 import·기본 disabled Drive 분기를 확인했고 모든 code cell 문법·빈 출력 상태를 검사했다. 실제 Colab 업로드·Drive 인증/API·준비 비용·운영 상한과 실제 좌우+pose clip은 미검증이다.
+- 자세한 계약·측정 범위·지원 포맷은 [압축 준비 안내](ARCHIVE_PREPARATION.md)를 따른다. M0/M1 전체 완료와 D1~D5 확정, 실제 RGB loader·좌표 변환·EfficientNet/M2 구현은 이 묶음에 포함하지 않는다.
 
 **2026-10-14 M1 학습 기반 구현 묶음 결과 — 전체 완료 아님**
 
@@ -91,7 +100,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **첫 구현 묶음과 운영 제안**
 
-첫 구현 묶음은 위 1~2번인 JSON 감사·공통 로더·정답 시각화 도구를 제공했다. 2026-10-14에는 실제 데이터를 가정하지 않는 합성 학습 기반을 먼저 구현했다. 압축 원본에서 small sample을 준비·검증하고 관절·좌표·단위와 split 진입 조건을 충족한 뒤 실제 3번 진단 학습으로 진행한다. JSON/window는 `rewind_data`, M1 tensor·모델·지표·학습은 `rewind_m1`에 분리하고 notebook을 실행 진입점으로 둔다. 표준 라이브러리 M0와 PyTorch M1 환경을 구분한다.
+첫 구현 묶음은 위 1~2번인 JSON 감사·공통 로더·정답 시각화 도구를 제공했다. 2026-10-14에는 합성 학습 기반과 이후 제한된 archive 준비 기능을 구현했다. 실제 small sample을 준비·검증하고 관절·좌표·단위와 split 진입 조건을 충족한 뒤 실제 3번 진단 학습으로 진행한다. JSON/window는 `rewind_data`, archive 준비는 `rewind_archive`, M1 tensor·모델·지표·학습은 `rewind_m1`에 분리하고 별도 notebook을 실행 진입점으로 둔다. 표준 라이브러리 M0/준비 도구와 PyTorch M1 환경을 구분한다.
 
 데이터 보관·추출 방식은 아래의 2026-10-13 운영 결정에 따른다. Drive 압축 원본과 영구 저장할 manifest·설정·checkpoint·결과를 런타임 추출본과 분리한다. 문서 반영으로 현재 다운로드 작업을 중단하거나 변경하지 않는다.
 
@@ -112,7 +121,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - 이 시험은 공식 서버의 원본에 대한 조사다. Drive 복사본과의 바이트 동일성, Drive 인증·Range 실제 응답, Colab 실행·처리량, 좌우 RGB/pose 대응 및 학습은 검증하지 않았다. 초기 RGB 8MiB 요청은 본문 읽기 제한 시간 45초에 걸려 중단했고 더 작은 요청으로 확인했다. 안정적인 처리 속도의 근거로 사용하지 않는다.
 - 조사용 스크립트·부분 바이트·로컬 검사 기록은 Git 제외 경로 `outputs/partial_archive_probe/`에 두었다. 다른 checkout에 존재한다고 가정하지 않으며, 현재 CLI의 정식 기능이나 재현 가능한 Colab 준비 모듈로 간주하지 않는다.
 
-**압축 준비 계획 — 아래 기능은 아직 미구현**
+**준비 흐름과 현재 구현 경계**
 
 1. 필요한 환경의 archive ID와 분할 파일 목록·순서·크기·변경 여부 및 검사 가능한 hash를 확인한다. 전체 archive 준비 여부와 `000`부터 연속된 prefix의 가용성을 구분한다. 중간 누락이나 잘린 파일을 건너뛰어 계속 해제하지 않는다.
 2. Colab에서 인증된 Drive API로 제한된 바이트 범위를 읽고, HTTP 206·Content-Range·받은 길이를 확인한다. 범위가 무시되어 전체 응답이 오거나 원본이 바뀌면 중단한다. 단순 `drive.mount()` 읽기가 동일한 전송량 상한을 보장한다고 가정하지 않는다.
@@ -120,9 +129,9 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 4. RGB·pose의 내부 순서에 의존하지 않고 sequence/frame 식별자로 좌우 영상·정답을 대조한다. Frame 정렬, 누락·연속성, split 및 원본 motion 중복을 확인한다. 매칭되지 않은 파일을 조용히 버려 편향된 평가 sample을 만들지 않는다. 한쪽 영상과 일부 JSON의 추출만으로 학습 준비 완료를 선언하지 않는다.
 5. 검증된 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 실제 데이터용 특징 계약과 RGB 로더 연결을 준비한 뒤 `rewind_m1` 학습 기반으로 배치를 구성해 GPU에 전달한다. 이 실제 데이터 연결은 아직 구현·검증하지 않았다. 같은 런타임에서는 추출본을 재사용하며 매 배치·epoch마다 원본을 처음부터 해제하지 않는다. 결과·checkpoint·manifest는 Drive 등 영구 저장소에 분리 보관하고 런타임 삭제·추출본 소실 후 재준비한다. [6]
 
-네트워크 읽기 단위는 학습 배치와 다르다. 인덱스 없는 gzip에서 뒤쪽 sample에 도달하려면 앞부분을 읽고 해제해야 하므로 작은 추출본도 큰 전송량·준비 시간을 요구할 수 있다. 작업별 다운로드량·경과 시간·RAM·임시 디스크 상한과 중단 조건을 설정하고, 실제 Colab 소량 시험에서 측정한 후 값을 정한다. 완전한 좌우 RGB/pose clip 확보, 중단 시 불완전 산출물 격리, 같은 런타임의 재사용, 새 런타임의 재준비와 manifest 연결을 준비 기능의 검증 항목으로 둔다.
+네트워크 읽기 단위는 학습 배치와 다르다. 인덱스 없는 gzip에서 뒤쪽 sample에 도달하려면 앞부분을 읽고 해제해야 하므로 작은 추출본도 큰 전송량·준비 시간을 요구할 수 있다. 준비 코어의 byte/buffer/파일/disk 및 협력적 deadline을 구현했고, 실제 Colab 소량 시험에서 처리량·운영 예산을 정해야 한다. 프로세스 RAM과 DNS/auth/OS 전체 hard 상한은 보장하지 않는다. 불완전 파일 제거와 같은 런타임 hash 재사용은 로컬에서 검사했으며 실제 좌우 RGB/pose clip·새 Colab 런타임의 재준비·GPU 학습 연결은 남아 있다.
 
-추출 manifest에는 archive ID, 분할 파일 이름·순서·크기·변경 식별 정보, 실제 읽은 바이트 범위, 확인한 hash의 알고리즘·값·검사 범위, 추출·누락 목록과 sequence/frame/split, 추출·전처리 버전을 남긴다. 부분 바이트의 hash와 전체 파일 hash를 구분하고 기존 파일 manifest에 연결한다. 확인하지 않은 값은 미확인으로 표시한다. 기존 디렉터리 loader와 준비 기능의 경계는 [M0 도구 안내](M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)를 함께 참조한다.
+추출 manifest에는 archive ID, 분할 파일 이름·순서·크기·변경 식별 정보, 실제 읽은 바이트 범위, 확인한 hash의 알고리즘·값·검사 범위, 추출·누락 목록과 sequence/frame/split, 추출·전처리 버전을 남긴다. `rewind_archive`는 이 별도 source/추출 기록과 이름 기반 매칭을 제공하며 실제 split·좌표·시간 등은 미확인으로 유지한다. 부분 바이트의 hash와 전체 파일 hash를 구분하고 기존 JSON 감사와 파일 경로·SHA-256을 대조해 연결한다. 기존 디렉터리 loader와 준비 기능의 경계는 [M0 도구 안내](M0_JSON_TOOLS.md#압축-원본-준비-계획과-구현-상태)를 함께 참조한다.
 
 **후속 검토 후보 — 미구현·미채택:** 직접 메모리에서 학습에 공급하는 경로, gzip 해제 재시작 인덱스와 tar 파일 위치 인덱스, RGB·pose를 맞춘 작은 독립 압축 묶음 생성. 인덱스·재포장에는 최초 순차 읽기 비용이 필요하고, 재포장에는 영구 저장 공간이 추가로 필요하다. 원본은 보존하며 반복 학습 비용을 측정한 뒤 별도로 선택한다. [7]
 
@@ -265,7 +274,7 @@ Colab notebook은 환경 준비·학습·평가의 진입점으로 두고, 핵�
 
 **2026-10-13 사용자 결정 — D2 중 보관·추출 운영 방식만 확정:** Drive 압축 원본을 보존하고 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스를 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료 또는 추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. GPU 종류·세션 길이·저장 용량·총 예산과 D1/D3/D4/D5는 계속 미정이다. 압축 준비 기능의 구현·실행 완료를 의미하지 않는다.
 
-**2026-10-14 계획 구체화:** 현재 압축 형식을 유지한 Drive 부분 읽기 → Colab CPU 순차 해제·선택 추출 → 검증된 추출본에서 GPU 학습 배치 구성 경로를 구현 계획으로 기록한다. 저장·전송·시간 상한의 값은 미정이며 기능 구현이나 Colab 실측 완료를 뜻하지 않는다.
+**2026-10-14 계획 구체화와 후속 구현:** 현재 압축 형식을 유지한 Drive 부분 읽기 → Colab CPU 순차 해제·선택 추출 → 검증된 추출본에서 GPU 학습 배치 구성 경로를 따른다. 후속 `rewind_archive`의 제한된 준비 코어·모의 Drive adapter와 개발용 상한을 구현했다. 실제 Colab 운영 상한·처리량·인증/API·GPU 연결 실측은 남아 있으며 D2 자원·예산 확정을 뜻하지 않는다.
 
 M0–M4는 제안하는 순차 개발 경로이며, M4까지를 필수 완료 범위로 할지는 D1에서 확정한다. M5는 GPU 예산에 맞춰 E1–E3부터 선택하고 M6에서 통합한다. 일정은 고정 날짜 대신 단계별 완료 조건으로 관리한다. Pilot 후 step당 시간 × 예정 update 수 × 실험 횟수로 GPU 시간을 추산하고 데이터 준비·평가·중단 후 재준비 여유를 별도로 잡는다.
 

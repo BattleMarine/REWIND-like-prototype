@@ -19,7 +19,7 @@ Python 3.10 이상과 표준 라이브러리만 필요하다. `rewind_data`는 �
 | `rewind_data/windows.py` | Field별 snapshot과 causal offline/streaming window 조립 |
 | `rewind_data/window_fixture.py`, `tests/test_windows.py` | 데이터 없는 합성 window 실행·검증 |
 
-프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이전 검증은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다. 아래 데이터 의존 명령은 추출된 JSON 디렉터리와 준비된 sample 산출물용이다. Archive 또는 분할 압축 파일을 `--input`으로 직접 읽지 않으며, 압축 결합·추출 기능은 아직 미구현이다.
+프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이전 검증은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다. 아래 데이터 의존 명령은 추출된 JSON 디렉터리와 준비된 sample 산출물용이다. `rewind_data --input`은 archive 또는 분할 압축 파일을 직접 읽지 않는다. 별도 `rewind_archive`의 제한된 선택 추출은 부분 구현·로컬 검증했고 실제 사용자 Drive/Colab 실행은 남아 있다.
 
 ```sh
 python -m rewind_data --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --dataset-version UnrealEgo2_train_val_pose_unverified --provenance data/sample_source.json --output outputs/m0_sample
@@ -46,7 +46,7 @@ outputs/m0_sample/audit_report.json
 outputs/m0_sample/viewer.html
 ```
 
-이전 18프레임 검증의 출처는 [지정 Drive JSON 폴더](https://drive.google.com/drive/folders/16ON8vzZDJ2yligsM_OmkwEA2MjJPnohv)다. 현재 Provenance 파일은 입력 root에 대한 상대 경로를 키로 하는 `files` 사전과 선택적인 폴더 inventory를 담는다. 인증 정보·임시 서명 URL을 쓰지 않으며 canonical Drive URL만 허용한다. 아래 schema는 기존 파일용이며 archive/추출 manifest 확장은 미구현이다.
+이전 18프레임 검증의 출처는 [지정 Drive JSON 폴더](https://drive.google.com/drive/folders/16ON8vzZDJ2yligsM_OmkwEA2MjJPnohv)다. 현재 Provenance 파일은 입력 root에 대한 상대 경로를 키로 하는 `files` 사전과 선택적인 폴더 inventory를 담는다. 인증 정보·임시 서명 URL을 쓰지 않으며 canonical Drive URL만 허용한다. 아래 schema는 기존 파일용이다. 새 archive/extraction manifest는 별도 계약으로 기록하며 이 Provenance schema에 자동 병합하지 않는다.
 
 ```json
 {
@@ -61,20 +61,24 @@ outputs/m0_sample/viewer.html
 
 `dataset_sample`은 실제로 가져온 dataset 파일이라는 뜻이며 실세계 촬영이라는 뜻이 아니다. UnrealEgo2는 합성 데이터다. `synthetic_fixture`는 코드 검사에서 만든 인위적 fixture를 의미한다. `observed_folder_inventory`는 그때 관측한 다운로드 폴더 목록이며 원본 motion 전체 길이를 보장하지 않는다.
 
-## 압축 원본 준비 계획(미구현)
+## 압축 원본 준비 계획과 구현 상태
 
-**2026-10-13 사용자 운영 결정:** Drive 압축 원본을 보존하고, 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스만 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료·추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. 저장 용량·GPU·학습 예산은 별도로 미정이며, 현재 도구에 압축 준비 기능이 추가된 것은 아니다.
+**2026-10-13 사용자 운영 결정:** Drive 압축 원본을 보존하고, 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스만 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료·추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. 저장 용량·GPU·학습 예산은 별도로 미정이다.
 
 준비 흐름은 필요한 환경의 분할 파일 목록·크기·무결성 확인 → 번호순 스트림 결합·선택 시퀀스 추출 → 좌우 RGB/pose/frame 및 train/validation/test 소속 검사 → 추출 JSON 디렉터리의 `--input` 연결이다. Gzip은 원하는 멤버까지 앞부분을 순차 해제해야 할 수 있어 작은 subset도 읽기·준비 시간이 든다. 불필요한 전체 추출·결합본 중복 저장을 피하고 공간 예산·추출/전처리 시간을 계획한다. 일부 분할 파일의 존재만으로 archive 전체 또는 내부 frame 무결성을 확인했다고 기록하지 않는다.
 
-추출 manifest에는 다음 항목을 남기고 기존 JSON 파일 manifest와 연결하는 설계가 필요하다. **현재 자동 기록·검증 기능은 미구현**이며 위 Provenance 예제가 이 항목을 지원하는 것은 아니다.
+**2026-10-14 구현:** `rewind_archive`에 local/HTTP Range 읽기, 주입형 Drive adapter, 제한된 gzip/tar 선택 추출, 별도 extraction manifest·이름 매칭·개별 hash 재사용 검사를 추가했다. Source manifest와 명시적 상한을 받고 000부터 연속 prefix만 읽는다. Range 200/잘못된 범위·길이·원본 변경을 거부하고, GNU/PAX metadata 크기·경로와 link/special/중복을 검사한다. 완전 payload+padding만 게시하며 잘린 파일은 제거한다. Schema·명령과 byte/시간/RAM/disk 측정의 정확한 범위는 [압축 준비 안내](ARCHIVE_PREPARATION.md)를 따른다.
+
+추출 manifest는 다음 항목을 기록한다. 위 Provenance 예제에 자동으로 넣는 것은 아니며 기존 JSON 감사와는 파일 경로·SHA-256을 대조해 연결한다.
 
 - Archive ID와 분할 파일 이름·번호 순서·크기
 - 확인한 hash의 알고리즘·값과 그 검사 범위(어느 분할 파일/스트림 범위/추출 파일을 검사했는지), 미확인 항목
-- 추출 목록, sequence/frame, train/validation/test 소속 및 확인 상태
+- 추출 목록·완전 파일 hash와 이름 기준 sequence/frame 매칭, unknown split·미검증 원본 motion
 - 추출·전처리 버전과 원본 archive 출처의 연결
 
-현재 명령은 추출 디렉터리만 처리한다. 압축 준비용 미구현 명령을 새로 안내하지 않으며, 압축 원본 목록 관측과 이전 샘플 검증을 이번 추출·검증 완료로 해석하지 않는다. 관측한 준비 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
+`rewind_data --input`은 여전히 추출 JSON 디렉터리만 처리한다. 준비 CLI의 `output/files/<sequence>/json` 아래 원하는 디렉터리를 선택해 기존 감사에 전달할 수 있으나, 감사 오류·단위·좌표·calibration·시간·공식 split을 확인해야 한다. 추출/이름 매칭만으로 M1 실제 입력을 만들거나 train_ready=true로 올리지 않는다.
+
+최신 Python 전체 83개 테스트(기존 59+archive 24)를 통과했다. 오케스트레이션의 기존 공식 prefix 로컬 재생은 RGB 2MiB의 PNG 2개·pose256KiB의 JSON16개, 이전 18개 SHA 일치·잘린 마지막 payload·CRC false·triplet0을 확인했다. 공식 서버 재다운로드·사용자 Drive 실행·Colab 인증/API·운영 비용 검증은 아니다. 새 준비 notebook의 실제 Colab 경로도 미검증이다. 압축 원본 목록 관측과 과거 sample 이력을 전체 archive 검증으로 해석하지 않는다. 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
 
 ## 로더·관절·mask 계약
 
