@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 13일
+검토 초안 v0.2   |   2026년 10월 14일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -30,9 +30,9 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
-### 2026-10-13 현재 상태와 우선 실행 계획
+### 2026-10-14 현재 상태와 우선 실행 계획
 
-**최신 데이터 상태(2026-10-13):** 오케스트레이션이 Drive 압축파일 목록을 확인했다. 내부 무결성·추출·프레임 검증은 미실행이며 목록 관측만으로 현재 다운로드 완료를 보장하지 않는다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. 사용자는 Drive 압축 원본 보존과 사용 시 필요한 시퀀스만 런타임에 추출하는 운영 방식을 결정했다. 압축 준비 기능은 아직 미구현이며, 추출 후 manifest/hash·좌우 RGB/pose/frame·split 검사를 거쳐 기존 디렉터리 loader에 연결한다.
+**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 학습 연결은 미검증이다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. Drive 압축 원본을 유지하고 필요한 시퀀스만 런타임에 추출하는 운영 결정은 유지한다. 압축 준비 기능·Colab 학습 진입점은 아직 미구현이며, 조사 결과만으로 M0/M1 완료를 선언하지 않는다.
 
 **2026-10-13 데이터 없는 후속 묶음 결과**
 
@@ -83,7 +83,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **첫 구현 묶음과 운영 제안**
 
-첫 구현 범위는 위 1~2번인 JSON 감사·공통 로더·정답 시각화로 둔다. 다음 묶음에서 3번 진단 학습을 추가한다. 모듈은 `data`(읽기·관절·좌표), `evaluation`(지표), `models`, `training`으로 역할을 나누고 notebook은 실행 진입점으로 둔다. 구체적인 패키지 경로와 의존성은 구현 시 확정한다.
+첫 구현 묶음은 위 1~2번인 JSON 감사·공통 로더·정답 시각화 도구를 제공했다. 다음 구현 후보는 압축 원본에서 small sample을 준비·검증하는 경로이며, 관절·좌표·단위와 split 진입 조건을 충족한 뒤 3번 진단 학습으로 진행한다. 모듈은 `data`(읽기·관절·좌표), `evaluation`(지표), `models`, `training`으로 역할을 나누고 notebook은 실행 진입점으로 둔다. 구체적인 패키지 경로와 의존성은 구현 시 확정한다.
 
 데이터 보관·추출 방식은 아래의 2026-10-13 운영 결정에 따른다. Drive 압축 원본과 영구 저장할 manifest·설정·checkpoint·결과를 런타임 추출본과 분리한다. 문서 반영으로 현재 다운로드 작업을 중단하거나 변경하지 않는다.
 
@@ -93,16 +93,34 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 기존 데이터 시작안은 UnrealEgo의 손 annotation이 포함된 시퀀스로 시작하고 UnrealEgo2로 확장하는 것이다. 이전 UnrealEgo2 JSON은 사전 도구 검증에 사용했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정한다. 공식 안내의 전체 UnrealEgo2 저장 공간은 약 3TB이므로 RGB와 pose를 필요한 범위만 추출하고 depth는 초기 필수 입력에서 제외한다. [3]
 
-**압축 준비 계획 — 아직 미구현**
+### 부분 다운로드 조사와 실행 계획
 
-1. 필요한 환경의 archive ID와 분할 파일 목록·번호 순서·크기·무결성을 확인한다. 일부 파일 목록만으로 전체 archive가 준비됐다고 판단하지 않는다.
-2. 분할 파일을 번호순 스트림으로 결합해 선택 시퀀스를 런타임 임시 디스크에 추출한다. Gzip은 원하는 멤버까지 앞부분을 순차 해제해야 할 수 있으므로 작은 subset에도 읽기·준비 시간이 들 수 있다. 불필요한 전체 추출과 결합본 중복 저장을 피하며 필요한 공간·추출/전처리 시간을 계획한다.
-3. 추출 목록과 좌우 RGB/pose/frame의 대응·누락, sequence 경계 및 train/validation/test 소속을 검사한다.
-4. 검증한 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 기존 CLI는 archive 직접 읽기·결합·추출 기능을 제공하지 않는다.
+**2026-10-14 확인한 사실 — 프로젝트 기능 구현과 구분**
 
-추출 manifest에는 archive ID, 분할 파일 이름·순서·크기, 확인한 hash의 알고리즘·값·검사 범위, 추출 목록·sequence/frame/split, 추출·전처리 버전을 남기고 기존 파일 manifest와 연결하는 설계가 필요하다. 확인하지 않은 hash/범위는 미확인으로 표시한다. 이 확장은 미구현이며 파일 목록 확인이나 문서 작성으로 M0 완료 상태를 올리지 않는다. 준비 절차의 세부 경계는 [M0 도구 안내](M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)에 기록한다.
+- 공식 배포 스크립트는 환경별 `.tar.gz000`, `.tar.gz001` 등을 연결해 해제한다. 현재 분할은 독립된 시퀀스 압축 묶음이 아니다. Google Drive API는 blob 파일의 HTTP `Range` 다운로드를 지원하지만, 바이트 범위 접근만으로 gzip 중간 해제가 가능해지지는 않는다. [4][5]
+- 공식 서버의 `UnrealEgoData2_train_val_rgb/CityPark_Showcase/CityPark_Showcase.tar.gz000`에서 `0–262143`, `262144–2097151` 범위를 받아 총 2MiB를 순서대로 연결했다. HTTP 206과 Content-Range를 확인했고, PNG 2개의 전체 payload와 PNG chunk CRC를 검사했다.
+- 공식 서버의 `UnrealEgoData2_train_val_pose/CityPark_Showcase/CityPark_Showcase.tar.gz000`에서 `0–262143`의 256KiB만 받아 완전한 JSON 16개를 파싱했다. RGB `001`의 시작 64바이트에는 gzip 시작 헤더가 없었고 독립 gzip 해제 시 header 오류가 발생했다.
+- 두 prefix 모두 gzip 끝에 도달하지 않았으며 마지막의 불완전한 파일은 제외했다. 전체 gzip CRC·archive 무결성은 미검증이다. RGB는 `Defender__1_`의 왼쪽 영상, pose는 `Stroke_Shrugging__1_`로 서로 다른 시퀀스였고 파일 순서도 frame 번호순이 아니었다. 대응 학습 sample이나 완전한 clip을 확보한 결과가 아니다.
+- 이 시험은 공식 서버의 원본에 대한 조사다. Drive 복사본과의 바이트 동일성, Drive 인증·Range 실제 응답, Colab 실행·처리량, 좌우 RGB/pose 대응 및 학습은 검증하지 않았다. 초기 RGB 8MiB 요청은 본문 읽기 제한 시간 45초에 걸려 중단했고 더 작은 요청으로 확인했다. 안정적인 처리 속도의 근거로 사용하지 않는다.
+- 조사용 스크립트·부분 바이트·로컬 검사 기록은 Git 제외 경로 `outputs/partial_archive_probe/`에 두었다. 다른 checkout에 존재한다고 가정하지 않으며, 현재 CLI의 정식 기능이나 재현 가능한 Colab 준비 모듈로 간주하지 않는다.
 
-직전 목록 관측은 train_val_pose 15개 약 18.02GB, test_pose 15개 약 1.97GB였다. 첫 준비 후보는 ArchVis RGB `000`~`004`(공식 5개) 약 52.44GB와 pose 약 368MB다. CityPark RGB `000`~`003`은 공식 17개 중 4개(약 42.95GB)만 관측했다. 이는 확인 시점의 목록·크기이며 현재 다운로드 완료, 내부 무결성 또는 최종 baseline 선택을 뜻하지 않는다. 오케스트레이션이 확인한 근거: [Drive 압축 원본 폴더](https://drive.google.com/drive/folders/1GIWTYCaHxz7YeBCabpZrUyioHwXVUo6O), [공식 RGB 분할 목록 스크립트](https://unrealego.mpi-inf.mpg.de/data/download_unrealego2_train_val_rgb.sh).
+**압축 준비 계획 — 아래 기능은 아직 미구현**
+
+1. 필요한 환경의 archive ID와 분할 파일 목록·순서·크기·변경 여부 및 검사 가능한 hash를 확인한다. 전체 archive 준비 여부와 `000`부터 연속된 prefix의 가용성을 구분한다. 중간 누락이나 잘린 파일을 건너뛰어 계속 해제하지 않는다.
+2. Colab에서 인증된 Drive API로 제한된 바이트 범위를 읽고, HTTP 206·Content-Range·받은 길이를 확인한다. 범위가 무시되어 전체 응답이 오거나 원본이 바뀌면 중단한다. 단순 `drive.mount()` 읽기가 동일한 전송량 상한을 보장한다고 가정하지 않는다.
+3. 번호순 바이트 스트림을 Colab CPU·메모리에서 순차 해제하며 필요한 파일만 `/content` 임시 디스크에 저장한다. 전체 압축본·결합본·전체 추출본을 먼저 만들지 않는다. 불완전한 prefix에서는 온전히 읽힌 파일만 후보로 남기고, 잘린 마지막 파일과 전체 무결성 미확인을 기록한다.
+4. RGB·pose의 내부 순서에 의존하지 않고 sequence/frame 식별자로 좌우 영상·정답을 대조한다. Frame 정렬, 누락·연속성, split 및 원본 motion 중복을 확인한다. 매칭되지 않은 파일을 조용히 버려 편향된 평가 sample을 만들지 않는다. 한쪽 영상과 일부 JSON의 추출만으로 학습 준비 완료를 선언하지 않는다.
+5. 검증된 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 이후 별도로 구현할 학습 코드가 추출본에서 배치를 구성해 GPU에 전달한다. 같은 런타임에서는 추출본을 재사용하며 매 배치·epoch마다 원본을 처음부터 해제하지 않는다. 결과·checkpoint·manifest는 Drive 등 영구 저장소에 분리 보관하고 런타임 삭제·추출본 소실 후 재준비한다. [6]
+
+네트워크 읽기 단위는 학습 배치와 다르다. 인덱스 없는 gzip에서 뒤쪽 sample에 도달하려면 앞부분을 읽고 해제해야 하므로 작은 추출본도 큰 전송량·준비 시간을 요구할 수 있다. 작업별 다운로드량·경과 시간·RAM·임시 디스크 상한과 중단 조건을 설정하고, 실제 Colab 소량 시험에서 측정한 후 값을 정한다. 완전한 좌우 RGB/pose clip 확보, 중단 시 불완전 산출물 격리, 같은 런타임의 재사용, 새 런타임의 재준비와 manifest 연결을 준비 기능의 검증 항목으로 둔다.
+
+추출 manifest에는 archive ID, 분할 파일 이름·순서·크기·변경 식별 정보, 실제 읽은 바이트 범위, 확인한 hash의 알고리즘·값·검사 범위, 추출·누락 목록과 sequence/frame/split, 추출·전처리 버전을 남긴다. 부분 바이트의 hash와 전체 파일 hash를 구분하고 기존 파일 manifest에 연결한다. 확인하지 않은 값은 미확인으로 표시한다. 기존 디렉터리 loader와 준비 기능의 경계는 [M0 도구 안내](M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)를 함께 참조한다.
+
+**후속 검토 후보 — 미구현·미채택:** 직접 메모리에서 학습에 공급하는 경로, gzip 해제 재시작 인덱스와 tar 파일 위치 인덱스, RGB·pose를 맞춘 작은 독립 압축 묶음 생성. 인덱스·재포장에는 최초 순차 읽기 비용이 필요하고, 재포장에는 영구 저장 공간이 추가로 필요하다. 원본은 보존하며 반복 학습 비용을 측정한 뒤 별도로 선택한다. [7]
+
+**Drive 목록 관측(2026-10-14):** train_val_pose 15개 약 18.02GB, test_pose 15개 약 1.97GB, ArchVis RGB `000`~`004` 5개 약 52.44GB는 전날과 같았다. CityPark RGB는 전날 `000`~`003` 4개 약 42.95GB에서 `000`~`012` 13개 약 139.59GB로 늘었다. 공식 17개 중 마지막 4개는 관측되지 않았다. 합계 48개 약 212.02GB이며 GB는 십진 단위다. 목록·크기 관측은 내부 무결성이나 최종 baseline 선택을 뜻하지 않는다. 모든 분할 이름이 보이는 ArchVis RGB와 pose 약 368MB는 첫 준비 후보이고, CityPark prefix는 제한된 추출 후보로 구분한다. 근거: [Drive 압축 원본 폴더](https://drive.google.com/drive/folders/1GIWTYCaHxz7YeBCabpZrUyioHwXVUo6O), [공식 RGB 분할 목록](https://unrealego.mpi-inf.mpg.de/data/download_unrealego2_train_val_rgb.sh).
+
+### M0 검증과 규모 확대
 
 | 데이터 단계 | 제안 규모 | 목적 |
 | --- | --- | --- |
@@ -237,7 +255,11 @@ Colab notebook은 환경 준비·학습·평가의 진입점으로 두고, 핵�
 
 **2026-10-13 사용자 결정 — D2 중 보관·추출 운영 방식만 확정:** Drive 압축 원본을 보존하고 사용 시 Colab/runtime 임시 디스크에 필요한 시퀀스를 추출한다. 같은 런타임에서는 검증된 추출본을 재사용하고, 세션 종료 또는 추출본 소실 후 다시 추출한다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관한다. GPU 종류·세션 길이·저장 용량·총 예산과 D1/D3/D4/D5는 계속 미정이다. 압축 준비 기능의 구현·실행 완료를 의미하지 않는다.
 
-M0–M4는 순차적인 필수 경로다. M5는 GPU 예산에 맞춰 E1–E3부터 선택하고 M6에서 통합한다. 일정은 고정 날짜 대신 단계별 완료 조건으로 관리한다. Pilot 후 step당 시간 × 예정 update 수 × 실험 횟수로 GPU 시간을 추산하고 평가·중단 여유를 별도로 잡는다.
+**2026-10-14 계획 구체화:** 현재 압축 형식을 유지한 Drive 부분 읽기 → Colab CPU 순차 해제·선택 추출 → 검증된 추출본에서 GPU 학습 배치 구성 경로를 구현 계획으로 기록한다. 저장·전송·시간 상한의 값은 미정이며 기능 구현이나 Colab 실측 완료를 뜻하지 않는다.
+
+M0–M4는 제안하는 순차 개발 경로이며, M4까지를 필수 완료 범위로 할지는 D1에서 확정한다. M5는 GPU 예산에 맞춰 E1–E3부터 선택하고 M6에서 통합한다. 일정은 고정 날짜 대신 단계별 완료 조건으로 관리한다. Pilot 후 step당 시간 × 예정 update 수 × 실험 횟수로 GPU 시간을 추산하고 데이터 준비·평가·중단 후 재준비 여유를 별도로 잡는다.
+
+**실현 가능성 판단:** small sample·overfit·pilot부터 확대하는 구조는 기술적으로 타당한 계획이다. 논문 크기 모델, 200만 step 규모나 여러 seed의 반복 실험을 현재 Colab 자원·예산 안에서 수행할 수 있는지는 미확정이다. 실제 GPU·VRAM, RGB front-end의 해상도·batch, 입출력 및 학습 시간을 측정한 뒤 모델 규모와 실험 수를 정한다. 30 FPS와 성능 개선은 측정할 목표이며 보장된 결과가 아니다. Colab 자원과 런타임 수명도 고정값으로 가정하지 않는다. [6]
 
 ### 주요 위험과 대응
 
@@ -264,3 +286,11 @@ M0–M4는 순차적인 필수 경로다. M5는 GPU 예산에 맞춰 E1–E3부�
 [2] 첨부 프로젝트 요약서. 프로젝트 목표, Colab 환경, 우선순위와 제외 범위.
 
 [3] [UnrealEgo Benchmark 공식 데이터 안내](https://unrealego.mpi-inf.mpg.de/). 확인일 2026년 10월 12일. 공개 안내와 실제 archive의 annotation은 구현 착수 시 대조한다.
+
+[4] UnrealEgo2 공식 분할·해제 스크립트: [train/val RGB](https://unrealego.mpi-inf.mpg.de/data/download_unrealego2_train_val_rgb.sh), [train/val pose](https://unrealego.mpi-inf.mpg.de/data/download_unrealego2_train_val_pose.sh). 2026-10-14 내용 확인 및 스크립트에 명시된 CityPark 원본 URL의 제한된 바이트 시험. 다운로드 스크립트 전체를 실행한 것은 아니다.
+
+[5] [Google Drive API 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download). 2026-10-14 확인. API의 지원 사실과 사용자 Drive 복사본에서의 실제 연결 검증은 구분한다.
+
+[6] [Google Colab FAQ](https://research.google.com/colaboratory/faq.html). 2026-10-14 확인. Drive I/O 비용·제한, 런타임 삭제와 가변 자원을 고려한다.
+
+[7] [zlib의 압축 스트림 인덱스·임의 접근 예제](https://raw.githubusercontent.com/madler/zlib/master/examples/zran.c). 2026-10-14 확인. 해제 재시작에는 압축 위치뿐 아니라 bit 위치·사전 상태 등이 필요하다.

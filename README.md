@@ -8,10 +8,10 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 프로젝트 로드맵 v0.2의 첫 구현 묶음인 M0 사전 JSON 감사·공통 로더·로컬 HTML viewer를 구현했습니다. 전체 완료 범위와 예산은 계속 검토 중입니다.
 - 이전 M0에서 지정 Drive 폴더의 UnrealEgo2 pose JSON `frame_0`~`frame_17` 18개, 각 87관절의 필수 배열 수치 검사를 통과했습니다. 이는 이전 검증 이력이며 단위·축·회전·시간·calibration·분할·공식 skeleton 검증은 남아 있습니다.
-- 2026-10-13 오케스트레이션이 Drive 압축파일 목록을 확인했습니다. 내부 무결성·추출·프레임 검증은 미실행이며 현재 다운로드 완료를 보장하지 않습니다. 사용자는 Drive 압축 원본을 보존하고 사용할 때 필요한 시퀀스만 런타임 임시 디스크에 추출하는 운영 방식을 결정했습니다. 압축 준비 기능은 아직 미구현이며 M0 전체 완료가 아닙니다.
+- 2026-10-14 Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 부분 다운로드·추출 가능성을 시험했습니다. RGB 앞 2MiB에서 PNG 2개, pose 앞 256KiB에서 JSON 16개를 완전히 읽었습니다. 서로 대응되는 학습 sample은 아니며 Drive 복사본의 추출·전체 무결성 및 Colab 연결은 미검증입니다. 프로젝트의 압축 준비 기능은 아직 미구현이고 M0 전체 완료가 아닙니다. 세부 근거와 한계는 [로드맵](docs/ROADMAP.md#부분-다운로드-조사와-실행-계획)에 기록합니다.
 - 데이터 없이 공식 규격 근거와 M1 준비용 causal window 조립·streaming API를 추가했습니다. 합성 테스트 40개(기존 17 + window 23)와 fixture 실행을 통과했으며 실제 데이터 검증·모델 학습은 포함하지 않습니다.
 - 모델 구현과 학습·평가는 아직 시작하지 않았습니다.
-- Python 표준 라이브러리로 실행하며 설치할 추가 Python 패키지는 없습니다. 합성 테스트와 실제 sample smoke 결과는 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 기록합니다. 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
+- 현재 구현된 JSON·window 도구는 Python 표준 라이브러리로 실행하며 설치할 추가 Python 패키지는 없습니다. 향후 Drive 인증·학습 코드의 의존성은 별도로 정합니다. 합성 테스트와 실제 sample smoke 결과는 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 기록합니다. 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 
 ## 문서 안내
 
@@ -60,6 +60,17 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 - Notebook은 실행 진입점으로 사용하고 핵심 로직은 Python 모듈로 분리할 계획입니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
 
+### Drive와 Colab의 데이터 사용 계획 — 미구현
+
+Drive의 현재 분할 압축 원본을 유지하고, 인증된 Drive API의 `Range` 요청으로 일정 바이트씩 읽어 Colab CPU·메모리에서 순차 해제할 계획입니다. 필요한 시퀀스의 좌우 RGB·pose만 `/content` 임시 디스크에 모아 대응·프레임 순서·split을 검증하고, 그 추출본에서 학습 배치를 구성해 GPU로 반복 학습합니다. 전체 압축본·결합본·전체 추출본을 런타임에 보관할 필요는 없습니다. 결과·checkpoint·manifest는 Drive 등 영구 저장소에 보관합니다. [Drive 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download), [Colab 운영 제약](https://research.google.com/colaboratory/faq.html)
+
+- 현재 `000`, `001` 등은 하나의 gzip 스트림을 나눈 조각입니다. 별도 인덱스 없이 중간 조각만 독립 해제하거나 원하는 학습 배치 위치로 바로 이동할 수 없습니다. 네트워크 읽기 단위와 학습 배치는 다릅니다.
+- 불완전한 archive도 `000`부터 끊김 없이 확보한 앞부분에서는 온전히 읽힌 파일을 sample 후보로 사용할 수 있습니다. 잘린 마지막 파일은 제외하며, 일부 추출 성공을 전체 무결성·완전한 시퀀스 확보로 해석하지 않습니다.
+- 저장할 sample이 작아도 앞부분을 읽고 해제하는 전송량·시간은 클 수 있습니다. 다운로드량·준비 시간·RAM·임시 디스크 상한을 설정하고, 초과 시 중단하도록 구현할 계획입니다. 실제 처리량과 상한값은 Colab 소량 시험 후 정합니다.
+- 같은 런타임에서는 검증된 추출본을 재사용합니다. 런타임 삭제·추출본 소실 후에는 재준비가 필요합니다. 직접 메모리에서 학습에 공급하는 방식, gzip 인덱스와 독립 압축 묶음 생성은 후속 검토 후보이며 현재 구현·채택된 기능이 아닙니다.
+
+작은 sample → overfit → pilot 순서는 실행 가능한 개발 방향입니다. 다만 논문 크기 모델·대규모 학습·반복 실험을 현재 Colab 예산으로 수행할 수 있는지는 GPU·VRAM·입출력·step 시간 측정 후 판단합니다. 30 FPS와 성능 개선은 달성이 보장된 결과가 아닙니다.
+
 ## M0 사전 도구 실행
 
 프로젝트 root에서 Python 3.10 이상으로 실행합니다. 아래 `python`은 실제 Python 실행파일을 가리켜야 합니다. 이 세션에서는 Codex 번들 Python 3.12.14로 명령을 검증했습니다. 원본 sample은 `data/`, 생성 산출물은 `outputs/`에 두며 두 경로 모두 Git에서 제외합니다.
@@ -70,7 +81,7 @@ python -m unittest discover -s tests -v
 python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --provenance data/sample_source.json --expected-frames 18 --expected-joints 87
 ```
 
-위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 필요한 환경의 분할 파일 목록·크기·무결성 확인 → 번호순 스트림 결합·선택 시퀀스 추출 → 좌우 RGB/pose/frame 및 split 소속 검사 → 기존 loader 연결이 준비 계획이며, 이 압축 준비 기능은 아직 미구현입니다. Gzip은 원하는 멤버까지 순차 해제가 필요할 수 있어 작은 subset도 읽기·준비 시간이 듭니다. 불필요한 전체 추출·결합본 중복 저장을 피하고 공간 예산·전처리 시간을 계획합니다.
+위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 분할 파일 목록·연속성·크기와 검증 범위 확인 → 바이트 범위 읽기·번호순 스트림 결합·선택 추출 → 좌우 RGB/pose/frame 및 split 소속 검사 → 기존 loader 연결이 준비 계획입니다. 이 압축 준비 기능과 Colab 학습 진입점은 아직 미구현입니다. Gzip 인덱스 없이 원하는 멤버에 도달하려면 앞부분의 순차 해제가 필요합니다.
 
 기존 18프레임 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행하며, 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춥니다. 일반 데이터에는 `--provenance`를 생략할 수 있습니다. 기존 파일은 Git에 포함되지 않고 현재 가용성을 가정하지 않습니다. 합성 fixture 테스트는 데이터셋 없이 실행할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. Archive 출처·확인한 hash와 범위·추출 manifest 요구 및 실행 전제는 [도구 안내](docs/M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)를 확인합니다.
 
