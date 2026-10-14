@@ -10,8 +10,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - 이전 M0에서 지정 Drive 폴더의 UnrealEgo2 pose JSON `frame_0`~`frame_17` 18개, 각 87관절의 필수 배열 수치 검사를 통과했습니다. 이는 이전 검증 이력이며 단위·축·회전·시간·calibration·분할·공식 skeleton 검증은 남아 있습니다.
 - 2026-10-14 Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 부분 다운로드·추출 가능성을 시험했습니다. RGB 앞 2MiB에서 PNG 2개, pose 앞 256KiB에서 JSON 16개를 완전히 읽었습니다. 서로 대응되는 학습 sample은 아니며 Drive 복사본의 추출·전체 무결성 및 Colab 연결은 미검증입니다. 프로젝트의 압축 준비 기능은 아직 미구현이고 M0 전체 완료가 아닙니다. 세부 근거와 한계는 [로드맵](docs/ROADMAP.md#부분-다운로드-조사와-실행-계획)에 기록합니다.
 - 데이터 없이 공식 규격 근거와 M1 준비용 causal window 조립·streaming API를 추가했습니다. 합성 테스트 40개(기존 17 + window 23)와 fixture 실행을 통과했으며 실제 데이터 검증·모델 학습은 포함하지 않습니다.
-- 모델 구현과 학습·평가는 아직 시작하지 않았습니다.
-- 현재 구현된 JSON·window 도구는 Python 표준 라이브러리로 실행하며 설치할 추가 Python 패키지는 없습니다. 향후 Drive 인증·학습 코드의 의존성은 별도로 정합니다. 합성 테스트와 실제 sample smoke 결과는 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 기록합니다. 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
+- 2026-10-14 M1 학습 기반을 추가했습니다. 명시적 tensor 계약, 작은 single-frame/causal temporal regression, loss·평가·checkpoint 재개와 train-only 합성 RGB 예측 캐시 연결을 구현했습니다. 최신 Python 테스트 59개와 합성 CPU 학습·재개·평가를 통과했습니다. 실제 데이터 baseline·EfficientNet front-end·Colab GPU는 미검증이며 M1 전체 완료가 아닙니다.
+- [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했으며 실제 Colab 업로드·인증·Drive/GPU 실행은 아직 하지 않았습니다.
+- JSON·window 도구는 Python 표준 라이브러리로 실행합니다. M1은 별도 PyTorch 환경이 필요하며 이번 검증은 Python 3.12.14 / torch 2.7.1+cpu입니다. 실행법과 한계는 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. 기존 실제 sample 이력은 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 있으며 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 
 ## 문서 안내
 
@@ -22,6 +23,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
+| [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
+| [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
 
 프로젝트 계획은 `docs/ROADMAP.md`를 기준으로 관리합니다. 이후 변경은 문서에 반영합니다. 로드맵의 미결정 항목 D1~D5와 잠정 목표는 확정된 요구사항과 구분합니다.
 
@@ -57,7 +60,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 - 기존 초기 데이터 후보는 UnrealEgo입니다. 이전 UnrealEgo2 JSON으로 사전 도구를 검증했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
 - **2026-10-13 운영 결정:** Drive에는 압축 원본을 보존하고 필요한 시퀀스를 Colab/runtime 임시 디스크에 추출해 읽습니다. 같은 런타임에서는 검증된 추출본을 재사용하며 세션 종료·추출본 소실 후 다시 추출합니다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관합니다.
 - 작은 데이터의 입출력 검증과 과적합 테스트를 통과한 뒤 학습 규모를 늘립니다.
-- Notebook은 실행 진입점으로 사용하고 핵심 로직은 Python 모듈로 분리할 계획입니다.
+- Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, M1 학습 기반은 `rewind_m1` 모듈로 분리했습니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
 
 ### Drive와 Colab의 데이터 사용 계획 — 미구현
@@ -81,7 +84,7 @@ python -m unittest discover -s tests -v
 python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --provenance data/sample_source.json --expected-frames 18 --expected-joints 87
 ```
 
-위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 분할 파일 목록·연속성·크기와 검증 범위 확인 → 바이트 범위 읽기·번호순 스트림 결합·선택 추출 → 좌우 RGB/pose/frame 및 split 소속 검사 → 기존 loader 연결이 준비 계획입니다. 이 압축 준비 기능과 Colab 학습 진입점은 아직 미구현입니다. Gzip 인덱스 없이 원하는 멤버에 도달하려면 앞부분의 순차 해제가 필요합니다.
+위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 분할 파일 목록·연속성·크기와 검증 범위 확인 → 바이트 범위 읽기·번호순 스트림 결합·선택 추출 → 좌우 RGB/pose/frame 및 split 소속 검사 → 기존 loader 연결이 준비 계획입니다. 압축 준비 기능과 실제 데이터의 Colab 연결은 아직 미구현·미검증입니다. 별도 합성 학습 notebook은 준비했습니다. Gzip 인덱스 없이 원하는 멤버에 도달하려면 앞부분의 순차 해제가 필요합니다.
 
 기존 18프레임 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행하며, 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춥니다. 일반 데이터에는 `--provenance`를 생략할 수 있습니다. 기존 파일은 Git에 포함되지 않고 현재 가용성을 가정하지 않습니다. 합성 fixture 테스트는 데이터셋 없이 실행할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. Archive 출처·확인한 hash와 범위·추출 manifest 요구 및 실행 전제는 [도구 안내](docs/M0_JSON_TOOLS.md#압축-원본-준비-계획미구현)를 확인합니다.
 
@@ -96,11 +99,26 @@ python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_
 
 Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 길이 정의, 명시적 container 경계의 streaming reset, 관절·단위·calibration 미확인 범위와 다음 진입 조건은 [데이터·window 계약](docs/DATA_CONTRACT.md)에 기록합니다. 기존 개발용 skeleton은 미검증 설정으로 유지합니다.
 
+## 데이터 없이 M1 학습 기반 실행
+
+PyTorch 환경에서 프로젝트 root를 기준으로 실행합니다. 이번 Windows 환경에서는 아래 `python`에 `.venv/Scripts/python.exe`를 사용했습니다. PyTorch가 없으면 M1 테스트는 건너뛰므로 [설치·검증 안내](docs/M1_BASELINE.md#환경과-의존성)를 먼저 확인합니다. 새 실행에는 비어 있는 output을 지정합니다.
+
+```sh
+python -m unittest discover -s tests -v
+python -m rewind_m1 train --config configs/m1_single_synthetic.json --output outputs/m1_single --steps 80 --device cpu
+python -m rewind_m1 train --config configs/m1_temporal_synthetic.json --output outputs/m1_temporal --steps 80 --device cpu
+python -m rewind_m1 train --config configs/m1_single_synthetic.json --output outputs/m1_single --steps 100 --resume outputs/m1_single/last.pt --device cpu
+python -m rewind_m1 evaluate --checkpoint outputs/m1_single/last.pt --output outputs/m1_single/evaluation.json --device cpu
+python -m rewind_m1.predicted_fixture --config configs/m1_single_synthetic.json --output outputs/m1_predicted_chain --frontend-steps 20 --steps 30
+```
+
+GT 입력과 예측 입력 모두 `synthetic_code_check`입니다. 합성 loss 감소는 실제 데이터 정확도·실시간성의 근거가 아닙니다. `last.pt`에 전체 regression 학습 상태를 저장하며 code/config/data/environment가 같을 때 재개합니다. 예측 경로의 같은 output 재개, 특징 계약·mask·집계 방식과 미검증 항목은 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. Colab 준비는 [노트북](notebooks/m1_baseline.ipynb)과 [환경 안내](docs/COLAB_SETUP.md)를 따릅니다. 실제 데이터 준비·검증 조건을 생략하지 않습니다.
+
 ## 평가 원칙
 
 Body/Hand MPJPE와 PA-MPJPE, 구조·시간 오차, failure subset 성능을 함께 평가합니다. 속도는 3D 모델만의 지연과 front-end를 포함한 전체 지연을 구분합니다. 30 FPS는 지정 GPU에서 검증할 잠정 목표입니다.
 
-개선 실험에서는 한 번에 하나의 요인을 변경하고 같은 조건의 기준 모델과 비교합니다. Test set은 최종 평가에 사용하며, 모델 선택과 튜닝은 validation에서 수행합니다. 아직 측정된 성능 수치는 없습니다.
+개선 실험에서는 한 번에 하나의 요인을 변경하고 같은 조건의 기준 모델과 비교합니다. Test set은 최종 평가에 사용하며, 모델 선택과 튜닝은 validation에서 수행합니다. 합성 코드 진단 수치만 있으며 실제 데이터 성능은 아직 측정하지 않았습니다.
 
 ## 참고 자료
 

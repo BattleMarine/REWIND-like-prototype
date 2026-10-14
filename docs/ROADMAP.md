@@ -32,7 +32,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-14 현재 상태와 우선 실행 계획
 
-**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 학습 연결은 미검증이다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. Drive 압축 원본을 유지하고 필요한 시퀀스만 런타임에 추출하는 운영 결정은 유지한다. 압축 준비 기능·Colab 학습 진입점은 아직 미구현이며, 조사 결과만으로 M0/M1 완료를 선언하지 않는다.
+**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 18프레임 결과는 이전 샘플 검증 이력이다. Drive 압축 원본을 유지하고 필요한 시퀀스만 런타임에 추출하는 운영 결정은 유지한다. 압축 준비 기능은 아직 미구현이고 별도 합성 학습 notebook을 준비했다. 조사·합성 실행 결과만으로 M0/M1 완료를 선언하지 않는다.
+
+**2026-10-14 M1 학습 기반 구현 묶음 결과 — 전체 완료 아님**
+
+- `rewind_m1`에 명시적 관절·단위·영상 크기·split·출처 계약, 특징 tensor, 작은 single-frame MLP/고정 causal window GRU, masked normalized MSE·anchor MPJPE와 학습·평가·checkpoint CLI를 구현했다. 미검증 실제 데이터는 검증 상태·근거가 없으면 거부한다. Camera encoding·projection·물리 시간 loss는 포함하지 않는다.
+- 작은 Conv heatmap 개발 모델로 train-only 합성 RGB 학습 → 고정 weights 예측 cache → sequence/frame 연결 → regression·validation과 동일 output 재개를 확인했다. GT 3D/mask와 unknown visibility를 보존한다. 이는 EfficientNet이나 실제 RGB baseline의 완료가 아니다.
+- CPU PyTorch 2.7.1+cpu에서 Python 테스트 59개(기존 40 + M1 19)를 통과했다. 두 regression의 80 update 과적합, model/optimizer/scheduler/scaler/RNG 재개 일치, 주기 checkpoint/report 사이 중단의 누락 log 명시 복구, causality·streaming/reset을 검사했다. 실제 데이터/Colab/CUDA·AMP와 latency는 미검증이다.
+- [Colab notebook](../notebooks/m1_baseline.ipynb)은 로컬 커밋의 소스 ZIP을 업로드하고 임시 디스크에서 합성 진단·재개 후 선택적으로 결과를 Drive에 복사하도록 준비했다. JSON/code cell 문법과 실행 셀의 로컬 CPU 실행, 로컬 결과 복사·파일별 hash를 확인했다. 실제 Colab 업로드·인증·Drive/GPU 실행을 대신하지 않는다.
+- 실행법·계약·증거·미검증 범위는 [M1 안내](M1_BASELINE.md), 환경 준비는 [Colab 안내](COLAB_SETUP.md)에 기록한다. M1 진입/완료 기준과 D1~D5는 유지한다. 다음 실제 데이터 진입에는 관절·단위·좌표/calibration·split·좌우 RGB/pose·timestamp 검증과 small sample이 필요하다.
 
 **2026-10-13 데이터 없는 후속 묶음 결과**
 
@@ -41,7 +49,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - Python 합성 테스트 40개(기존 17 + window 23)와 6개 window fixture의 offline/streaming 일치 검증을 통과했다. 실제 데이터·Drive·이전 실제 sample 산출물 접근, smoke_sample 재실행, 모델·학습·projection 구현은 하지 않았다.
 - M0/M1 전체 완료 및 D1~D5 확정은 보류한다. 다음 진입 조건은 재다운로드 subset의 manifest/hash·관절·split 재감사와 좌표·단위·FPS/timestamp·calibration 대조다. 이후 GT 2D 진단 학습은 별도 지시 범위로 진행한다.
 
-전체 다운로드를 기다리지 않고, 확보된 pose JSON으로 데이터 감사와 학습 경로의 진단을 먼저 진행하는 계획이다. 아래 순서는 실행 제안이며 D1~D5의 범위·예산 확정을 대신하지 않는다. 2026-10-13 첫 구현 지시로 1~2번의 사전 도구를 구현했다. 모델 구현·학습은 아직 시작하지 않았다.
+전체 다운로드를 기다리지 않고, 확보된 pose JSON으로 데이터 감사와 학습 경로의 진단을 먼저 진행하는 계획이다. 아래 순서는 실행 제안이며 D1~D5의 범위·예산 확정을 대신하지 않는다. 2026-10-13 첫 구현 지시로 1~2번의 사전 도구를 구현했고 2026-10-14 합성 M1 학습 기반을 추가했다. 실제 데이터의 모델 학습·평가는 아직 시작하지 않았다.
 
 **2026-10-13 첫 구현 묶음 결과**
 
@@ -83,7 +91,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **첫 구현 묶음과 운영 제안**
 
-첫 구현 묶음은 위 1~2번인 JSON 감사·공통 로더·정답 시각화 도구를 제공했다. 다음 구현 후보는 압축 원본에서 small sample을 준비·검증하는 경로이며, 관절·좌표·단위와 split 진입 조건을 충족한 뒤 3번 진단 학습으로 진행한다. 모듈은 `data`(읽기·관절·좌표), `evaluation`(지표), `models`, `training`으로 역할을 나누고 notebook은 실행 진입점으로 둔다. 구체적인 패키지 경로와 의존성은 구현 시 확정한다.
+첫 구현 묶음은 위 1~2번인 JSON 감사·공통 로더·정답 시각화 도구를 제공했다. 2026-10-14에는 실제 데이터를 가정하지 않는 합성 학습 기반을 먼저 구현했다. 압축 원본에서 small sample을 준비·검증하고 관절·좌표·단위와 split 진입 조건을 충족한 뒤 실제 3번 진단 학습으로 진행한다. JSON/window는 `rewind_data`, M1 tensor·모델·지표·학습은 `rewind_m1`에 분리하고 notebook을 실행 진입점으로 둔다. 표준 라이브러리 M0와 PyTorch M1 환경을 구분한다.
 
 데이터 보관·추출 방식은 아래의 2026-10-13 운영 결정에 따른다. Drive 압축 원본과 영구 저장할 manifest·설정·checkpoint·결과를 런타임 추출본과 분리한다. 문서 반영으로 현재 다운로드 작업을 중단하거나 변경하지 않는다.
 
@@ -110,7 +118,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 2. Colab에서 인증된 Drive API로 제한된 바이트 범위를 읽고, HTTP 206·Content-Range·받은 길이를 확인한다. 범위가 무시되어 전체 응답이 오거나 원본이 바뀌면 중단한다. 단순 `drive.mount()` 읽기가 동일한 전송량 상한을 보장한다고 가정하지 않는다.
 3. 번호순 바이트 스트림을 Colab CPU·메모리에서 순차 해제하며 필요한 파일만 `/content` 임시 디스크에 저장한다. 전체 압축본·결합본·전체 추출본을 먼저 만들지 않는다. 불완전한 prefix에서는 온전히 읽힌 파일만 후보로 남기고, 잘린 마지막 파일과 전체 무결성 미확인을 기록한다.
 4. RGB·pose의 내부 순서에 의존하지 않고 sequence/frame 식별자로 좌우 영상·정답을 대조한다. Frame 정렬, 누락·연속성, split 및 원본 motion 중복을 확인한다. 매칭되지 않은 파일을 조용히 버려 편향된 평가 sample을 만들지 않는다. 한쪽 영상과 일부 JSON의 추출만으로 학습 준비 완료를 선언하지 않는다.
-5. 검증된 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 이후 별도로 구현할 학습 코드가 추출본에서 배치를 구성해 GPU에 전달한다. 같은 런타임에서는 추출본을 재사용하며 매 배치·epoch마다 원본을 처음부터 해제하지 않는다. 결과·checkpoint·manifest는 Drive 등 영구 저장소에 분리 보관하고 런타임 삭제·추출본 소실 후 재준비한다. [6]
+5. 검증된 추출 JSON 디렉터리를 기존 loader의 `--input`에 연결한다. 실제 데이터용 특징 계약과 RGB 로더 연결을 준비한 뒤 `rewind_m1` 학습 기반으로 배치를 구성해 GPU에 전달한다. 이 실제 데이터 연결은 아직 구현·검증하지 않았다. 같은 런타임에서는 추출본을 재사용하며 매 배치·epoch마다 원본을 처음부터 해제하지 않는다. 결과·checkpoint·manifest는 Drive 등 영구 저장소에 분리 보관하고 런타임 삭제·추출본 소실 후 재준비한다. [6]
 
 네트워크 읽기 단위는 학습 배치와 다르다. 인덱스 없는 gzip에서 뒤쪽 sample에 도달하려면 앞부분을 읽고 해제해야 하므로 작은 추출본도 큰 전송량·준비 시간을 요구할 수 있다. 작업별 다운로드량·경과 시간·RAM·임시 디스크 상한과 중단 조건을 설정하고, 실제 Colab 소량 시험에서 측정한 후 값을 정한다. 완전한 좌우 RGB/pose clip 확보, 중단 시 불완전 산출물 격리, 같은 런타임의 재사용, 새 런타임의 재준비와 manifest 연결을 준비 기능의 검증 항목으로 둔다.
 
@@ -144,6 +152,8 @@ EfficientNet 계열 encoder와 heatmap decoder로 2D joints와 confidence를 예
 Front-end를 학습·고정한 뒤 2D 특징을 캐시한다. 캐시에 모델과 전처리 버전을 기록하고, 단일 프레임 3D regression 및 temporal regression을 비교 기준으로 구현한다. GT 2D 사용 결과와 예측 2D 결과는 별도 표로 보고한다.
 
 **완료 기준:** Body/hand별 2D 지표와 예측 2D 기반 3D 학습·평가를 끝까지 실행한다.
+
+**2026-10-14 구현 상태:** 작은 regression·loss·checkpoint와 개발용 Conv front-end/cache의 합성 연결을 구현·CPU 검증했다. 설정 `m1_*_synthetic.json`과 모든 결과의 synthetic 출처를 보존한다. EfficientNet baseline, 실제 RGB 로더·데이터셋 학습/캐시, body/hand 지표, Colab GPU 비용 실측은 남아 있어 위 완료 기준을 충족하지 않는다. [M1 실행 안내](M1_BASELINE.md)를 기준으로 후속 범위를 검토한다.
 
 ## 2 기준 모델 구현과 학습
 

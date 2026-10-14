@@ -1,0 +1,2 @@
+# Colab에서는 기존 GPU PyTorch를 우선 사용한다. 로컬 CPU 설치법은 M1 안내 참조.
+torch>=2.3
