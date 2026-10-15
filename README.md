@@ -18,6 +18,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - JSON·window 도구는 Python 표준 라이브러리로 실행합니다. M1은 별도 PyTorch 환경이 필요하며 이번 검증은 Python 3.12.14 / torch 2.7.1+cpu입니다. 실행법과 한계는 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. 기존 실제 sample 이력은 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 있으며 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 - 2026-10-15 후속 [ArchVis sample 감사](docs/ARCHVIS_POSE_AUDIT.md)에서 Drive ZIP의 32 JSON hash·87관절 필수 배열을 대조했습니다. 연속 18프레임 smoke와 실제 causal window 검사를 통과했고, 산재된 Opening 14개는 gap 진단을 유지합니다. 좌표 사이의 수치 관계를 확인했으며 단위·시간·RGB/calibration·split과 학습은 미검증입니다.
 
+- 후속 공식 자료 대조에서 두 sample의 train 경로 소속과 Scaramuzza 3D→2D annotation 정합성을 확인했습니다. 실제 RGB 대응·단위·시간은 남아 있고, 공식 RGB 부분 읽기는 상한 부근 오류로 재사용 불가 처리했습니다. [후속 근거](docs/ARCHVIS_POSE_AUDIT.md)를 따릅니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |

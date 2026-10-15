@@ -32,6 +32,11 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-15 현재 상태와 우선 실행 계획
 
+**2026-10-15 공식 근거 확인 및 M2/M3 구현 진행 범위**
+
+- 두 sample의 공식 train 경로 소속과 공식 Scaramuzza calibration의 3D→2D annotation 정합성을 독립 확인했다. 원본 motion 독립성·RGB overlay·단위·시간 등은 남아 있다. 공식 RGB 제한 읽기는 2,301,530 bytes/60.031초 후 `http_body_failed`로 재사용 불가 처리했으며 대상 pose와 대응하는 RGB는 확보하지 못했다. [상세 근거](ARCHVIS_POSE_AUDIT.md#후속-공식-근거rgb-준비-조사-2026-10-15)를 따른다.
+- 사용자는 M3까지 진행하고 M2 후 커밋할 것을 지시했다. 현재 M0/M1 실제 데이터 완료 기준은 미충족임을 설명했으며, 우선 데이터 없이 가능한 M2 body teacher와 M3 body→hand cascade 구현·합성 검증을 진행한다. M2 검토 후 로컬 커밋하고 M3로 이어간다. 이 구현 범위 승인은 실제 학습 예산, M4, 원격 push 승인이나 M2/M3 성능 완료 선언이 아니다.
+
 **2026-10-15 후속 실제 JSON 감사 — M0 부분 검증**
 
 - [사용자 sample ZIP 감사](ARCHVIS_POSE_AUDIT.md)에서 32개 payload의 SHA-256·크기를 manifest와 대조했고 모두 동일했다. 각 87관절의 필수 배열 13,920개가 수치 검사를 통과했다. 기존 3개 보고서도 byte 단위로 동일하다.

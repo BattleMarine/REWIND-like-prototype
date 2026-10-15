@@ -45,3 +45,15 @@ Git 제외 로컬 보관 위치는 다음과 같다. 새 checkout에는 자동�
 관절 선택 62개·연결 61개는 기존 개발용 미검증 설정이다. 단위·축·회전 composition·변환 방향·calibration/재투영·FPS/timestamp·공식 split/원본 motion·RGB 대응·데이터 버전은 계속 미검증이다. `train_ready=false`와 M0/M1 미완료 상태를 유지한다.
 
 다음 작업 후보는 이 18프레임과 대응하는 좌우 RGB·calibration·공식 split 근거를 제한된 예산으로 확보하고 관절/단위·좌표·시간 규격을 검증하는 것이다. 이후 train 소속과 입력 계약이 확인되면 GT 2D 진단 학습으로 연결한다. RGB 예측 입력 baseline과 GPU 검증은 별도이며 이번 감사에서 학습이나 데이터 규모 확대는 실행하지 않았다.
+
+## 후속 공식 근거·RGB 준비 조사 (2026-10-15)
+
+- [공식 UnrealEgo2 split ZIP](https://unrealego.mpi-inf.mpg.de/data/data_split/UnrealEgoData2.zip)의 SHA-256은 `40160ff2c2192b5c342a80a1f76b37ea651afc45d1fd99fdc778dd4f18b81171`이다. Opening과 Brutal_Assassination의 전체 sequence 경로가 train.txt 14행·23행에 각각 한 번 포함되고 validation/test에는 없다. 오케스트레이션도 독립 대조했다. 따라서 해당 경로의 공식 train 소속은 확인했지만 원본 motion 단위 독립성·전체 archive 버전 일치는 별도다. 기존 원본 report의 unknown은 소급 변경하지 않는다.
+- [공식 calibration ZIP](https://unrealego.mpi-inf.mpg.de/data/fisheye_calib_unrealego.zip)의 SHA-256은 `0163a86866827dcd8e4fc5bba76f9812fe919cebed1941ce1fa95c8ba2102345`다. Scaramuzza JSON의 W2C polynomial·affine·center를 그대로 사용하고 `theta=atan2(-z,hypot(x,y))`로 camera 3D를 투영하면 5,568관측의 2D annotation과 평균 `1.90656e-5 px`, 최대 `7.46509e-5 px` 차이로 일치한다. 고정된 축/부호 후보 16개를 비교했으며 계수를 학습하거나 fitting하지 않았다. 독립 계산으로 동일 결과를 확인했다.
+- 위 값은 **저장된 3D와 2D annotation 사이의 정합성**이다. 모델 예측 정확도, 실제 RGB overlay, 물리 단위·FPS·world extrinsics의 검증이 아니다. 음수 2D 192개와 z≤0 관측 704개도 유지했다. OpenCV 모델의 z>0 한정 비교는 평균 0.81146px/최대 7.77749px였으며 나머지 704개는 해당 경로에서 평가하지 않았다.
+- 숫자 suffix를 제거한 motion 이름 후보가 다른 split에도 존재한다(Brutal train/validation/test 12/0/1, Opening 109/20/18). 이름만으로 같은 원본 mocap이라고 판정하거나 split 누수가 없다고 선언하지 않는다.
+- Drive RGB 목록에 ArchVis `000`~`004` 5개가 있으며 공식 다운로드 스크립트의 part 수와 일치한다. 총 목록 크기는 52,441,303,081 bytes다. 내용·hash·전체 무결성 검사가 아니다. Drive media는 이번에 읽지 않았다.
+- 별도의 공식 서버 RGB 부분 읽기는 기본 8MiB/60초/16MiB 저장 상한으로 실행했다. 사용자 중단 전 실행은 최종 보고서 없이 partial 983,040 bytes를 남겨 재사용하지 않는다(전송량 미확정). 재개 실행은 새 폴더에서 2,301,530 bytes/60.031초 뒤 `http_body_failed`로 종료했고 `inspection_candidates_usable=false`, verify `not_usable`이다. 완전 파일 기록 1개도 다른 인물의 Getting_Up__1_/camera_right/final_10.png여서 목표 pose와 대응하지 않는다. 실패 추출본은 학습에 쓰지 않고 예산을 자동 확대하지 않았다. 이 결과를 Drive/Colab 전송 성능이나 원본 손상 증거로 해석하지 않는다.
+- Git 제외 `outputs/m0_next_evidence_20261015/`에 공식 파일·수신 log·split/재투영 결과·독립 검토·RGB 실패 보고서를 보존한다. `root/archvis_rgb_selection.json`은 기존 Colab notebook의 `INPUT_MODE=json_upload`에 넣을 개인용 선택 입력이며 metadata를 새로 확인해야 한다. `root/colab_target.json`의 glob은 목표 sequence frame 0의 좌우 PNG만 선택한다. 형식과 이름 계약만 검사했으며 Drive RGB 실행은 미완료다. 상한 내 결과가 0이어도 원본에 해당 frame이 없다는 뜻은 아니다.
+
+M0에서 남은 실제 RGB·좌표/단위·시간·skeleton·원본 motion 검증을 유지한다. 후속 M2/M3의 합성 구현 검증은 이 데이터의 학습 준비 완료와 구분한다.
