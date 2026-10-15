@@ -13,7 +13,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - 2026-10-14 M1 학습 기반을 추가했습니다. 명시적 tensor 계약, 작은 single-frame/causal temporal regression, loss·평가·checkpoint 재개와 train-only 합성 RGB 예측 캐시 연결을 구현했습니다. 당시 Python 테스트 59개와 합성 CPU 학습·재개·평가를 통과했습니다. 실제 데이터 baseline·EfficientNet front-end·Colab GPU는 미검증이며 M1 전체 완료가 아닙니다.
 - [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했으며 실제 Colab 업로드·인증·Drive/GPU 실행은 아직 하지 않았습니다.
 - `rewind_archive`에 분할 gzip/tar의 상한 있는 순차 읽기·선택 추출·이름 대응·hash 재사용 검사를 추가했습니다. 당시 Python 테스트 83개(기존 59+archive 24)를 통과했고, 실제 HTTP 검증은 로컬 loopback 서버입니다. M0/M1 전체 완료가 아닙니다.
-- Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 최신 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 dict/작은 선택 JSON → 기본 비활성 metadata/auth → 별도 기본 비활성 pilot/verify 순서로 실행할 수 있습니다. 실제 전송 라이브러리는 익명 credential+loopback에서 확인했고 실제 Drive·Colab 인증/API와 학습 데이터 검증은 남아 있습니다.
+- Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 당시 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 dict/작은 선택 JSON → 기본 비활성 metadata/auth → 별도 기본 비활성 pilot/verify 순서로 실행할 수 있습니다.
+- 2026-10-15 사용자 Colab에서 metadata HTTP 200·chunked·Content-Length 없음 때문에 `metadata_protocol` 실패가 관측됐습니다. 양쪽 metadata 경로를 byte/시간 상한 내 EOF 읽기로 수정했고 전체 97개 회귀와 실제 라이브러리 loopback 오류 검사를 통과했습니다. Media의 strict 206 Range 조건은 유지합니다. 수정 후 실제 Colab manifest/pilot 성공·학습 데이터 검증은 아직 미확인입니다.
 - JSON·window 도구는 Python 표준 라이브러리로 실행합니다. M1은 별도 PyTorch 환경이 필요하며 이번 검증은 Python 3.12.14 / torch 2.7.1+cpu입니다. 실행법과 한계는 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. 기존 실제 sample 이력은 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 있으며 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 
 ## 문서 안내
@@ -66,9 +67,9 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 - Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, M1 학습 기반은 `rewind_m1` 모듈로 분리했습니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
 
-### Drive와 Colab의 데이터 준비 — 부분 구현·실제 연결 미검증
+### Drive와 Colab의 데이터 준비 — 부분 구현·실제 추출 미검증
 
-Drive의 현재 분할 압축 원본을 유지하고, 인증된 Drive API의 `Range` 요청으로 일정 바이트씩 읽어 Colab CPU에서 순차 해제하는 구조입니다. `rewind_archive`의 local/HTTP 소스와 추출 코어는 합성·기존 공식 prefix 로컬 재생으로 확인했습니다. 명시한 Drive ID의 metadata manifest 생성과 bounded pilot도 모의/실제 라이브러리 loopback에서 검사했으나 실제 Google 인증/API는 미실행입니다. 좌우 RGB·pose의 정합성·split을 검증한 뒤 GPU 학습에 연결하는 실제 경로는 미완료입니다. 전체 압축본·결합본·전체 추출본을 런타임에 보관하지 않습니다. 결과·checkpoint·manifest는 별도 영구 보관합니다. [Drive 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download), [Colab 운영 제약](https://research.google.com/colaboratory/faq.html)
+Drive의 현재 분할 압축 원본을 유지하고, 인증된 Drive API의 `Range` 요청으로 일정 바이트씩 읽어 Colab CPU에서 순차 해제하는 구조입니다. `rewind_archive`의 local/HTTP 소스와 추출 코어는 합성·기존 공식 prefix 로컬 재생으로 확인했습니다. Metadata HTTP200 chunked 실패는 사용자 Colab에서 관측했고 수정은 모의/실제 라이브러리 loopback으로 검사했습니다. 수정본의 실제 manifest/pilot 성공과 좌우 RGB·pose의 정합성·split·GPU 학습 연결은 미완료입니다. 전체 압축본·결합본·전체 추출본을 런타임에 보관하지 않습니다. 결과·checkpoint·manifest는 별도 영구 보관합니다. [Drive 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download), [Colab 운영 제약](https://research.google.com/colaboratory/faq.html)
 
 - 현재 `000`, `001` 등은 하나의 gzip 스트림을 나눈 조각입니다. 별도 인덱스 없이 중간 조각만 독립 해제하거나 원하는 학습 배치 위치로 바로 이동할 수 없습니다. 네트워크 읽기 단위와 학습 배치는 다릅니다.
 - 불완전한 archive도 `000`부터 끊김 없이 확보한 앞부분에서는 온전히 읽힌 파일을 sample 후보로 사용할 수 있습니다. 잘린 마지막 파일은 제외하며, 일부 추출 성공을 전체 무결성·완전한 시퀀스 확보로 해석하지 않습니다.

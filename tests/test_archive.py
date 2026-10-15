@@ -409,7 +409,8 @@ class HttpArchiveTests(ArchiveTestCase):
         session.version='8'
         with self.assertRaisesRegex(PreparationError,'source_changed'): source.read_range(0,4,budget,received.append)
         session.with_length=False
-        with self.assertRaisesRegex(PreparationError,'metadata_response'): source.read_range(0,4,budget,received.append)
+        session.version='7'
+        self.assertEqual(source.read_range(0,4,budget,received.append),b'01234')
         session.with_length=True
         session.bad_metadata=True
         for bad in (None,[],"text",False,23):

@@ -1,10 +1,10 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-14 · `rewind_archive`의 제한된 준비 코어와 후속 metadata→manifest/pilot 묶음입니다. 분할 조각을 000부터 읽어 하나의 gzip을 순차 해제하고 tar의 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 실제 사용자 Drive와 Colab 실행은 미검증입니다.
+2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패는 관측했으나 수정본의 실제 manifest/pilot 성공은 아직 미확인입니다.
 
 ## 현재 가능한 범위
 
-Python 3.10 이상 표준 라이브러리로 local file·HTTP Range 소스를 읽습니다. `AuthorizedSession` 주입형 Drive API adapter와 metadata builder의 실제 google-auth/requests/urllib3 전송 경로는 익명 credential·로컬 loopback으로 검사했습니다. 실제 Google 인증·Drive/Colab 접속·응답은 미검증입니다. GPU는 준비 작업에 필요하지 않습니다. Archive 준비 notebook은 [archive_prepare.ipynb](../notebooks/archive_prepare.ipynb), M1 합성 학습 notebook은 별도 [m1_baseline.ipynb](../notebooks/m1_baseline.ipynb)입니다.
+Python 3.10 이상 표준 라이브러리로 local file·HTTP Range 소스를 읽습니다. `AuthorizedSession` 주입형 Drive API adapter와 metadata builder의 실제 전송 라이브러리는 익명 credential·로컬 loopback으로 검사했습니다. 사용자 실제 metadata 응답의 전송 조건과 로컬 수정 검증을 구분하며 실제 Drive/Colab pilot 완료는 미확인입니다. GPU는 준비 작업에 필요하지 않습니다. Archive 준비 notebook은 [archive_prepare.ipynb](../notebooks/archive_prepare.ipynb), M1 합성 학습 notebook은 별도 [m1_baseline.ipynb](../notebooks/m1_baseline.ipynb)입니다.
 
 현재 기능은 일반 tar 도구 전체를 대체하지 않습니다. 단일 gzip stream의 regular file·directory, GNU LongName과 제한된 PAX metadata를 지원합니다. Concatenated gzip, sparse file, link·device·FIFO 등의 special file은 거부합니다. gzip restart/index와 재포장, 실제 RGB loader·좌표 변환·EfficientNet 학습은 포함하지 않습니다.
 
@@ -68,7 +68,7 @@ HTTP source는 다음과 같습니다. URL의 username/password/query/fragment�
 }
 ```
 
-Strong ETag 또는 Last-Modified 중 최소 하나가 필요합니다. 제공한 모든 validator가 응답과 일치해야 하며 If-Match/If-Unmodified-Since도 보냅니다. HTTP **206**, 정확한 Content-Range(start/end/전체 size), Content-Length와 identity encoding을 검사한 후 요청한 구간만 읽습니다. Range를 무시한 200이나 잘못된 header는 본문을 읽지 않습니다. Content-Length가 없는 chunked 응답은 현재 지원하지 않습니다. 자동 재시도는 구현하지 않습니다.
+Strong ETag 또는 Last-Modified 중 최소 하나가 필요합니다. 제공한 모든 validator가 응답과 일치해야 하며 If-Match/If-Unmodified-Since도 보냅니다. Media는 HTTP **206**, 정확한 Content-Range(start/end/전체 size), Content-Length와 identity encoding을 검사한 후 요청한 구간만 읽습니다. Range를 무시한 200이나 잘못된 header는 본문을 읽지 않습니다. **Media의** 길이 없는 chunked 응답은 지원하지 않습니다. Metadata의 별도 bounded EOF 읽기는 아래 조건을 따릅니다. 자동 재시도는 구현하지 않습니다.
 
 ## Drive runtime adapter
 
@@ -81,13 +81,15 @@ Drive part source/identity는 아래 구조입니다. size/version/modifiedTime�
 }
 ```
 
-CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 metadata와 pilot을 각각 기본 비활성으로 두고, 명시한 part 선택을 검사한 후 사용자가 인증하며 metadata로 manifest를 생성합니다. Media는 별도 pilot 활성화·사용자 glob 지정 후에만 읽습니다. 이 셀의 실제 Google 인증·접속은 미검증입니다. Mount된 Drive 파일 읽기와 Drive API 부분 읽기는 다릅니다.
+CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 metadata와 pilot을 각각 기본 비활성으로 두고, 명시한 part 선택을 검사한 후 사용자가 인증하며 metadata로 manifest를 생성합니다. Media는 별도 pilot 활성화·사용자 glob 지정 후에만 읽습니다. 사용자 Colab에서 metadata200응답을 받았지만 수정 후 전체 단계의 성공은 아직 확인하지 않았습니다. Mount와 Drive API 부분 읽기는 다릅니다.
 
-Drive adapter는 media Range 요청 전후 metadata의 size/version/modifiedTime을 대조합니다. Metadata는 Content-Length 1~16384가 있는 HTTP 200 JSON object만, media는 정확한 HTTP 206만 허용합니다. Null/list/string 등 잘못된 metadata는 report를 남기며 거부합니다. 자동 auth 재요청을 피하려고 notebook의 `AuthorizedSession(max_refresh_attempts=0)`와 `HTTPAdapter(max_retries=0)`를 사용합니다. Adapter도 알려진 session의 refresh retry 정책이 0이 아니면 거부합니다.
+Drive adapter는 media Range 요청 전후 metadata의 size/version/modifiedTime을 대조합니다. Metadata는 HTTP200·identity content encoding·유효 JSON object를 요구합니다. Content-Length가 있으면 기존 양의 길이/상한/short-body 검사를 유지하고, 없으면 chunked 또는 EOF 종료 응답을 read1로 제한 읽습니다. Declared length와 Transfer-Encoding 혼재, 미지원 encoding·HTTP 실패·잘린 JSON/chunk·종료 chunk 누락은 거부합니다. Media는 정확한206조건을 유지합니다. Null/list/string도 거부하며 auth 재요청/transport retry는 기존0설정을 유지합니다.
+
+길이 없는 metadata는 response 상한(기본16KiB)과 단계의 남은 global body 상한을 넘겨 읽지 않습니다. **정확히 상한까지 읽으면 EOF를 확인하지 못한 상태로 실패**하며 1byte를 더 읽지 않습니다. Metadata report request_audit와 준비 stats.metadata_response_audit에는 정해진 status·길이·TE/CE/Content-Type 분류와 수신 byte만 남기며 원본 header·URL·본문을 출력하지 않습니다. Chunk framing은 실제 transport 라이브러리가 해석하고 오류는 `http_body_failed`로 유지합니다. [HTTP chunked framing](https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1)
 
 응답 body는 urllib3의 `raw.read1(size, decode_content=False)`를 요구하며 미지원 API에 `raw.read(size)`로 우회하지 않습니다. 이는 단일 read 후 deadline을 확인하기 위한 계약입니다. 접근 가능한 socket은 잔여 시간으로 timeout을 줄이고, 접근 불가하면 session의 요청 timeout과 read1 사이 협력적 검사를 사용합니다. 모의 session과 실제 라이브러리의 loopback 전송을 구분해 검사했습니다. [urllib3 read1 API](https://urllib3.readthedocs.io/en/stable/reference/urllib3.response.html#urllib3.response.HTTPResponse.read1), [google-auth AuthorizedSession](https://google-auth.readthedocs.io/en/latest/reference/google.auth.transport.requests.html#google.auth.transport.requests.AuthorizedSession), [Drive 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download)
 
-최초 인증과 credential refresh는 builder/prepare 밖에서 수행하며 그 비용은 통계와 별도입니다. Credential은 session에만 존재하고 manifest/code/report/log에 저장·출력하지 않습니다. 준비 중 before_request refresh나 transport 자체 동작이 추가될 수 있어 실제 Colab에서 별도로 검증해야 합니다. Google 인증·대용량 원본 읽기·프로젝트 의존성 변경은 없었고, 오케스트레이션이 전송 검증용 라이브러리만 Git 제외 경로에 격리 설치했습니다.
+최초 인증과 credential refresh는 builder/prepare 밖에서 수행하며 그 비용은 통계와 별도입니다. Credential은 session에만 존재하고 manifest/code/report/log에 저장·출력하지 않습니다. 준비 중 before_request refresh나 transport 자체 동작이 추가될 수 있어 실제 Colab에서 별도로 검증해야 합니다. 로컬 검증에서는 Google 인증·대용량 원본 읽기·프로젝트 의존성 변경 없이, Git 제외 경로에 격리 설치한 전송 검증용 라이브러리를 사용했습니다.
 
 ## Drive metadata에서 manifest와 pilot으로
 
@@ -179,6 +181,14 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 - 오케스트레이션의 **기존 공식 서버 prefix 로컬 재생**: RGB 2 MiB → PNG 2개, pose 256 KiB → JSON 16개, 이전 검사와 완료 파일 18개 SHA-256 모두 일치. 둘 다 마지막 payload 잘림, gzip EOF/CRC false, 전체 무결성/train_ready false, partial 잔여 0. 이름은 서로 다른 2개 sequence라 완전 triplet **0개**입니다. 이번 새 도구 검증에서 공식 서버를 다시 다운로드한 결과가 아닙니다. 내부 실행 근거는 Git 제외 `outputs/archive_next_step/review_replay.json` 등에 보관합니다.
 - 초기 준비 notebook은 5개 code cell의 별도 ZIP/새 임시 checkout 실행·문법·빈 출력을 검사했습니다(`outputs/archive_next_step/review_notebook.json`). 후속 notebook은 **7개** code cell로 metadata/pilot을 나눴고 fresh ZIP의 기본 auth0·합성 triplet4, mock metadata/pilot pose4·선택 변경 차단·실패 재실행 결과 폐기·선택 JSON 업로드를 확인했습니다. Notebook 사전 테스트는 archive24+metadata10, 총34개를 실행했습니다. 실제 Colab 업로드·Google 인증/API가 아니며 후속 근거는 `outputs/drive_pilot_review/notebook_review.json`입니다.
 
-최신 전체 회귀는 Python 3.12.14 / torch 2.7.1+cpu에서 **93개**(이전83+metadata10) 모두 통과했습니다(오케스트레이션 독립 14.548 s, loopback 허용). requests2.34.2/urllib3 2.8.0/google-auth2.62.0을 격리해 AnonymousCredentials+loopback으로 metadata3요청672body bytes(media0) → 준비9요청1756bytes → 완전 pose4/verify/저장·반환 report 일치를 확인했습니다. 200 Range 거부·media 후 version 변경·slow/trickle 중단도 실제 라이브러리로 검사했습니다. Google 요청·인증0이며 근거는 `outputs/drive_pilot_review/pipeline_review.json`·`transport_review.json`입니다.
+앞선 metadata 묶음은 **93개** 회귀와 실제 requests2.34.2/urllib3 2.8.0/google-auth2.62.0의 AnonymousCredentials+loopback을 검사했습니다(`outputs/drive_pilot_review/`). Chunked 수정 후 최신 전체는 **97개** 모두 통과했습니다(오케스트레이션17.470s). 사전 테스트는 archive24+metadata14=38개입니다. Fresh ZIP notebook의 기본 auth0·합성triplet4·mock metadata/pilot·선택변경·실패결과폐기·JSON업로드와7codecell을 확인했습니다(`outputs/chunked_metadata_review/notebook_review.json`).
+
+실제 라이브러리의 별도 검사 **15조건**은 정상chunked→manifest→pilot 전후metadata, response/global cap·slow·잘린chunk/JSON·JSON완료뒤종료chunk 누락·HTTP인증상태·encoding·CL/TE혼재·media조건유지·post-media 오류를 통과했습니다. 두report의 byte합도 reserve안입니다. 별도 driver는 optional dependency를 skip하지 않고 명시적 환경에서 실행하며 unittest97개와 합산하지 않습니다. Google요청/인증0이고 근거는 `outputs/chunked_metadata_dev_final/transport_report.json`·오케스트레이션의 `outputs/chunked_metadata_review/pipeline_review.json`입니다.
+
+```sh
+python tests/check_chunked_transport.py --dependency-dir outputs/drive_pilot_review/transport_deps --output outputs/chunked_transport_check
+```
+
+사용자 Colab의 실제 관측은 status 200, Content-Length 없음, Transfer-Encoding chunked, Content-Encoding 없음, Content-Type JSON UTF-8과 기존 `metadata_protocol` 실패입니다. 이는 수정 후 manifest/다운로드 성공을 뜻하지 않습니다. 최신 소스 ZIP을 사용하고, 이미 import한 구모듈을 계속 쓰지 않도록 [Colab 재시작·재업로드 절차](COLAB_SETUP.md)를 따릅니다.
 
 앞선 공식 prefix 로컬 재생은 PNG2·JSON16의 과거 SHA 일치·incomplete_contiguous_prefix·verify·triplet0/incomplete18 기록을 유지합니다(`outputs/archive_next_step/review_replay_final.json`·`review_matching_final.json`). 실제 사용자 Drive blob/원본 version·Colab 인증/API/준비 비용·운영 상한, 실제 좌우 RGB+pose clip과 공식 split·원본 motion은 미검증입니다. Colab·GPU 성능을 보장하지 않습니다. [로드맵](ROADMAP.md), [M0 도구](M0_JSON_TOOLS.md), [M1 입력 계약](M1_BASELINE.md), [Colab 안내](COLAB_SETUP.md)를 따릅니다.

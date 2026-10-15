@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 14일 운영·검증 상태 보완
+검토 초안 v0.2   |   2026년 10월 15일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -30,7 +30,12 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
-### 2026-10-14 현재 상태와 우선 실행 계획
+### 2026-10-15 현재 상태와 우선 실행 계획
+
+**2026-10-15 Colab metadata 전송 오류 수정**
+
+- 사용자 Colab의 HTTP200·Transfer-Encoding chunked·Content-Length 없음·JSON UTF-8 응답에서 기존 `metadata_protocol` 실패를 확인했다. Builder와 pilot 전후 Drive metadata에 공통 bounded EOF reader를 적용했다. Declared length 조건과 byte/deadline을 유지하며 무제한 body/JSON 읽기를 사용하지 않는다. 길이 없는 응답이 정확히 상한에 닿으면 EOF 확인용 1byte를 더 읽지 않고 미확정으로 거부한다. Media206/Content-Range/Length 검증은 그대로다.
+- 전체97개(기존93+필수4)와 notebook 사전38개(archive24+metadata14), 실제 라이브러리 loopback15조건을 통과했다. 정상 chunked→manifest→pilot 전후metadata·verify, 잘린 chunk/JSON·종료 chunk 누락·상한·slow·인증상태·encoding·media조건 유지와 report reserve를 확인했다. 비밀 없는 status/헤더 분류·수신 byte를 기록한다. 실제 Colab 실패 관측과 수정 후 로컬 검증을 구분하며 수정본의 실제 manifest/pilot 성공·전체archive·학습데이터/운영예산 검증은 남아 있다. 재실행은 [Colab 가이드](COLAB_SETUP.md)의 새 runtime/소스 ZIP 절차를 따른다.
 
 **최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 이후 `rewind_archive`로 저장된 공식 prefix를 로컬 재생해 PNG 2개·JSON 16개의 hash를 대조했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 과거 18프레임 sample과 이번 prefix의 16 pose 파일은 다른 검증 이력이다. 원본 압축을 보존하고 필요한 파일만 런타임에 추출하는 운영 결정을 유지한다. 제한된 준비 기능과 별도 합성 notebook을 구현했으며 조사·합성/부분 실행으로 M0/M1 완료를 선언하지 않는다.
 

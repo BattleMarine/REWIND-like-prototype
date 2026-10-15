@@ -1,10 +1,10 @@
 # Colab 환경 준비·부분 추출·M1 실행 가이드
 
-2026-10-14 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. Colab 접속·Drive 인증·GPU 실행은 아직 이 프로젝트에서 검증하지 않았습니다.
+2026-10-15 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. 사용자의 실제 Colab 진단에서 Drive metadata HTTP 200 응답을 확인했습니다. Manifest 생성·실제 압축 추출·GPU 실행 성공은 아직 확인하지 않았습니다.
 
 오케스트레이션 검토에서는 노트북의 환경 확인·테스트·합성 학습·재개·평가·캐시 셀을 Windows CPU에서 실행했습니다. 59개 테스트가 통과했고, 결과 17개 파일의 로컬 복사·SHA-256 일치를 확인했습니다. 업로드·Drive 인증 셀은 실행하지 않았으며 로컬 복사 검증을 실제 Drive 전송 성공으로 해석하지 않습니다.
 
-후속 압축 준비·metadata/pilot 구현까지 포함한 최신 Python 회귀검사는 93개가 통과했습니다(기존 59개 + 압축 준비 24개 + metadata/pilot 10개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 전송을 검증한 수치는 아닙니다.
+Chunked metadata 수정까지 포함한 최신 Python 회귀검사는 97개가 통과했습니다(기존 59개 + 압축 준비 24개 + metadata/pilot 14개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 추출 성공을 검증한 수치는 아닙니다.
 
 압축 준비 노트북은 별도 로컬 ZIP·임시 폴더에서 코드 추출·커널 import와 합성 추출/재사용/매칭을 실행해 RGB 8개·pose 4개, 대응 triplet 4개를 확인했습니다. 업로드 UI는 모의 호출했고 실제 Drive 분기는 비활성으로 검사했습니다. 노트북 구문 검증과 로컬 실행 결과를 실제 Colab 인증 성공으로 해석하지 않습니다.
 
@@ -104,7 +104,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 ### Drive 파일 선택부터 소량 읽기까지
 
-1. **CPU 런타임**에서 준비 노트북의 환경·소스 ZIP·사전 테스트 34개·합성 진단을 실행합니다.
+1. **CPU 런타임**에서 준비 노트북의 환경·소스 ZIP·사전 테스트 38개·합성 진단을 실행합니다.
 2. 선택 입력에 `archive_id`, `dataset_version`, `kind`(`rgb` 또는 `pose`), 원본의 `total_parts`, 읽을 조각의 `index`·`name`·`file_id`를 넣습니다. `drive_part_selection_v1` JSON을 업로드하거나 노트북에서 직접 입력할 수 있습니다. 파일 공유 URL의 `/d/` 뒤 식별자가 file ID이며, 폴더 ID와 혼동하지 않습니다. 목록은 `000`부터 연속해야 합니다. `total_parts`는 현재 다운로드된 개수가 아니라 공식 배포 목록 등으로 확인한 원본 조각 수입니다.
 3. `INPUT_MODE`를 직접 입력이면 `"dict"`, 선택 JSON 업로드이면 `"json_upload"`로 정합니다. **`RUN_DRIVE_METADATA = True`만 활성화**해 계정을 인증합니다. 파일 ID·이름·유형·다운로드 가능 여부·크기·version·modifiedTime을 검사하고, 모두 통과한 경우에만 `archive_manifest.json`과 `metadata_report.json`을 만듭니다. 이 단계는 압축 본문을 읽지 않습니다. 실패하면 보고서의 중단 이유를 확인합니다.
 4. manifest와 읽기 상한을 확인하고, `SELECTED_MEMBER_GLOBS`에 저장할 member glob을 입력한 뒤 **`RUN_DRIVE_PILOT = True`를 별도로 활성화**합니다. 원본 내부 시퀀스 경로를 아직 모르면 작은 조사 목적의 glob을 명시적으로 선택할 수 있지만, 기존 전송·시간·파일 수 상한을 유지합니다. 실패·0개 추출 시 자동으로 범위를 늘리거나 재시도하지 않습니다. Glob만 바꿀 때는 별도 셀에서 해당 변수만 설정합니다. 입력 셀 전체를 다시 실행하면 metadata 결과가 초기화되므로 metadata부터 다시 실행합니다.
@@ -122,6 +122,20 @@ Metadata 조회와 media 읽기는 모두 기본 비활성입니다. 같은 커�
 4. 가중치만 불러오는 평가와 optimizer·scheduler·RNG·학습 위치를 복원하는 학습 재개를 구분합니다. 코드·데이터가 달라졌다면 같은 실험의 정확한 재개로 기록하지 않습니다.
 
 ## 자주 막히는 지점
+
+### Metadata 단계에서 `metadata_protocol`이 나온 경우
+
+2026-10-15 사용자 Colab에서 `status=200`, `Content-Length` 없음, `Transfer-Encoding=chunked`, JSON 응답을 확인했습니다. 이전 코드는 metadata 응답에 길이 헤더가 반드시 있다고 가정해 본문을 읽기 전에 거부했습니다. 정상 chunked 응답을 처리하되 응답별·누적 읽기 상한과 시간 제한을 유지하도록 수정했습니다. 최초 manifest 생성과 pilot 중 원본 변경 확인에 같은 metadata 읽기를 적용합니다. 실제 압축 본문의 206·Range 검증은 유지합니다.
+
+수정된 코드로 다시 실행하는 순서는 다음과 같습니다.
+
+1. 프로젝트에서 새로 제공한 `outputs/rewind-colab-source.zip`을 준비합니다. 선택 JSON은 그대로 사용할 수 있습니다.
+2. Colab **런타임 → 세션 다시 시작**(표시 언어·UI에 따라 런타임 다시 시작)을 실행합니다. 이미 import한 이전 Python 모듈을 없애기 위한 절차입니다. 필요한 임시 결과가 있다면 먼저 내려받습니다.
+3. 기존 준비 노트북을 맨 위 환경 셀부터 다시 실행합니다. 소스 업로드 셀에서는 **새 ZIP**을 선택합니다. 출력된 revision이 새 배포 커밋인지 확인합니다. ZIP을 바꾸기만 하고 이전 커널의 모듈을 계속 사용하지 않습니다.
+4. 사전 테스트·합성 진단 후 입력 셀을 `INPUT_MODE = "json_upload"`로 실행합니다. 첫 pose 조사에는 `SELECTED_MEMBER_GLOBS = ["*/json/*.json"]`을 사용할 수 있습니다. 이는 읽기 상한 내 JSON 후보 선택이며 특정 sequence 확보를 보장하지 않습니다.
+5. `RUN_DRIVE_METADATA = True`로 실행하고 기존 선택 JSON을 업로드·인증합니다. `manifest_ready=True`인지 확인한 뒤에만 `RUN_DRIVE_PILOT = True`로 진행합니다. 실패하면 새 `stop_reason`과 metadata 보고서의 `request_audit`를 확인합니다. 인증 토큰은 공유하지 않습니다.
+
+사용자가 제공한 HTTP 응답 관측과 수정 후 로컬 검증은 실제 Colab 재실행 성공을 대신하지 않습니다. 새 오류가 있으면 상한이나 검사를 끄지 말고 보고서를 확인합니다.
 
 | 증상 | 확인할 사항 |
 | --- | --- |

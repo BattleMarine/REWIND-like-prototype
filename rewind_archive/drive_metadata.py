@@ -15,7 +15,7 @@ from rewind_data.audit import read_json
 from . import __version__
 from .contracts import Budget, PreparationError, canonical, digest, validate_manifest
 from .extraction import code_hashes
-from .sources import read_body, session_opener
+from .sources import read_metadata_body, metadata_diagnostic, session_opener
 
 
 FIELDS = "id,name,size,version,modifiedTime,mimeType,trashed,capabilities(canDownload)"
@@ -166,17 +166,8 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
             try:
                 url=f"https://www.googleapis.com/drive/v3/files/{part['file_id']}?fields={FIELDS}"
                 response=opener(url,{"Accept-Encoding":"identity"},budget.timeout())
-                length=response.headers.get("Content-Length","")
-                if response.status!=200 or not re.fullmatch(r"[0-9]{1,6}",length):
-                    raise PreparationError("metadata_protocol")
-                if response.headers.get("Content-Encoding","identity").lower()!="identity":
-                    raise PreparationError("metadata_content_encoding")
-                count=int(length)
-                if not 0<count<=limits.max_response_bytes:
-                    raise PreparationError("metadata_response_bytes_limit")
-                if count>limits.max_transfer_bytes-budget.transfer_bytes:
-                    raise PreparationError("transfer_bytes_limit")
-                raw=read_body(response,count,budget,on_chunk)
+                record["response"]=metadata_diagnostic(response)
+                raw=read_metadata_body(response,budget,limits.max_response_bytes,on_chunk)
                 try:
                     doc=read_json(raw)
                 except (ValueError,UnicodeError):

@@ -62,36 +62,82 @@ def session_opener(session):
     return open_response
 
 
-def read_body(response, expected, budget, on_chunk):
-    data = bytearray()
-    while len(data) < expected:
-        timeout = budget.timeout()
-        # 연결 socket 접근이 가능하면 각 body read의 잔여 시간도 줄인다.
+def read_one(response, size, budget, on_chunk):
+    timeout = budget.timeout()
+    try:
         if hasattr(response,"set_timeout"):
             response.set_timeout(timeout)
         sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
         if sock is not None:
             sock.settimeout(timeout)
-        try:
-            chunk = response.read1(min(expected-len(data), budget.limits.io_chunk_bytes))
-        except PreparationError:
-            raise
-        except Exception as exc:
-            partial = getattr(exc,"partial",b"")
-            if isinstance(partial,bytes):
-                budget.transfer_bytes += len(partial)
-                on_chunk(partial)
-            raise PreparationError("http_body_failed") from None
+        chunk = response.read1(size)
+    except PreparationError:
+        raise
+    except Exception as exc:
+        partial = getattr(exc,"partial",b"")
+        if isinstance(partial,bytes):
+            budget.transfer_bytes += len(partial)
+            on_chunk(partial)
+        raise PreparationError("http_body_failed") from None
+    budget.transfer_bytes += len(chunk)
+    on_chunk(chunk)
+    if budget.transfer_bytes > budget.limits.max_transfer_bytes:
+        raise PreparationError("transfer_bytes_limit")
+    budget.check_time()
+    return chunk
+
+
+def read_body(response, expected, budget, on_chunk):
+    data = bytearray()
+    while len(data) < expected:
+        chunk = read_one(response,min(expected-len(data),budget.limits.io_chunk_bytes),budget,on_chunk)
         if not chunk:
             raise PreparationError("short_http_body")
-        # 반환된 바이트는 timeout 후에도 기록한다. 다음 read 전에 중단한다.
-        budget.transfer_bytes += len(chunk)
-        on_chunk(chunk)
-        if budget.transfer_bytes > budget.limits.max_transfer_bytes:
-            raise PreparationError("transfer_bytes_limit")
-        budget.check_time()
         data.extend(chunk)
     return bytes(data)
+
+
+def metadata_diagnostic(response):
+    """값이 정해진 status/헤더 분류만 기록한다. 원본 URL/헤더/본문은 기록하지 않는다."""
+    length=response.headers.get("Content-Length")
+    encoding=response.headers.get("Content-Encoding")
+    transfer=response.headers.get("Transfer-Encoding")
+    content_type=response.headers.get("Content-Type")
+    return {"status":response.status if type(response.status) is int and 100<=response.status<=599 else None,
+        "content_length":None if length is None else int(length) if isinstance(length,str) and re.fullmatch(r"[0-9]{1,6}",length) else "invalid",
+        "content_encoding":"absent" if encoding is None else "identity" if isinstance(encoding,str) and encoding.strip().lower()=="identity" else "unsupported",
+        "transfer_encoding":"absent" if transfer is None else "chunked" if isinstance(transfer,str) and transfer.strip().lower()=="chunked" else "unsupported",
+        "content_type":"absent" if content_type is None else "json" if isinstance(content_type,str) and content_type.split(";",1)[0].strip().lower()=="application/json" else "other"}
+
+
+def read_metadata_body(response, budget, maximum, on_chunk, protocol_reason="metadata_protocol", limit_reason="metadata_response_bytes_limit"):
+    diagnostic=metadata_diagnostic(response)
+    length=diagnostic["content_length"]
+    if diagnostic["status"]!=200 or diagnostic["transfer_encoding"]=="unsupported" or (length is not None and diagnostic["transfer_encoding"]!="absent"):
+        raise PreparationError(protocol_reason)
+    if diagnostic["content_encoding"]=="unsupported":
+        raise PreparationError("metadata_content_encoding")
+    if length is not None:
+        if length=="invalid":
+            raise PreparationError(protocol_reason)
+        if not 0<length<=maximum:
+            raise PreparationError(limit_reason)
+        if length>budget.limits.max_transfer_bytes-budget.transfer_bytes:
+            raise PreparationError("transfer_bytes_limit")
+        return read_body(response,length,budget,on_chunk)
+    data=bytearray()
+    while True:
+        # EOF 확인용 1byte도 budget을 초과해 읽지 않는다. Exact cap은 미확정으로 거부한다.
+        remaining=maximum-len(data)
+        global_remaining=budget.limits.max_transfer_bytes-budget.transfer_bytes
+        if global_remaining<=0:
+            raise PreparationError("transfer_bytes_limit")
+        if remaining<=0:
+            raise PreparationError(limit_reason)
+        chunk=read_one(response,min(budget.limits.io_chunk_bytes,remaining,global_remaining),budget,on_chunk)
+        if not chunk:
+            return bytes(data)
+        data.extend(chunk)
 
 
 class LocalSource:
@@ -169,12 +215,13 @@ class DriveSource(HttpSource):
         budget.add("ranges",1,budget.limits.max_ranges)
         response = self.opener(self.metadata_url, {"Accept-Encoding":"identity"}, budget.timeout())
         try:
-            length = response.headers.get("Content-Length", "")
-            if response.status != 200 or not re.fullmatch(r"[0-9]{1,5}", length) or not 1 <= int(length) <= 16384:
-                raise PreparationError("drive_metadata_response")
-            if int(length) > budget.limits.max_transfer_bytes-budget.transfer_bytes:
-                raise PreparationError("transfer_bytes_limit")
-            raw = read_body(response,int(length),budget,lambda chunk:None)
+            if not hasattr(budget,"metadata_response_audit"):
+                budget.metadata_response_audit=[]
+            audit={"response":metadata_diagnostic(response),"bytes_received":0}
+            budget.metadata_response_audit.append(audit)
+            def received(chunk):
+                audit["bytes_received"]+=len(chunk)
+            raw = read_metadata_body(response,budget,16384,received,protocol_reason="drive_metadata_response")
             try:
                 doc = json.loads(raw)
             except (ValueError,UnicodeError):

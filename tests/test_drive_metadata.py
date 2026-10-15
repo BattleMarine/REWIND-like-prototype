@@ -22,6 +22,11 @@ class Raw(io.BytesIO):
     def read1(self, size, decode_content=False):
         return super().read1(size)
 
+    def close(self):
+        if not self.closed:
+            self.consumed=self.tell()
+        super().close()
+
 
 class FakeDrive:
     _max_refresh_attempts=0
@@ -121,7 +126,7 @@ class DriveMetadataTests(unittest.TestCase):
             self.assertEqual(result['report']['stats']['requests'],1)
 
     def test_protocol_status_length_encoding_and_metadata_json(self):
-        protocols=[(206,{'Content-Length':'100'}),(302,{'Content-Length':'100'}),(200,{}),
+        protocols=[(206,{'Content-Length':'100'}),(302,{'Content-Length':'100'}),
             (200,{'Content-Length':'65537'}),(200,{'Content-Length':'0'}),
             (200,{'Content-Length':'100','Content-Encoding':'gzip'})]
         for protocol in protocols:
@@ -132,6 +137,57 @@ class DriveMetadataTests(unittest.TestCase):
             session=FakeDrive(self.selection);session.raw_override['fake_id_0']=raw
             result=self.build(session)
             self.assertIsNone(result['manifest']);self.assertNotIn('sk-proj-secret',json.dumps(result))
+
+    def test_metadata_without_length_chunked_and_close_delimited(self):
+        for headers in ({},{'Transfer-Encoding':'chunked','Content-Encoding':None,'Content-Type':'application/json; charset=UTF-8'}):
+            session=FakeDrive(self.selection);session.protocol['fake_id_0']=(200,headers)
+            result=self.build(session)
+            self.assertTrue(result['report']['manifest_ready'])
+            response=result['report']['request_audit'][0]['response']
+            self.assertIsNone(response['content_length'])
+            self.assertEqual(result['report']['request_audit'][0]['bytes_received'],len(canonical(session.docs['fake_id_0'])))
+
+    def test_unknown_length_exact_caps_reject_without_probe_overread(self):
+        for mode in ('response','global','smaller'):
+            session=FakeDrive(self.selection);session.protocol['fake_id_0']=(200,{'Transfer-Encoding':'chunked'})
+            size=len(canonical(session.docs['fake_id_0']))
+            if mode=='response':
+                limits=replace(self.limits,max_response_bytes=size);cap=size;reason='metadata_response_bytes_limit'
+            else:
+                cap=size if mode=='global' else size-1
+                limits=replace(self.limits,max_transfer_bytes=cap);reason='transfer_bytes_limit'
+            result=self.build(session,limits)
+            self.assertIsNone(result['manifest']);self.assertEqual(result['report']['stop_reason'],reason)
+            self.assertEqual(result['report']['stats']['transfer_bytes'],cap)
+            self.assertEqual(session.responses[0].raw.consumed,cap)
+        # Declared length는 이미 알려진 endpoint까지 정확히 읽을 수 있다.
+        session=FakeDrive(self.selection)
+        result=self.build(session,replace(self.limits,max_response_bytes=len(canonical(session.docs['fake_id_0']))))
+        self.assertTrue(result['report']['manifest_ready'])
+
+    def test_metadata_framing_auth_and_safe_header_diagnostics(self):
+        for status,headers in ((401,{'Set-Cookie':'sk-proj-secret'}),(200,{'Transfer-Encoding':'gzip, chunked'}),
+            (200,{'Content-Length':'100','Transfer-Encoding':'chunked'}),
+            (200,{'Content-Encoding':'gzip sk-proj-secret'}),(200,{'Content-Length':'sk-proj-secret'})):
+            session=FakeDrive(self.selection);session.protocol['fake_id_0']=(status,headers)
+            result=self.build(session)
+            self.assertIsNone(result['manifest']);self.assertEqual(result['report']['stats']['transfer_bytes'],0)
+            self.assertNotIn('sk-proj-secret',json.dumps(result))
+
+    def test_unknown_length_transport_error_after_valid_json_is_not_eof(self):
+        from rewind_archive.sources import read_metadata_body
+        from rewind_archive.contracts import Budget
+        class Broken:
+            status=200;headers={'Transfer-Encoding':'chunked'}
+            def __init__(self): self.calls=0
+            def read1(self,n):
+                self.calls+=1
+                if self.calls==1:return b'{}'
+                raise RuntimeError('sk-proj-secret https://private/?token=secret')
+        budget=Budget(self.limits);received=[]
+        with self.assertRaisesRegex(PreparationError,'http_body_failed'):
+            read_metadata_body(Broken(),budget,100,received.append)
+        self.assertEqual(budget.transfer_bytes,2)
 
     def test_each_budget_and_missing_session_fail_without_manifest(self):
         cases=[({'max_files':1},0),({'max_requests':1},1),({'max_transfer_bytes':10},1),({'max_response_bytes':10},1)]
