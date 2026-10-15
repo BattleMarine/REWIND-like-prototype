@@ -1,10 +1,10 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패는 관측했으나 수정본의 실제 manifest/pilot 성공은 아직 미확인입니다.
+2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 실제 annotation 내용·RGB 대응·전체 archive 무결성은 미검증입니다.
 
 ## 현재 가능한 범위
 
-Python 3.10 이상 표준 라이브러리로 local file·HTTP Range 소스를 읽습니다. `AuthorizedSession` 주입형 Drive API adapter와 metadata builder의 실제 전송 라이브러리는 익명 credential·로컬 loopback으로 검사했습니다. 사용자 실제 metadata 응답의 전송 조건과 로컬 수정 검증을 구분하며 실제 Drive/Colab pilot 완료는 미확인입니다. GPU는 준비 작업에 필요하지 않습니다. Archive 준비 notebook은 [archive_prepare.ipynb](../notebooks/archive_prepare.ipynb), M1 합성 학습 notebook은 별도 [m1_baseline.ipynb](../notebooks/m1_baseline.ipynb)입니다.
+Python 3.10 이상 표준 라이브러리로 local file·HTTP Range 소스를 읽습니다. `AuthorizedSession` 주입형 Drive API adapter와 metadata builder의 실제 전송 라이브러리는 익명 credential·로컬 loopback으로 검사했습니다. 사용자 실제 metadata 응답의 전송 조건과 로컬 수정 검증을 구분하며 실제 Drive/Colab의 pose 소량 pilot 성공은 후속 사용자 보고서로 확인했습니다. GPU는 준비 작업에 필요하지 않습니다. Archive 준비 notebook은 [archive_prepare.ipynb](../notebooks/archive_prepare.ipynb), M1 합성 학습 notebook은 별도 [m1_baseline.ipynb](../notebooks/m1_baseline.ipynb)입니다.
 
 현재 기능은 일반 tar 도구 전체를 대체하지 않습니다. 단일 gzip stream의 regular file·directory, GNU LongName과 제한된 PAX metadata를 지원합니다. Concatenated gzip, sparse file, link·device·FIFO 등의 special file은 거부합니다. gzip restart/index와 재포장, 실제 RGB loader·좌표 변환·EfficientNet 학습은 포함하지 않습니다.
 
@@ -81,7 +81,7 @@ Drive part source/identity는 아래 구조입니다. size/version/modifiedTime�
 }
 ```
 
-CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 metadata와 pilot을 각각 기본 비활성으로 두고, 명시한 part 선택을 검사한 후 사용자가 인증하며 metadata로 manifest를 생성합니다. Media는 별도 pilot 활성화·사용자 glob 지정 후에만 읽습니다. 사용자 Colab에서 metadata200응답을 받았지만 수정 후 전체 단계의 성공은 아직 확인하지 않았습니다. Mount와 Drive API 부분 읽기는 다릅니다.
+CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 metadata와 pilot을 각각 기본 비활성으로 두고, 명시한 part 선택을 검사한 후 사용자가 인증하며 metadata로 manifest를 생성합니다. Media는 별도 pilot 활성화·사용자 glob 지정 후에만 읽습니다. 사용자 Colab에서 metadata 생성과 pose 소량 pilot·verify 성공을 확인했습니다. 이는 RGB 준비·실제 학습 성공을 뜻하지 않습니다. Mount와 Drive API 부분 읽기는 다릅니다.
 
 Drive adapter는 media Range 요청 전후 metadata의 size/version/modifiedTime을 대조합니다. Metadata는 HTTP200·identity content encoding·유효 JSON object를 요구합니다. Content-Length가 있으면 기존 양의 길이/상한/short-body 검사를 유지하고, 없으면 chunked 또는 EOF 종료 응답을 read1로 제한 읽습니다. Declared length와 Transfer-Encoding 혼재, 미지원 encoding·HTTP 실패·잘린 JSON/chunk·종료 chunk 누락은 거부합니다. Media는 정확한206조건을 유지합니다. Null/list/string도 거부하며 auth 재요청/transport retry는 기존0설정을 유지합니다.
 
@@ -189,6 +189,6 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 python tests/check_chunked_transport.py --dependency-dir outputs/drive_pilot_review/transport_deps --output outputs/chunked_transport_check
 ```
 
-사용자 Colab의 실제 관측은 status 200, Content-Length 없음, Transfer-Encoding chunked, Content-Encoding 없음, Content-Type JSON UTF-8과 기존 `metadata_protocol` 실패입니다. 이는 수정 후 manifest/다운로드 성공을 뜻하지 않습니다. 최신 소스 ZIP을 사용하고, 이미 import한 구모듈을 계속 쓰지 않도록 [Colab 재시작·재업로드 절차](COLAB_SETUP.md)를 따릅니다.
+사용자 Colab의 실제 관측은 status 200, Content-Length 없음, Transfer-Encoding chunked, Content-Encoding 없음, Content-Type JSON UTF-8과 기존 `metadata_protocol` 실패입니다. 이 최초 실패 관측과 별도로, 이후 사용자 보고서에서 수정본의 manifest 생성·pose 32개 추출·verify 성공을 확인했습니다. 수치와 검토 한계는 [로드맵](ROADMAP.md)에 기록합니다. 최신 소스 ZIP을 사용하고, 이미 import한 구모듈을 계속 쓰지 않도록 [Colab 재시작·재업로드 절차](COLAB_SETUP.md)를 따릅니다.
 
-앞선 공식 prefix 로컬 재생은 PNG2·JSON16의 과거 SHA 일치·incomplete_contiguous_prefix·verify·triplet0/incomplete18 기록을 유지합니다(`outputs/archive_next_step/review_replay_final.json`·`review_matching_final.json`). 실제 사용자 Drive blob/원본 version·Colab 인증/API/준비 비용·운영 상한, 실제 좌우 RGB+pose clip과 공식 split·원본 motion은 미검증입니다. Colab·GPU 성능을 보장하지 않습니다. [로드맵](ROADMAP.md), [M0 도구](M0_JSON_TOOLS.md), [M1 입력 계약](M1_BASELINE.md), [Colab 안내](COLAB_SETUP.md)를 따릅니다.
+앞선 공식 prefix 로컬 재생은 PNG2·JSON16의 과거 SHA 일치·incomplete_contiguous_prefix·verify·triplet0/incomplete18 기록을 유지합니다(`outputs/archive_next_step/review_replay_final.json`·`review_matching_final.json`). 후속 ArchVis pose 시험에서는 실제 Drive metadata·부분 읽기·준비 비용을 한 차례 확인했습니다. 전체 blob 무결성·운영 상한 확정, 실제 좌우 RGB+pose clip과 공식 split·원본 motion은 미검증입니다. Colab·GPU 성능을 보장하지 않습니다. [로드맵](ROADMAP.md), [M0 도구](M0_JSON_TOOLS.md), [M1 입력 계약](M1_BASELINE.md), [Colab 안내](COLAB_SETUP.md)를 따릅니다.
