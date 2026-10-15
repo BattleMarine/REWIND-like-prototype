@@ -215,6 +215,12 @@ Noisy 3D joints에 stereo 2D joints·confidence, camera encoding, diffusion time
 
 **완료 기준:** 소량 과적합, 미래 프레임 변경에 대한 과거 출력 불변성, 긴 시퀀스 추론을 검증한다. Diffusion과 temporal modeling의 효과를 regression 비교로 분리한다.
 
+**2026-10-15 구현 상태 — 합성 검증 묶음:** `rewind_m2`에 명시적 camera R6D/translation·skeleton 입력, GCN/spatial attention·RoPE causal temporal denoiser와 intermediate head, x0 forward diffusion·DDIM eta=0, masked position/frame loss, anchor-window streaming·학습/평가/재개 CLI를 구현했다. Cosine beta endpoint 보간과 per-joint softmax temporal은 명시적 프로젝트 선택이다. Window 총 slot과 층별 과거 수를 분리하며 full-sequence denoise와 잘린 window의 동등성을 주장하지 않는다.
+
+- 기존 97 + M2 10 = **107 tests**를 통과했다. CPU tiny 합성 100 update 후 동일 output에서 110까지 재개·평가, stochastic training의 5+7 vs 12 update 전체 상태 일치를 확인했다. 모델·sampler 미래 불변성, 58frame streaming/gap/reset 및 keyed noise를 검사했다.
+- 오케스트레이션은 수학 oracle·3관절 future perturbation·RoPE offset·padding을 독립 검사하고, 저장된 110 update checkpoint의 validation batch/streaming MPJPE 차이가 약 4.77e-7 mm임을 확인했다. 이는 인위적 2관절 fixture의 코드 경로 검증이다.
+- 실제 관절/입력 baseline·M0/M1 완료 기준, velocity/foot loss·논문 규모 학습·실제 과적합/pilot·regression 대비 효과·Colab CUDA/AMP/latency는 남아 있다. [M2 상세 안내](M2_BODY_TEACHER.md)를 따르며 위 M2 전체 완료 기준을 충족했다고 선언하지 않는다. 검토 후 로컬 커밋하고 M3 구현으로 이어간다.
+
 ### M3 Whole body teacher
 
 Body teacher를 고정하고 Hand teacher를 학습한다. Hand 모델에는 상체 3D conditioning을 추가한다. 원본처럼 학습 시 GT 상체, 평가 시 예측 상체를 사용한다. 손의 출력 좌표와 손목 결합 규칙을 명시한다.

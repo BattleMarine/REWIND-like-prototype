@@ -20,6 +20,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 후속 공식 자료 대조에서 두 sample의 train 경로 소속과 Scaramuzza 3D→2D annotation 정합성을 확인했습니다. 실제 RGB 대응·단위·시간은 남아 있고, 공식 RGB 부분 읽기는 상한 부근 오류로 재사용 불가 처리했습니다. [후속 근거](docs/ARCHVIS_POSE_AUDIT.md)를 따릅니다.
 
+- M2 body diffusion teacher의 [합성 구현 묶음](docs/M2_BODY_TEACHER.md)을 추가했습니다. Graph convolution·spatial attention·RoPE causal denoiser, x0/DDIM, 명시적 camera 계약·checkpoint 재개·streaming을 구현했습니다. 전체 107개 테스트와 CPU 합성 100→110 update 재개를 통과했습니다. 실제 body baseline·regression 대비 효과·GPU 성능은 미검증이며 M2 전체 완료가 아닙니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
@@ -29,6 +31,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
+| [M2 body teacher 안내](docs/M2_BODY_TEACHER.md) | Diffusion·camera·loss·streaming 계약과 CPU 합성 실행·한계 |
 | [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
 | [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
 | [압축 원본 준비 도구](docs/ARCHIVE_PREPARATION.md) | Source/예산 계약, 제한된 순차 추출, 완전 파일·CRC·매칭·재사용 검증 범위 |
