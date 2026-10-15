@@ -32,21 +32,27 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-15 현재 상태와 우선 실행 계획
 
+**2026-10-15 후속 실제 JSON 감사 — M0 부분 검증**
+
+- [사용자 sample ZIP 감사](ARCHVIS_POSE_AUDIT.md)에서 32개 payload의 SHA-256·크기를 manifest와 대조했고 모두 동일했다. 각 87관절의 필수 배열 13,920개가 수치 검사를 통과했다. 기존 3개 보고서도 byte 단위로 동일하다.
+- Brutal_Assassination 0~17번은 감사 오류 0과 실제 smoke 통과. Opening 14개는 산재 subset으로 `missing_frames`를 유지하므로 전체 감사는 exit 1이며 연속 학습에서 제외한다. 길이 3의 실제 causal windows 32개에서 offline/streaming 일치·현재/과거 제한·gap/sequence reset·미래 변경 격리를 확인했다.
+- 독립 검사에서 좌우 camera 3D 평균과 device 3D가 최대 약 5.684e-14 raw units 잔차로 일치했다. 단위·좌표 의미·재투영·시간·split·RGB 대응을 검증한 것은 아니다. 개발용 skeleton과 train_ready=false를 유지하며 학습·GPU 실행은 하지 않았다. 다음 후보는 대응 RGB·calibration·공식 split 근거와 좌표/시간 규격 검증이다.
+
 **2026-10-15 실제 Colab pose 소량 추출 — 사용자 보고서 검토 완료**
 
 - 사용자가 제공한 `metadata_report.json`, `extraction_manifest.json`, `pilot_report.json`의 내용 hash와 상호 참조, manifest·통계·파일 수를 대조했다. 실행 revision은 `fbed7b13633b15ee95c35e9cb40c23517f75179f`, 환경은 Linux x86_64 / Python 3.13.16 / CPU다. 기록된 9개 소스 파일 hash는 배포 ZIP과 정확히 일치하며 Git 코드와의 차이는 텍스트 줄바꿈뿐이다. 원본 보고서·검토 요약은 Git 제외 `outputs/colab_archvis_pose_20261015/`에 보관한다. 보고서 무결성 검사는 실행 출처의 암호학적 인증을 뜻하지 않는다.
 - `ArchVisInterior_ArchVis_RT.tar.gz000` pose 원본 368,145,316 bytes에서 앞 524,288 bytes(512 KiB)를 64 KiB Range 8회로 읽었다. 최초 metadata 290 bytes/0.282초, 준비 단계 525,728 bytes/8.427초이며 합계 응답 본문은 526,018 bytes다. 준비 단계에는 원본 전후 metadata 16회/1,440 bytes가 포함된다. 시간 합계 8.709초는 인증·업로드·별도 verify·전체 wire 전송 시간을 포함한 end-to-end 수치가 아니다.
 - 완전 pose 파일 **32개**, 합계 **2,735,012 bytes**를 저장했고 Colab 보고서의 hash 재사용 검사는 **32개 모두 passed**다. `files_limit` / `bounded_stop`은 설정한 32개 상한 도달에 따른 정상 중단이다. 다음 member는 written_bytes=0으로 완료 목록에 들어가지 않았다. 전체 파일을 받은 것이 아니므로 gzip CRC·tar 종료·전체 archive 무결성은 false/미검증이고 `train_ready=false`를 유지한다.
 - 이름 기준 `025/Brutal_Assassination`은 frame 0~17의 18개가 연속되고, `017/Opening`은 5,32,36,50,54,61,65,88,90,94,113,117,122,126의 14개가 흩어져 있다. Archive 순서를 시간 순서로 사용하지 않는다. 번호 연속성은 timestamp·시퀀스 전체 완전성의 증명이 아니다. 앞선 Lab_Scene 18프레임/공식 CityPark 16 JSON 이력과 별개다.
-- 이번에 확인한 것은 **사용자 Drive → Colab metadata → 제한된 pose 부분 추출 → 해당 런타임 verify** 경로다. 추출 JSON 본문은 아직 제공되지 않아 로컬에서 각 파일의 hash·관절 배열을 재검사하지 않았다. 좌우 RGB 대응·단위·좌표/calibration·timestamp·split/원본 motion·GPU 학습은 남아 있고 M0/M1 전체 완료가 아니다. 보고서의 `live_drive_colab_validation`은 코드의 고정 미검증 목록이므로 이번 성공을 자동 반영하지 않는다. 원본 보고서는 수정하지 않는다.
-- **다음 작업:** 기존 Colab 추출본과 보고서를 함께 보관 → 0~17 pose JSON의 구조·관절·좌표 단서 감사 → 같은 sequence/frame의 좌우 RGB와 calibration·split 확보 순서로 진행한다. 현재 추출본을 먼저 활용하며 전체 다운로드·상한 확대·GPU 학습은 자동 시작하지 않는다. 운영 예산은 이번 한 pose 시험만으로 확정하지 않는다.
+- 이번에 확인한 것은 **사용자 Drive → Colab metadata → 제한된 pose 부분 추출 → 해당 런타임 verify** 경로다. 당시 추출 JSON 본문은 미제공이었다. 이후 위 sample ZIP 감사에서 각 파일 hash·관절 배열을 재검사했다. 좌우 RGB 대응·단위·좌표/calibration·timestamp·split/원본 motion·GPU 학습은 남아 있고 M0/M1 전체 완료가 아니다. 보고서의 `live_drive_colab_validation`은 코드의 고정 미검증 목록이므로 이번 성공을 자동 반영하지 않는다. 원본 보고서는 수정하지 않는다.
+- **후속 진행:** 추출본과 보고서 보관 및 JSON 구조·관절·좌표 단서 감사는 위 결과로 확인했다. 다음 후보는 같은 sequence/frame의 좌우 RGB와 calibration·split 확보 및 좌표/시간 규격 검증이다. 현재 추출본을 먼저 활용하며 전체 다운로드·상한 확대·GPU 학습은 자동 시작하지 않는다. 운영 예산은 이번 한 pose 시험만으로 확정하지 않는다.
 
 **2026-10-15 Colab metadata 전송 오류 수정**
 
 - 사용자 Colab의 HTTP200·Transfer-Encoding chunked·Content-Length 없음·JSON UTF-8 응답에서 기존 `metadata_protocol` 실패를 확인했다. Builder와 pilot 전후 Drive metadata에 공통 bounded EOF reader를 적용했다. Declared length 조건과 byte/deadline을 유지하며 무제한 body/JSON 읽기를 사용하지 않는다. 길이 없는 응답이 정확히 상한에 닿으면 EOF 확인용 1byte를 더 읽지 않고 미확정으로 거부한다. Media206/Content-Range/Length 검증은 그대로다.
 - 전체97개(기존93+필수4)와 notebook 사전38개(archive24+metadata14), 실제 라이브러리 loopback15조건을 통과했다. 정상 chunked→manifest→pilot 전후metadata·verify, 잘린 chunk/JSON·종료 chunk 누락·상한·slow·인증상태·encoding·media조건 유지와 report reserve를 확인했다. 비밀 없는 status/헤더 분류·수신 byte를 기록한다. 수정 직후의 로컬 검증과 후속 사용자 Colab pose 소량 추출 성공을 구분해 기록한다. 전체 archive·학습 데이터·운영 예산 검증은 남아 있다. 재실행은 [Colab 가이드](COLAB_SETUP.md)의 새 runtime/소스 ZIP 절차를 따른다.
 
-**최신 데이터 상태(2026-10-14):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 이후 `rewind_archive`로 저장된 공식 prefix를 로컬 재생해 PNG 2개·JSON 16개의 hash를 대조했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 과거 18프레임 sample과 이번 prefix의 16 pose 파일은 다른 검증 이력이다. 원본 압축을 보존하고 필요한 파일만 런타임에 추출하는 운영 결정을 유지한다. 제한된 준비 기능과 별도 합성 notebook을 구현했으며 조사·합성/부분 실행으로 M0/M1 완료를 선언하지 않는다.
+**2026-10-14 당시 데이터 상태(후속 10월 15일 검증은 위에 별도 기록):** Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 제한된 바이트 범위의 추출 가능성을 시험했다. 이후 `rewind_archive`로 저장된 공식 prefix를 로컬 재생해 PNG 2개·JSON 16개의 hash를 대조했다. 사용자 Drive 복사본의 내부 무결성·추출·프레임 검증과 Drive → Colab → 실제 데이터 학습 연결은 미검증이다. 아래 과거 18프레임 sample과 이번 prefix의 16 pose 파일은 다른 검증 이력이다. 원본 압축을 보존하고 필요한 파일만 런타임에 추출하는 운영 결정을 유지한다. 제한된 준비 기능과 별도 합성 notebook을 구현했으며 조사·합성/부분 실행으로 M0/M1 완료를 선언하지 않는다.
 
 **2026-10-14 Colab pilot 진입 준비 후속 묶음 — 실제 실행 대기**
 

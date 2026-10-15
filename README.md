@@ -14,8 +14,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했으며 실제 Colab 업로드·인증·Drive/GPU 실행은 아직 하지 않았습니다.
 - `rewind_archive`에 분할 gzip/tar의 상한 있는 순차 읽기·선택 추출·이름 대응·hash 재사용 검사를 추가했습니다. 당시 Python 테스트 83개(기존 59+archive 24)를 통과했고, 실제 HTTP 검증은 로컬 loopback 서버입니다. M0/M1 전체 완료가 아닙니다.
 - Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 당시 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 dict/작은 선택 JSON → 기본 비활성 metadata/auth → 별도 기본 비활성 pilot/verify 순서로 실행할 수 있습니다.
-- 2026-10-15 사용자 Colab에서 metadata HTTP 200·chunked·Content-Length 없음 때문에 `metadata_protocol` 실패가 관측됐습니다. 양쪽 metadata 경로를 byte/시간 상한 내 EOF 읽기로 수정했고 전체 97개 회귀와 실제 라이브러리 loopback 오류 검사를 통과했습니다. Media의 strict 206 Range 조건은 유지합니다. 후속 사용자 Colab 보고서에서 metadata 생성과 pose 32개 추출·verify 성공을 확인했습니다. 원본 앞 512KiB를 읽고 파일 수 상한에서 정상 중단했으며, 관절·좌표·RGB 대응과 실제 학습 검증은 남아 있습니다.
+- 2026-10-15 사용자 Colab에서 metadata HTTP 200·chunked·Content-Length 없음 때문에 `metadata_protocol` 실패가 관측됐습니다. 양쪽 metadata 경로를 byte/시간 상한 내 EOF 읽기로 수정했고 전체 97개 회귀와 실제 라이브러리 loopback 오류 검사를 통과했습니다. Media의 strict 206 Range 조건은 유지합니다. 후속 사용자 Colab 보고서에서 metadata 생성과 pose 32개 추출·verify 성공을 확인했습니다. 원본 앞 512KiB를 읽고 파일 수 상한에서 정상 중단했으며, 당시 관절·좌표·RGB 대응과 실제 학습은 미검증이었으며, 후속 JSON 감사는 아래에 구분합니다.
 - JSON·window 도구는 Python 표준 라이브러리로 실행합니다. M1은 별도 PyTorch 환경이 필요하며 이번 검증은 Python 3.12.14 / torch 2.7.1+cpu입니다. 실행법과 한계는 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. 기존 실제 sample 이력은 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 있으며 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
+- 2026-10-15 후속 [ArchVis sample 감사](docs/ARCHVIS_POSE_AUDIT.md)에서 Drive ZIP의 32 JSON hash·87관절 필수 배열을 대조했습니다. 연속 18프레임 smoke와 실제 causal window 검사를 통과했고, 산재된 Opening 14개는 gap 진단을 유지합니다. 좌표 사이의 수치 관계를 확인했으며 단위·시간·RGB/calibration·split과 학습은 미검증입니다.
 
 ## 문서 안내
 

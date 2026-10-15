@@ -1,6 +1,6 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 실제 annotation 내용·RGB 대응·전체 archive 무결성은 미검증입니다.
+2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 
 ## 현재 가능한 범위
 

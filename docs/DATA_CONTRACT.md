@@ -2,6 +2,8 @@
 
 2026-10-13 · 공개 1차 자료 조사 및 합성 코드 검증. 이번 묶음에서는 Drive, 기존 raw 데이터, 실제 sample 산출물에 접근하지 않았다. **자료의 설명**, **과거 파일 관측 이력**, **프로젝트 구현 가정**을 분리하며 runtime의 `unknown` 상태를 자료 조사만으로 올리지 않는다.
 
+2026-10-15 후속 [실제 ArchVis sample 감사](ARCHVIS_POSE_AUDIT.md)에서 별도로 32개·각 87관절을 확인했다. 좌우 camera 3D 평균과 device 3D의 수치 일치를 확인했지만 단위·축·회전·시간·calibration·split은 unknown을 유지한다. 아래 10월 13일 조사와 구분한다.
+
 ## 관절 집합을 구분하는 기준
 
 | 범위 | 근거와 확인 수준 | 프로젝트 적용 |
@@ -26,7 +28,7 @@ foot_l, foot_r, ball_l, ball_r
 | 항목 | 공개 근거 | archive/구현에서 남은 일 |
 | --- | --- | --- |
 | 좌표 field | [S1] Metadata: `trans`는 UE4 global XYZ, `rot` 배열 표기는 P/Y/R. Camera 3D는 OpenCV camera-relative, 2D는 image XY. `device_pts3d`는 stereo camera 중점 상대 GT | 실제 축 방향·회전 composition·변환 방향과 역변환 검사. P/Y/R 배열 표기를 Euler 적용 순서로 해석하지 않음 |
-| Device 좌표 | [S3] README는 UE1 camera-left/right 3D의 평균으로 device-relative pose를 얻는 절차를 안내 | UE2 원본 field와 수치 대조. 서로 다른 orientation의 임의 camera 좌표를 평균하는 일반 변환으로 사용하지 않음 |
+| Device 좌표 | [S3] README는 UE1 camera-left/right 3D의 평균으로 device-relative pose를 얻는 절차를 안내 | 후속 ArchVis 32파일의 수치 일치를 확인했으며 범위·잔차는 위 감사 기록에 명시. 서로 다른 orientation의 임의 camera 좌표를 평균하는 일반 변환으로 사용하지 않음 |
 | 단위 | [S5] p.8 Fig.4의 UE1 pelvis-relative 분포는 cm 표기. [S1]의 공식 평가 지표는 mm로 보고됨 | UE2 raw `device_pts3d`·global/camera field의 단위는 미확인. cm→mm 변환을 자동 적용하지 않음 |
 | 회전 | [S1]/[S3]의 `rot`는 P/Y/R 표기 | 각도 단위·handedness·rotation composition, camera/device `open3d_rot` 정의는 미확인. 같은 단위라는 가정 금지 |
 | 시간 | [S5] p.8 §3.2는 UE1 capture 25 FPS를 명시. 같은 페이지의 2 frames/s는 렌더 처리 속도 | UE2 및 재다운로드 subset의 FPS·timestamp 의미·누락 시간은 미확인. Frame index를 초로 변환하지 않음 |

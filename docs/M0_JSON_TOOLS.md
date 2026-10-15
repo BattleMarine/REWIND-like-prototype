@@ -2,6 +2,8 @@
 
 2026-10-13 첫 개발 묶음의 실행법과 검증 근거다. 모델 학습·평가, 좌표 의미 검증, M0 전체 완료를 포함하지 않는다.
 
+2026-10-15 후속 [ArchVis 실제 sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·관절 배열, 연속 18프레임 smoke 및 실제 causal window를 검사했다. 전체 subset에는 Opening의 gap 오류가 남으며 의미 검증과 학습은 미완료다.
+
 ## 코드와 실행
 
 Python 3.10 이상과 표준 라이브러리만 필요하다. `rewind_data`는 프로젝트 root에서 import하거나 `python -m rewind_data`로 실행한다. 추가 패키지 설치가 필요하지 않다. Notebook에서는 같은 모듈을 import해 사용할 수 있으며 이번 묶음은 CLI 진입점을 제공한다.
@@ -78,7 +80,7 @@ outputs/m0_sample/viewer.html
 
 `rewind_data --input`은 여전히 추출 JSON 디렉터리만 처리한다. 준비 CLI의 `output/files/<sequence>/json` 아래 원하는 디렉터리를 선택해 기존 감사에 전달할 수 있으나, 감사 오류·단위·좌표·calibration·시간·공식 split을 확인해야 한다. 추출/이름 매칭만으로 M1 실제 입력을 만들거나 train_ready=true로 올리지 않는다.
 
-압축 준비 코어 구현 당시 Python 전체 83개 테스트(기존 59+archive 24)를 통과했다. 후속 metadata/pilot을 포함한 최신 검증은 로드맵을 따른다. 오케스트레이션의 기존 공식 prefix 로컬 재생은 RGB 2MiB의 PNG 2개·pose256KiB의 JSON16개, 이전 18개 SHA 일치·잘린 마지막 payload·CRC false·triplet0을 확인했다. 공식 서버 재다운로드·사용자 Drive 실행·Colab 인증/API·운영 비용 검증은 아니다. 새 준비 notebook의 실제 Colab 경로도 미검증이다. 압축 원본 목록 관측과 과거 sample 이력을 전체 archive 검증으로 해석하지 않는다. 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
+압축 준비 코어 구현 당시 Python 전체 83개 테스트(기존 59+archive 24)를 통과했다. 후속 metadata/pilot을 포함한 최신 검증은 로드맵을 따른다. 오케스트레이션의 기존 공식 prefix 로컬 재생은 RGB 2MiB의 PNG 2개·pose256KiB의 JSON16개, 이전 18개 SHA 일치·잘린 마지막 payload·CRC false·triplet0을 확인했다. 공식 서버 재다운로드·사용자 Drive 실행·Colab 인증/API·운영 비용 검증은 아니다. 당시 새 준비 notebook의 실제 Colab 경로도 미검증이었다. 2026-10-15 후속 pose 부분 추출과 본문 감사 결과는 위 감사 기록에 구분한다. 압축 원본 목록 관측과 과거 sample 이력을 전체 archive 검증으로 해석하지 않는다. 후보와 날짜별 결정은 [로드맵](ROADMAP.md#확정된-데이터-운영-결정)을 기준으로 관리한다.
 
 ## 로더·관절·mask 계약
 
