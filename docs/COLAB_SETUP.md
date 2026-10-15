@@ -1,6 +1,6 @@
-# Colab 환경 준비·부분 추출·M1 실행 가이드
+# Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
-2026-10-15 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. 사용자의 실제 Colab 진단에서 Drive metadata HTTP 200 응답을 확인했습니다. 후속 사용자 보고서에서 manifest 생성과 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 구조·수치와 연속 18프레임을 검사했습니다. 단위·좌표 의미·시간·split·RGB 대응·GPU 실행은 남아 있습니다. 수치와 검토 범위는 [로드맵](ROADMAP.md)에 기록합니다.
+2026-10-15 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. 사용자의 실제 Colab 진단에서 Drive metadata HTTP 200 응답을 확인했습니다. 후속 사용자 보고서에서 manifest 생성과 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 구조·수치와 연속 18프레임을 검사했습니다. 공식 train 경로 소속과 annotation 재투영의 수치 정합성도 후속 확인했지만, 단위·좌표 의미·시간·원본 motion 독립성·실제 RGB 대응·GPU 실행은 남아 있습니다. 수치와 검토 범위는 [로드맵](ROADMAP.md)에 기록합니다.
 
 오케스트레이션 검토에서는 노트북의 환경 확인·테스트·합성 학습·재개·평가·캐시 셀을 Windows CPU에서 실행했습니다. 59개 테스트가 통과했고, 결과 17개 파일의 로컬 복사·SHA-256 일치를 확인했습니다. 업로드·Drive 인증 셀은 실행하지 않았으며 로컬 복사 검증을 실제 Drive 전송 성공으로 해석하지 않습니다.
 
@@ -66,6 +66,25 @@ python -m rewind_m1 train --config configs/m1_single_synthetic.json --output out
 학습 결과의 `data_kind=synthetic_fixture` 표시를 확인합니다. 실제 단위의 성능으로 해석하지 않고, loss 감소·gradient·저장 경로 검사용으로 사용합니다. Temporal 모델, 재개·평가·예측 캐시 명령은 M1 안내와 노트북에 따른 순서로 실행합니다.
 
 실제 Colab에서 실행한 뒤에는 GPU·precision·버전과 결과를 보관해야 합니다. 로컬 CPU 통과 기록을 Colab GPU 통과로 바꾸지 않습니다.
+
+### M2·M3 합성 teacher 실행
+
+M2/M3가 포함된 최신 소스 ZIP을 새 디렉터리에 풀고 그 프로젝트 root로 이동한 뒤, 노트북에 코드 셀을 추가해 아래 CLI를 호출할 수 있습니다. 기존 M1 노트북이 자동으로 M3를 실행하지는 않습니다. M3는 현재 CPU float32만 지원하므로 GPU 런타임을 요구하지 않습니다. 다음 명령의 모델 경로는 로컬 CPU에서 검증했으며 실제 Colab에서의 M2/M3 실행은 아직 검증하지 않았습니다.
+
+```python
+import subprocess
+import sys
+
+subprocess.run([
+    sys.executable, "-m", "rewind_m3.fixture",
+    "--output", "outputs/m3_cascade_new",
+    "--body-steps", "80", "--hand-steps", "100",
+], check=True)
+```
+
+`outputs/m3_cascade_new`가 이미 있으면 새 이름을 지정합니다. `comparison.json`은 독립 학습한 none 모델, GT 상체 진단, 고정 body 예측 상체의 결과를 구분합니다. 손목 상대 오차와 global 오차의 의미, 개별 학습 재개 명령은 [M3 안내](M3_WHOLE_BODY_TEACHER.md)를 따릅니다. 별도의 작은 M2 body 실행은 [M2 안내](M2_BODY_TEACHER.md)를 사용합니다.
+
+M3 결과는 기존 M1 노트북의 자동 export 대상에 추가되어 있지 않습니다. `whole.json`, `body.json`, body·hand의 checkpoint/보고서와 조건별 평가를 포함한 **M3 output 폴더 전체**를 별도 Drive 실험 폴더에 보관해야 합니다. 이때 사용한 소스 ZIP도 함께 보관합니다. 기존 로컬 CPU checkpoint를 다른 Python/Torch·코드 환경에서 그대로 재개하는 것은 보장하지 않으며, 현재 정확한 재개 검사는 동일 환경을 요구합니다.
 
 ## 4. Drive 연결과 저장 위치
 

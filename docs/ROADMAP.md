@@ -35,7 +35,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 **2026-10-15 공식 근거 확인 및 M2/M3 구현 진행 범위**
 
 - 두 sample의 공식 train 경로 소속과 공식 Scaramuzza calibration의 3D→2D annotation 정합성을 독립 확인했다. 원본 motion 독립성·RGB overlay·단위·시간 등은 남아 있다. 공식 RGB 제한 읽기는 2,301,530 bytes/60.031초 후 `http_body_failed`로 재사용 불가 처리했으며 대상 pose와 대응하는 RGB는 확보하지 못했다. [상세 근거](ARCHVIS_POSE_AUDIT.md#후속-공식-근거rgb-준비-조사-2026-10-15)를 따른다.
-- 사용자는 M3까지 진행하고 M2 후 커밋할 것을 지시했다. 현재 M0/M1 실제 데이터 완료 기준은 미충족임을 설명했으며, 우선 데이터 없이 가능한 M2 body teacher와 M3 body→hand cascade 구현·합성 검증을 진행한다. M2 검토 후 로컬 커밋하고 M3로 이어간다. 이 구현 범위 승인은 실제 학습 예산, M4, 원격 push 승인이나 M2/M3 성능 완료 선언이 아니다.
+- 사용자는 M3까지 진행하고 M2 후 커밋할 것을 지시했다. 현재 M0/M1 실제 데이터 완료 기준은 미충족임을 설명했으며, 데이터 없이 가능한 M2 body teacher 구현·합성 검증을 검토해 `371589c`로 로컬 커밋했고 M3 body→hand cascade의 구현·합성 검증과 독립 검토까지 진행했다. 상세 구현 상태는 아래 M2/M3 항목을 따른다. 이 구현 범위 승인은 실제 학습 예산, M4, 원격 push 승인이나 M2/M3 성능 완료 선언이 아니다.
 
 **2026-10-15 후속 실제 JSON 감사 — M0 부분 검증**
 
@@ -219,7 +219,7 @@ Noisy 3D joints에 stereo 2D joints·confidence, camera encoding, diffusion time
 
 - 기존 97 + M2 10 = **107 tests**를 통과했다. CPU tiny 합성 100 update 후 동일 output에서 110까지 재개·평가, stochastic training의 5+7 vs 12 update 전체 상태 일치를 확인했다. 모델·sampler 미래 불변성, 58frame streaming/gap/reset 및 keyed noise를 검사했다.
 - 오케스트레이션은 수학 oracle·3관절 future perturbation·RoPE offset·padding을 독립 검사하고, 저장된 110 update checkpoint의 validation batch/streaming MPJPE 차이가 약 4.77e-7 mm임을 확인했다. 이는 인위적 2관절 fixture의 코드 경로 검증이다.
-- 실제 관절/입력 baseline·M0/M1 완료 기준, velocity/foot loss·논문 규모 학습·실제 과적합/pilot·regression 대비 효과·Colab CUDA/AMP/latency는 남아 있다. [M2 상세 안내](M2_BODY_TEACHER.md)를 따르며 위 M2 전체 완료 기준을 충족했다고 선언하지 않는다. 검토 후 로컬 커밋하고 M3 구현으로 이어간다.
+- 실제 관절/입력 baseline·M0/M1 완료 기준, velocity/foot loss·논문 규모 학습·실제 과적합/pilot·regression 대비 효과·Colab CUDA/AMP/latency는 남아 있다. [M2 상세 안내](M2_BODY_TEACHER.md)를 따르며 위 M2 전체 완료 기준을 충족했다고 선언하지 않는다. 검토 후 `371589c`로 로컬 커밋했다. 이후 M3를 별도 구현 묶음으로 진행한다.
 
 ### M3 Whole body teacher
 
@@ -228,6 +228,15 @@ Body teacher를 고정하고 Hand teacher를 학습한다. Hand 모델에는 상
 상체 조건 없음, GT 상체 조건, 예측 상체 조건을 비교해 cascade의 효과와 오류 전파를 측정한다. 손목 불연속·좌우 뒤바뀜을 검사하고 body 및 hand의 지표를 분리한다.
 
 **완료 기준:** 실제 Body 예측으로 whole-body 평가를 완료하고 teacher checkpoint와 기준 설정을 고정한다.
+
+**2026-10-15 구현 상태 — 합성 검증 묶음:** `rewind_m3`에 이름·역할이 명시된 body 6관절/손가락 4관절 fixture, upper pose MLP를 추가한 hand diffusion, 고정된 M2 body checkpoint의 frame별 예측 cache, body→hand streaming·CLI·조건별 평가를 구현했다. Body의 손목을 공유하고 손가락은 `wrist_relative_parallel_device` 좌표로 예측해 device 좌표로 결합한다. 이 내부 좌표는 원본 device-relative 입력 계약과 구분한다.
+
+- GT 상체로 학습한 hand의 **예측 상체 평가**와 **GT 상체 진단**, 상체 조건 없이 **별도 학습한 none 모델**을 비교한다. 세 경로 모두 global 손목 위치는 예측 body에서 가져온다. Hand local/global·좌우별·body wrist·중복 없는 whole-body MPJPE와 유효 관절 수를 분리한다. 손목 결합 차이 0은 구조적 규칙이며 정확도 지표가 아니다.
+- 기존 107 + M3 12 = **119 tests**를 통과했다. CPU named-body 80 update → 고정 → upper/none hand 각각 100 update → 세 경로 평가를 실행했다. Upper hand를 같은 output에서 110까지 재개하고 별도 평가했다. Config·관절/좌표·body weights/checkpoint·source hash를 검증하며, 평가 CLI에서도 다른 body checkpoint 조합을 거부한다.
+- GT target을 바꿔도 실제 body sampling cache와 예측 cascade는 불변이고 GT cue 진단만 반응하는 것을 확인했다. Body weight·gradient·mode 고정, 유한 gradient·작은 합성 과적합, dropout/무작위 batch·k/noise를 포함한 5+7 vs 12 update 완전 재개, 미래 입력 격리·24 anchor streaming·gap/reset·추가 36 frame의 bounded history를 검사했다.
+- 오케스트레이션은 저장된 110 update checkpoint에서 GT 값과 mask를 모두 바꾸어도 예측이 동일함을 독립 확인했다. Validation 12 anchor의 offline/stream 최대 성분 차이는 약 3.58e-5 mm이고 body/hand history는 각각 최대 4다. 왼쪽 손목 이동의 좌측 손가락 전파와 결측 손목의 local supervision 제외/global GT 유지도 확인했다. 모두 인위적 10관절 fixture의 코드 경로 검증이다.
+- `comparison.json`의 세 경로는 body 80/hand 100 update로 고정되어 있다. 110 update 결과는 별도 재개 검증이며 100 update none 모델과 같은 예산 비교로 섞지 않는다. 조건부 모델이 실제 정확도를 개선한다는 결론은 내리지 않는다.
+- 실제 손 annotation·body/hand mapping·좌표/시간/단위, 대응 RGB와 예측 2D baseline, 실제 데이터 teacher 학습·성능 비교·checkpoint 선정, PA/시간/failure 지표, Colab GPU/AMP·latency·VRAM은 남아 있다. M3는 현재 CPU float32만 지원한다. [M3 상세 안내](M3_WHOLE_BODY_TEACHER.md)의 설정·지표·재개 방법을 따르며 M3 전체 완료나 M4 착수를 선언하지 않는다.
 
 ### M4 One step student
 

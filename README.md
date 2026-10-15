@@ -22,6 +22,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - M2 body diffusion teacher의 [합성 구현 묶음](docs/M2_BODY_TEACHER.md)을 추가했습니다. Graph convolution·spatial attention·RoPE causal denoiser, x0/DDIM, 명시적 camera 계약·checkpoint 재개·streaming을 구현했습니다. 전체 107개 테스트와 CPU 합성 100→110 update 재개를 통과했습니다. 실제 body baseline·regression 대비 효과·GPU 성능은 미검증이며 M2 전체 완료가 아닙니다.
 
+- M3 body–hand cascade의 [합성 구현 묶음](docs/M3_WHOLE_BODY_TEACHER.md)을 추가했습니다. 학습된 body checkpoint 고정, GT 상체 조건 hand 학습, 예측 상체 평가, 독립 none 모델·GT 진단 비교와 손목 상대/전체 좌표 지표를 구현했습니다. 전체 119개 테스트, CPU body 80·hand 각 100 update와 조건부 hand 110까지 재개를 통과했습니다. 실제 UnrealEgo whole-body teacher·Colab GPU·cascade 성능 개선은 미검증이며 M3 전체 완료가 아닙니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
@@ -31,6 +33,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
+| [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
 | [M2 body teacher 안내](docs/M2_BODY_TEACHER.md) | Diffusion·camera·loss·streaming 계약과 CPU 합성 실행·한계 |
 | [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
 | [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
@@ -70,7 +73,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 - 기존 초기 데이터 후보는 UnrealEgo입니다. 이전 UnrealEgo2 JSON으로 사전 도구를 검증했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
 - **2026-10-13 운영 결정:** Drive에는 압축 원본을 보존하고 필요한 시퀀스를 Colab/runtime 임시 디스크에 추출해 읽습니다. 같은 런타임에서는 검증된 추출본을 재사용하며 세션 종료·추출본 소실 후 다시 추출합니다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관합니다.
 - 작은 데이터의 입출력 검증과 과적합 테스트를 통과한 뒤 학습 규모를 늘립니다.
-- Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, M1 학습 기반은 `rewind_m1` 모듈로 분리했습니다.
+- Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, regression은 `rewind_m1`, body diffusion은 `rewind_m2`, body–hand cascade는 `rewind_m3` 모듈로 분리했습니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
 
 ### Drive와 Colab의 데이터 준비 — pose 소량 추출 확인
@@ -139,6 +142,19 @@ python -m rewind_m1.predicted_fixture --config configs/m1_single_synthetic.json 
 ```
 
 GT 입력과 예측 입력 모두 `synthetic_code_check`입니다. 합성 loss 감소는 실제 데이터 정확도·실시간성의 근거가 아닙니다. `last.pt`에 전체 regression 학습 상태를 저장하며 code/config/data/environment가 같을 때 재개합니다. 예측 경로의 같은 output 재개, 특징 계약·mask·집계 방식과 미검증 항목은 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. Colab 준비는 [노트북](notebooks/m1_baseline.ipynb)과 [환경 안내](docs/COLAB_SETUP.md)를 따릅니다. 실제 데이터 준비·검증 조건을 생략하지 않습니다.
+
+## 데이터 없이 M2·M3 teacher 실행
+
+M2 body diffusion과 M3 body–hand cascade의 CPU 합성 진입점입니다. M3 fixture는 이름이 명시된 body 6관절과 손가락 4관절로 별도 body checkpoint를 학습·고정한 뒤, GT 상체 조건 hand와 상체 조건 없는 hand를 각각 학습합니다. 조건 없음·GT 상체 진단·예측 상체 cascade를 나눠 평가합니다. 실제 UnrealEgo의 전체 body/hand 관절 규격은 아닙니다.
+
+```sh
+python -m rewind_m2 train --config configs/m2_body_synthetic.json --output outputs/m2_body_new --steps 100 --device cpu
+python -m rewind_m3.fixture --output outputs/m3_cascade_new --body-steps 80 --hand-steps 100
+```
+
+새 실행에는 새 output을 사용합니다. M3 결과는 `comparison.json`, 단계별 `report.json`·`last.pt`, 세 조건의 평가 JSON에 기록합니다. 손목은 body가 담당하고 손가락 상대 좌표를 예측 body 손목에 연결합니다. GT 상체 진단도 연결 위치는 예측 body 손목을 사용합니다. 손목 상대 오차와 전체 좌표 오차를 구분하며, 결합 규칙상 손목 연결 차이가 0인 것은 예측 정확도 증거가 아닙니다.
+
+재개·checkpoint 식별·지표의 정확한 범위는 [M2 안내](docs/M2_BODY_TEACHER.md)와 [M3 안내](docs/M3_WHOLE_BODY_TEACHER.md)를 따릅니다. 현재 M3는 CPU float32 경로만 지원합니다. 기존 Colab 소스 ZIP에는 새 모듈이 없을 수 있으므로 최신 커밋으로 ZIP을 다시 만들고 새 소스 디렉터리에서 실행합니다. 실제 RGB/2D baseline과 GPU 학습·성능 검증은 남아 있습니다.
 
 ## 평가 원칙
 
