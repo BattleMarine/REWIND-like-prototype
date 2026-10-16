@@ -30,6 +30,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 2026-10-16 후속 [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md)에서 실제 32개 JSON의 world↔camera/device 변환과 카메라 degree/device radian 관계를 수치 대조했습니다. 거리 단위 cm는 논문의 rig 간격과 실제 baseline으로 강하게 지지되지만 UE2 raw 필드 직접 선언과는 구분합니다. Body22+finger40, upper13을 초기 학습 구성으로 권고하며, 모델 연결에는 좌표계의 축 반전 처리와 별도 변환기가 필요합니다. 설정·학습 가드는 유지했고 실제 학습은 실행하지 않았습니다.
 
+2026-10-16 후속 작업으로 [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md)와 별도 `real_archvis62_v1` 규격을 추가했습니다. Body22+finger40·upper13·평가16 및 graph를 프로젝트 가정으로 채택하고, cm 근거를 명시해 출력은 mm로 통일합니다. 기존 개발용 설정은 유지합니다. 변환 산출물은 검토용 candidate이며 학습 입력으로 자동 승인하지 않습니다. 대응 RGB·독립 validation·원본 motion 검증이 남아 있어 실제 학습은 아직 실행하지 않았습니다. 현재 Colab 런타임이 없으므로 [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md)에 Drive 선택 입력과 실행 순서를 준비했습니다. 전체 133개 테스트와 실제 32파일 변환·독립 수치 대조를 통과했습니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
@@ -39,6 +41,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
 | [실제 관절 대응표](docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
 | [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) | 실제 변환 수치 검증, 단위 근거의 강도, body22+finger40 권고와 학습 진입 조건 |
+| [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md) | 채택한 초기 규격, mm·mask·camera·손목 상대 특징 변환과 candidate 검증 |
+| [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md) | 현재 확보 상태, 다음 Colab의 train RGB·validation pose 선택과 남은 학습 조건 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |

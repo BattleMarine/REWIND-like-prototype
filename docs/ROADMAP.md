@@ -32,6 +32,14 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-16 현재 상태와 우선 실행 계획
 
+**2026-10-16 실제 입력 규격·변환기 후속 묶음 — 실제 학습 전 준비**
+
+- 사용자의 후속 작업 전체 진행 지시로 첫 실험용 body22+finger40(고유62), upper13·평가16과 61개 graph 연결을 별도 `real_archvis62_v1`에 프로젝트 가정으로 채택했다. Native rig 부모 관계 검증이나 최종 D1~D5 확정으로 확대하지 않는다. cm는 12cm rig 근거에 따른 명시적 채택이며 raw 필드 직접 선언과 구분한다. 출력 GT와 camera translation은 mm로 통일한다.
+- `rewind_prepare`는 raw hash·공식 split/calibration hash·명시적 motion 선언을 대조하고, GT2D 특징·필드별 mask·proper R/t·손목 상대 target·gap reset을 보존한 `real_pose_candidate_v1`을 만든다. [변환기 안내](REAL_DATA_PREPARATION.md)에 검증 범위를 기록한다. 기존 모델 설정·학습 guard는 유지하며 candidate를 학습 계약으로 내보내는 release 기능은 아직 없다.
+- 전체133개 테스트와 실제32파일 변환을 통과했다. 오케스트레이션 독립 검사에서 raw hash32개·GT mm 환산·관측 특징868값/프레임·손목 상대 복원·proper camera encoding과 gap reset을 대조했다. 미검증 candidate는 기존 M1 입력 guard에서 거부된다. 수치 변환 일치는 예측 정확도나 학습 성능이 아니다.
+- 사용자에게 현재 실행 중인 Colab 런타임이 없음을 확인했다. Drive 목록의 기존 pose ZIP과 ArchVis RGB 5조각·pose 1조각을 확인했지만 새 대응 RGB sample은 미확보다. 공식 서버의 별도 validation 탐색은 2,498,141 bytes/60.047초 후 `http_body_failed`, 완전 후보0·재사용불가였다. 상한 확대·자동 재시도는 하지 않았다.
+- 다음 Colab에서 기존 train18에 대응하는 RGB와 공식 validation 경로를 각각 읽을 선택 plan 및 [실행 안내](REAL_DATA_NEXT_RUN.md)를 준비했다. 공식 split 소속만으로 원본 motion 독립성·영상 정합성 verified를 설정하지 않는다. 실제 regression → body → hand 학습은 이 조건과 학습 계약 연결이 충족된 뒤 실행할 남은 작업이다. 현재 M0/M1/M2/M3 전체 완료와 M4 착수를 선언하지 않는다.
+
 **2026-10-16 사용자 Colab CPU 검증·보관 확인**
 
 - 사용자 결과 `m3_check_0c3343b1.zip`·실행 `m1_baseline.ipynb`를 대조했다. 실행 revision `5e52aa3`, Python 3.13.16 / torch 2.11.0+cpu에서 119 tests 통과, named-body80·upper/none100·upper110 재개와 평가를 확인했다. 기록된 31개 코드 hash는 배포 소스 ZIP과 일치하고 checkpoint 단계·frozen body 참조·재개 원본 hash가 일치한다. [M3 상세 근거](M3_WHOLE_BODY_TEACHER.md#사용자-colab-cpu-검증-2026-10-16)를 따른다.
@@ -51,7 +59,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 3. 확인된 규격으로 실제 pose → 모델 특징 변환기를 준비하고 원본 hash·전처리 버전·mask·sequence/split을 보존한다. GT 2D 진단과 RGB 예측 입력 baseline을 구분한다. 현재 필수 입력 guard를 우회하거나 미확인 항목을 verified로 채우지 않는다.
 4. 진입 조건이 충족된 뒤 작은 train subset으로 regression → body → hand 과적합을 확인한다. 18프레임 내부 분할을 일반화 평가로 사용하지 않으며 독립 validation 시퀀스는 별도로 준비한다. 대응 RGB·overlay와 예측 2D baseline은 계속 남은 작업이다.
 
-위 항목 중 이름 대응표와 확보 sample의 좌표 변환 수치 검증·학습 관절 구성 검토를 완료했다. 물리 단위 근거의 강도와 미확정 항목은 별도 검토 문서를 따른다. 실제 RGB 정합성·시간·원본 motion 독립성 및 적용할 모델 규격, 변환기 구현·실제 학습은 남아 있다. 현재 학습기는 독립 train/validation을 요구하므로 연속18프레임을 나누어 일반화 검증용 validation처럼 사용하지 않는다.
+위 목록은 단계별 진행 순서다. 이름 대응·좌표 수치 검토 이후 모델 규격의 프로젝트 가정 채택과 candidate 변환은 위 후속 묶음에서 진행했다. 실제 RGB 정합성·시간·원본 motion 독립성, 학습 계약 연결·실제 학습은 남아 있다. 현재 학습기는 독립 train/validation을 요구하므로 연속18프레임을 나누어 일반화 검증용 validation처럼 사용하지 않는다.
 
 **2026-10-15 공식 근거 확인 및 M2/M3 구현 진행 범위**
 
