@@ -20,7 +20,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from rewind_archive.contracts import Budget, Limits, PreparationError, canonical, digest, validate_manifest
-from rewind_archive.extraction import prepare
+from rewind_archive.extraction import prepare, report_reserve_bytes
 from rewind_archive.fixture import SEQUENCE, create_fixture, local_manifest, tar_bytes
 from rewind_archive.matching import identify, match_extractions, verify_extraction
 from rewind_archive.sources import DriveSource, HttpSource, LocalSource, SessionResponse, SplitStream
@@ -199,7 +199,7 @@ class ArchiveTests(ArchiveTestCase):
                 self.assertLessEqual(report['stats']['transfer_bytes'],limits.max_transfer_bytes)
                 self.assertLessEqual(report['stats']['decompressed_bytes'],limits.max_decompressed_bytes)
                 self.assertFalse(list(out.rglob('*.partial')))
-        reserve=16384+2*len(canonical(manifest))+len(canonical(['**']))+self.limits.max_ranges*1024+self.limits.max_files*(3*self.limits.max_path_bytes+1024)
+        reserve=report_reserve_bytes(manifest,['**'],self.limits)
         report,out=self.run_extract(manifest,base,replace(self.limits,max_disk_bytes=reserve+1600))
         self.assertEqual(report['stop_reason'],'payload_disk_bytes_limit')
         logical=sum(f.stat().st_size for f in out.rglob('*') if f.is_file())

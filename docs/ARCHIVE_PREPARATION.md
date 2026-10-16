@@ -1,6 +1,6 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-15 · 제한된 준비 코어와 metadata→manifest/pilot 및 chunked metadata 수정입니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
+2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 최신 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 
 ## 현재 가능한 범위
 
@@ -8,7 +8,7 @@ Python 3.10 이상 표준 라이브러리로 local file·HTTP Range 소스를 �
 
 현재 기능은 일반 tar 도구 전체를 대체하지 않습니다. 단일 gzip stream의 regular file·directory, GNU LongName과 제한된 PAX metadata를 지원합니다. Concatenated gzip, sparse file, link·device·FIFO 등의 special file은 거부합니다. gzip restart/index와 재포장, 실제 RGB loader·좌표 변환·EfficientNet 학습은 포함하지 않습니다.
 
-`inspection_candidates_usable=true`는 수치·영상 검사에 사용할 수 있는 완전 파일 후보를 뜻합니다. 학습 준비 완료가 아닙니다. 추출·verify·matching 결과의 **train_ready는 항상 false**입니다. M0/M1의 관절·단위·좌표/calibration·timestamp·split·원본 motion·RGB/pose 내용 정합성 검증을 유지합니다.
+`inspection_candidates_usable=true`는 무결성/안전성 실패 없이 남은 검사 후보를 사용할 수 있다는 뜻이며 완전 파일이 있다는 보장은 아닙니다. Scan의 저장 파일은0개이므로 별도 `member_observations_usable`와 trust를 함께 읽습니다. 학습 준비 완료가 아닙니다. 추출·verify·matching 결과의 **train_ready는 항상 false**입니다. M0/M1의 관절·단위·좌표/calibration·timestamp·split·원본 motion·RGB/pose 내용 정합성 검증을 유지합니다.
 
 ## 데이터 없는 실행
 
@@ -26,7 +26,7 @@ python -m unittest discover -s tests -p test_archive.py -v
 
 Fixture는 실제 단위·카메라가 없는 4개 frame(0·1·2·10)의 합성 pose와 작은 PNG입니다. RGB/pose 내부 순서는 frame 순서와 다르게 만듭니다. gzip 중간에서 3개 조각으로 나뉘고 완전 triplet은 4개지만 train_ready는 false입니다. Gap 3~9를 별도로 기록합니다.
 
-`extract`/`pilot`은 report의 inspection 후보 사용 여부가 true이면 exit 0, 손상·원본 변경·안전하지 않은 입력 또는 pilot verify 실패이면 exit 1입니다. **Exit 0은 전체 완료가 아닙니다.** 반드시 stop_reason·failure_class·CRC·완전 파일 수를 읽습니다. `verify`는 manifest·개별 hash가 맞을 때 exit 0입니다. `match`는 이름 계약 오류·중복·dataset version 불일치가 없을 때 exit 0이며 triplet 개수는 별도입니다. 설정·입출력 오류는 argparse exit 2입니다.
+`extract`/`pilot`/`scan`은 report의 inspection 후보 또는 bounded 관측 사용 여부가 true이면 exit 0, 손상·원본 변경·안전하지 않은 입력 또는 pilot verify 실패이면 exit 1입니다. **Exit 0은 전체 완료가 아닙니다.** 반드시 stop_reason·failure_class·CRC·완전 파일 수를 읽습니다. `verify`는 manifest·개별 hash가 맞을 때 exit 0입니다. `match`는 이름 계약 오류·중복·dataset version 불일치가 없을 때 exit 0이며 triplet 개수는 별도입니다. 설정·입출력 오류는 argparse exit 2입니다.
 
 현재 샌드박스는 loopback 연결도 차단할 수 있습니다. 검증에서 이 경우 HTTP 테스트를 skip하거나 프로토콜 검사를 끄지 않고, 허용된 로컬 loopback 실행 환경에서 테스트했습니다. 외부 데이터 전송은 없었습니다.
 
@@ -81,7 +81,7 @@ Drive part source/identity는 아래 구조입니다. size/version/modifiedTime�
 }
 ```
 
-CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 metadata와 pilot을 각각 기본 비활성으로 두고, 명시한 part 선택을 검사한 후 사용자가 인증하며 metadata로 manifest를 생성합니다. Media는 별도 pilot 활성화·사용자 glob 지정 후에만 읽습니다. 사용자 Colab에서 metadata 생성과 pose 소량 pilot·verify 성공을 확인했습니다. 이는 RGB 준비·실제 학습 성공을 뜻하지 않습니다. Mount와 Drive API 부분 읽기는 다릅니다.
+CLI는 새 인증을 시작하지 않습니다. 런타임에서는 `prepare(..., authorized_session=session)`에 사용자가 인증한 session을 주입합니다. Notebook은 단일 JOB 설정→네트워크 없는 preflight→기본 비활성 EXECUTE_ONCE 한 번으로 metadata와 scan/pilot을 연결합니다. 선택·예산·현재 설정의 동일성을 검사한 후에만 인증합니다. Metadata 성공 후 실제 size/version/modifiedTime을 표시하고 media를 읽습니다. 사용자 Colab에서 metadata 생성과 pose 소량 pilot·verify 성공을 확인했습니다. 이는 RGB 준비·실제 학습 성공을 뜻하지 않습니다. Mount와 Drive API 부분 읽기는 다릅니다.
 
 Drive adapter는 media Range 요청 전후 metadata의 size/version/modifiedTime을 대조합니다. Metadata는 HTTP200·identity content encoding·유효 JSON object를 요구합니다. Content-Length가 있으면 기존 양의 길이/상한/short-body 검사를 유지하고, 없으면 chunked 또는 EOF 종료 응답을 read1로 제한 읽습니다. Declared length와 Transfer-Encoding 혼재, 미지원 encoding·HTTP 실패·잘린 JSON/chunk·종료 chunk 누락은 거부합니다. Media는 정확한206조건을 유지합니다. Null/list/string도 거부하며 auth 재요청/transport retry는 기존0설정을 유지합니다.
 
@@ -93,7 +93,7 @@ Drive adapter는 media Range 요청 전후 metadata의 size/version/modifiedTime
 
 ## Drive metadata에서 manifest와 pilot으로
 
-Notebook의 입력은 다음 `drive_part_selection_v1` dict 또는 128KiB 이하의 같은 JSON 하나입니다. ID·기대 파일명은 사용자 Drive 목록에서, total_parts는 공식 목록에서 확인합니다. Size/version/modifiedTime을 입력하거나 이전 관측 값으로 채우지 않습니다. 개인 ID·경로·인증 정보는 커밋하지 않습니다.
+Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict를 입력합니다. 선택/plan JSON 업로드는 요구하지 않으며 숨은 plan 덮어쓰기 셀도 없습니다. 범용 metadata API/CLI는 기존 선택 dict/JSON 계약을 유지합니다. ID·기대 파일명은 사용자 Drive 목록에서, total_parts는 공식 목록에서 확인합니다. Size/version/modifiedTime을 입력하거나 이전 관측 값으로 채우지 않습니다. 개인 ID·경로·인증 정보는 커밋하지 않습니다.
 
 ```json
 {
@@ -106,10 +106,12 @@ Notebook의 입력은 다음 `drive_part_selection_v1` dict 또는 128KiB 이하
 }
 ```
 
-1. 입력 셀의 `INPUT_MODE=dict`와 `DRIVE_SELECTION`, `SELECTED_MEMBER_GLOBS` 1~32개를 채웁니다. 선택 JSON이 있으면 `json_upload`를 택합니다. Glob 개수·경로·중복을 인증 전에 검사합니다. 아직 media를 읽지 않습니다.
-2. `RUN_DRIVE_METADATA=True`로 metadata 셀만 실행합니다. 상한은 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답당16KiB·누적128KiB, 협력적30초·요청5초입니다. Files.get의 id/name/size/version/modifiedTime/mimeType/trashed/capabilities.canDownload만 조회하고 검색·media는 호출하지 않습니다.
-3. `manifest_ready`와 stop_reason/stats를 확인합니다. 연속 000-prefix·동일 `.tar.gz` stem·고유 ID/이름과 실제 metadata를 검사합니다. Native Docs/shortcut/folder·trash·다운로드 불가·빈/누락/비정상 size/version을 거부하고 실패 시 `metadata_report.json`만 남깁니다. Version은 변경마다 증가하는 API 값입니다. [Files.get](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/get), [File metadata 규격](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
-4. 성공 manifest와 기존 준비 smoke 상한을 확인하고 별도로 `RUN_DRIVE_PILOT=True`를 실행합니다. 한 archive만 읽어도 pilot입니다. RGB/pose pair 완성·학습·범위 확대·retry는 시작하지 않습니다. Metadata 재실행은 이전 결과를 먼저 폐기하며 현재 선택 digest가 바뀌면 pilot을 차단합니다. 이미 시작한 작업 ID는 metadata/pilot 재실행을 거부합니다.
+1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사60개(archive24+metadata14+planning8+scan7+workflow7)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다.
+2. 단일 `JOB` 설정 셀(id=`job-config`)만 편집합니다. 최초 조사는 `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, 확인한 selection과 기존 예산입니다. 새 job_id와 목적 reason을 함께 기록합니다. `extract`는 `discovery` 또는 `targeted` 목적과 명시 glob1~32개를 사용합니다. Discovery는 `limits.max_files`를 직접2이하로 설정하며 notebook이 목적이나 필터를 바꾸지 않습니다.
+3. Preflight에서 mode/purpose·selection/archive·필터·Range256KiB/IO64KiB·예산·동일 설정/선택 이력을 확인합니다. 이 단계는 원본 요청과 인증0입니다. 실제 source size/version/modifiedTime은 아직 unknown이며 metadata 성공 뒤 따로 표시합니다. `includes`는 gzip 위치 점프가 아닌 저장/선택 필터입니다.
+4. 다음 셀의 `EXECUTE_ONCE=True`를 명시해 한 번 실행합니다. 현재 JOB와 frozen preflight가 다르면 인증 전 거부합니다. 먼저 job을 기록하고 인증→metadata→scan/pilot을 실행합니다. Metadata는 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답16KiB·합128KiB,30초/요청5초입니다. 최초 metadata 단계와 준비 단계의8MiB/60초 비용을 구분합니다. 실패도 job을 소비하고 자동 재시도하지 않습니다.
+5. 아래 결과 검토→ZIP 셀로 진행합니다. 별도 아래쪽 새 job 셀이나 위쪽으로 돌아가 plan 업로드를 실행하는 절차는 없습니다. 같은 job ID는 재실행을 차단합니다. 같은 effective 설정 fingerprint를 새 ID로 반복하려면 기존과 **변경한 reason**도 단일 JOB에 명시한 뒤 preflight부터 실행해야 합니다. 이것은 새로운 byte0 재읽기이며 이전 압축 상태를 이어받지 않습니다. 현재 커널과 현재 source outputs의 작은 job 기록만 인식하므로, 과거 다른 런타임/ZIP도 별도로 검토합니다.
+6. `mode="review"`, `purpose="review"`, `previous_result`는 기존 런타임의 결과 폴더만 검사합니다. 코드 hash가 바뀌거나 source 실패인 추출본은 현재 코드로 verified라고 표시하지 않습니다. 원본/인증 요청과 ZIP 자동 업로드는 하지 않습니다.
 
 `build_drive_manifest(selection, session, MetadataLimits)`는 manifest 또는 None과 sanitized report를 반환합니다. `save_metadata_bundle`은 새 디렉터리만 사용하고 기존 파일을 덮어쓰지 않습니다. 성공이면 `metadata/archive_manifest.json`·`metadata_report.json`, 실패이면 report만 보존합니다. Code/revision/hash·실행 환경·metadata snapshot·요청 body 범위와 stats를 기록합니다. 실패한 부분 snapshot에서 유효 manifest를 만들지 않습니다.
 
@@ -159,6 +161,22 @@ Gzip EOF/CRC와 tar end block은 별도입니다. Tar의 두 종료 block을 만
 
 연속 prefix의 정상 부족과 예산 중단은 완전 파일 후보를 남길 수 있습니다. CRC 오류·원본 변경·안전하지 않은 member·잘못된 parser/HTTP 응답 등은 전체 추출의 inspection 후보 사용을 거부합니다. 완전 gzip인데 tar가 자체적으로 잘린 경우도 invalid로 분류합니다. 이전에 남긴 파일이 있더라도 그 상태의 match/reuse는 실패합니다. 오류를 삭제하거나 usable 플래그를 임의로 바꿔 학습하지 않습니다.
 
+## Payload 저장 없는 scan과 bounded 관측 목록
+
+```sh
+python -m rewind_archive scan --manifest outputs/archive_fixture/rgb_manifest.json --limits configs/archive_limits_smoke.json --output outputs/archive_scan
+```
+
+`scan`은 `run_pilot(..., mode="scan")`, `run_metadata_pilot(..., mode="scan")`, `prepare(..., mode="scan")`으로도 실행합니다. 기존 함수의 기본 mode는 `extract`이며 기존 CLI·선택 검사·원본 변경 검사·예산을 유지합니다. Scan은 `includes=[]`를 허용하고 payload 저장0입니다. 선택 glob이 있어도 `selected`만 기록하며 저장하지 않습니다. 선행 payload를 읽고 해제하는 전송/시간 비용은 그대로 발생합니다.
+
+`extraction_manifest.json.member_observations`에는 도달해 검사한 regular header를 최대 `min(128,max_members)`개 기록합니다. `header_ordinal`은 metadata/directory를 포함한 nonzero tar header 순서, `regular_ordinal`은 regular 관측 순서입니다. `member`, `size_bytes`는 검증한 header의 선언이며 `selected`, `payload_complete`, `stored`를 구분합니다. `payload_complete`는 payload+padding을 소비한 상태이고 내용 검증이나 파일 저장의 증거가 아닙니다. `payload_bytes_returned`는 reader가 callback에 반환한 payload bytes이며 parser 내부 선수신량/정확한 seek offset이 아닙니다. Range offset이나 `decompressed_bytes`를 파일 위치 인덱스로 변환하지 않습니다.
+
+저장하지 않는 member도 관측하고, payload/padding이 잘렸거나 파일 크기/예산/개수 제한에 걸렸으면 `payload_complete=false`로 남깁니다. Scan은 기록 cap 뒤 새 regular header에 닿으면 `observed_members_limit`로 중단하고 `member_observation_cap_reached=true`를 표시합니다. 기존 extract는 이 cap에서 목록만 자르고 원래 header/byte/시간 상한 안에서 선택 추출을 계속합니다. 이 목록은 source 전체 목록이나 gzip seek/restart state가 아니며 `full_source_listing_claimed=false`를 유지합니다. Tar/원본 내부 순서를 frame 번호나 다른 archive 순서로 가정하지 않습니다.
+
+경로 UTF-8 bytes는 기존 max_path_bytes를 지키고, JSON escape 최악2배+record512bytes를 항목당 disk reserve에 추가합니다. 최대 record 수는 사전 고정하며 목록을 pilot report에 복사하지 않습니다. `pilot_report.json`은 관측 수·trust만 요약합니다. Payload+두 report 합은 기존16MiB 범위이며 workflow job/최초 metadata 및 ZIP은 별도 기록입니다.
+
+정상 bounded 중단의 `member_observations_usable=true`, `member_observation_trust="bounded_observation_only"`는 관측 prefix만 진단 가능하다는 뜻입니다. Source 변경·후검사 미완료·unsafe 경로/link·CRC/parser 실패는 전체 목록을 `untrusted_failed_source_or_parser`로 표시합니다. 개별 행의 payload_complete가 true여도 이 전체 실패 상태를 우회하지 않습니다. Scan의 파일0개/`sample_acquired=false`는 의도한 동작이며 sample 확보 성공과 구분합니다.
+
 ## 매칭과 같은 런타임 재사용
 
 UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다. 확장자가 다른 파일이나 다른 규칙은 무시하지 않고 matching issue로 기록합니다.
@@ -177,20 +195,23 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 
 ## 실행한 검증과 남은 일
 
+### 2026-10-16 단방향 notebook·scan 검증
+
+오케스트레이션의 전체155개 회귀와 디벨로퍼의 새 scan/workflow14개·기존 archive24개를 통과했습니다. Fresh source ZIP의7개 code cell을 위에서 아래로 실행하여 배포ZIP 내부 파일명 안내, 기본 인증0, 단일 설정 scan 관측3/저장0, stale 설정 인증 전 차단, 동일ID/fingerprint 재실행 차단, 새ID+변경reason, 인증 실패 job-only ZIP, 기존 결과 review와 ZIP 재다운로드를 모의 확인했습니다. 별도 선택/plan 업로드는0회입니다. 실제 Colab 인증·새 원본 읽기 결과가 아닙니다.
+
+실제 requests/urllib3/AnonymousCredentials loopback scan6조건에서 기본8MiB 예산·96요청·payload저장0, 후검사 원본 변경·HTTP200/401/403/429 실패 시 관측 untrusted를 검사했습니다. 기존 추출 경로 검증과 분리하며 새 notebook의 실제 Drive 재실행은 남아 있습니다. 근거는 Git 제외 `outputs/archive_notebook_rewrite_20261016/developer/`와 오케스트레이션 `root/`에 보존합니다.
+
 ### 2026-10-16 요청 상한 원인과 다음 sample 확보 절차
 
 사용자 RGB 보고서3개는 모두 동일한 byte0 시작 입력에서 media43회×64KiB=2,818,048bytes를 수신했습니다. 당시 `ranges`는 media와 전후 metadata를 같은128회 상한에 더했고, metadata85회+media43회=128에서 마지막 후검사가 막혔습니다. 마지막64KiB는 이미 전송했지만 해제기로 반환되지 않았습니다. 별도1개는 `range_status_not_206`으로 실패했으며 당시 HTTP status는 기록되지 않아200/403/429 등을 확정할 수 없습니다. 이는 원인 대조이며 이 수정본의 실제 Drive 성공 검증이 아닙니다.
 
 새 기본값은 요청 상한을 올리지 않고 HTTP Range를256KiB로 묶습니다. 로컬 실제 requests/urllib3/AuthorizedSession+AnonymousCredentials loopback에서 기본8MiB/60초/128회로 media32+metadata64=96회, 본문8,355,952bytes 후 `transfer_bytes_limit`로 중단했고 완전 합성 파일3개의 hash를 확인했습니다. 마지막 Range 축소·64KiB 해제·200/401/403/429 body 미읽기·후검사 원본 변경 거부·예약 여유 부족 시 네트워크0을 확인했습니다. 실제 Google 요청·인증·새 RGB sample 확보는 포함하지 않습니다.
 
-최신 전체 unittest는141개(기존133+planning/예약8개)이며 기존 실제 라이브러리 chunked/오류15조건과 신규 요청 예산6조건을 별도로 통과했습니다. Fresh source ZIP의 notebook10개 code cell 문법·빈 출력, 기본 인증0,36glob 인증 전 차단, targeted4개/discovery2개 합성 파일, 같은 job metadata/media 재실행 차단, 명시적 새 job·실패 결과 폐기·JSON 입력·ZIP 재다운로드·원본 미접근 대응 제안을 모의 검증했습니다. 이 notebook 검증은 실제 Colab 인증이 아닙니다. 근거는 Git 제외 `outputs/archive_request_review_20261016/developer/`에 보관합니다.
+이전 요청 효율 개선 묶음의 전체 unittest는141개(기존133+planning/예약8개)이며 기존 실제 라이브러리 chunked/오류15조건과 신규 요청 예산6조건을 별도로 통과했습니다. Fresh source ZIP의 notebook10개 code cell 문법·빈 출력, 기본 인증0,36glob 인증 전 차단, targeted4개/discovery2개 합성 파일, 같은 job metadata/media 재실행 차단, 명시적 새 job·실패 결과 폐기·JSON 입력·ZIP 재다운로드·원본 미접근 대응 제안을 모의 검증했습니다. 이 notebook 검증은 실제 Colab 인증이 아닙니다. 근거는 Git 제외 `outputs/archive_request_review_20261016/developer/`에 보관합니다.
 
-1. 경로를 모르면 **discovery 1회**를 선언합니다. `PILOT_PURPOSE="discovery"`, RGB는 `<archive-prefix>/*/fisheye_final_image/camera_*/final_*.png`, pose는 `<archive-prefix>/*/json/frame_*.json`처럼 명시합니다. Notebook은 이 모드에서 파일 수만 최대2개로 낮추고8MiB/60초/16MiB/128회를 유지합니다. 이미 실제 sample에서 관측한 경로라도 다른 archive에서 앞쪽에 있다는 보장은 없습니다.
-2. `complete_files`, `sample_acquired`, `sample_status`, `stop_reason`, 카운터를 읽습니다. **파일0개와 verification passed는 sample 확보 성공이 아닙니다.** 이때는 ZIP 보관 후 중단·검토합니다. 실패 원인 확인 없이 동일 byte0 입력을 다시 실행하지 않습니다. 잘린 active member는 완전 파일 목록과 구분합니다.
-3. 완전 파일이 있으면 원본을 읽지 않는 `counterpart_plan`으로 hash 재검사 → 실제 sequence/frame → 누락 RGB/pose glob 제안을 만듭니다. 최대16관측 frame/종류별16glob이며 기본8frame입니다. RGB는 `camera_*`1개로 두 view를 표현합니다. 18frame×좌우의36glob은 preflight에서 거부하며18개의 `camera_*`로 표현할 수 있습니다. Archive의 내부 순서가 좌우/pose에서 같다는 가정은 하지 않습니다.
-4. 제안과 해당 archive·split·예산을 검토한 뒤에만 별도 `targeted` 작업을 선언합니다. 제안 함수와 notebook은 후속 metadata/media를 자동 호출하지 않습니다. 이미 있는 파일은 verify 후 재사용하며, 대응이 예산 안에 도달할지는 unknown입니다. 같은 범위 반복·상한 자동 확대·전체 다운로드를 하지 않습니다.
-5. Notebook **결과 ZIP** 셀에서 `SAVE_RESULT_ZIP=True`로 저장하고 `DOWNLOAD_RESULT_ZIP=True`로 내려받습니다. 저장 후 다운로드만 재실행할 수 있으며 기존 ZIP은 덮어쓰지 않습니다. 이후 만든 counterpart 제안은 화면 출력만이며 기존 ZIP에 자동 추가되지 않습니다. ZIP 저장에는 작은 결과 묶음 최대17MiB와 비슷한 별도 임시 디스크가 필요하며 준비 단계16MiB 통계와 구분합니다.
-6. 입력/metadata 셀을 다시 실행해도 `PILOT_JOB_ID`와 `_PILOT_JOBS`는 커널에 남습니다. 시작한 작업은 실패해도 다시 소비하지 않습니다. 검토 후 **새 작업 선언** 셀에서 `START_NEW_PILOT_JOB=True`와 `NEW_JOB_REASON`을 명시해야 새 ID가 생기며 오래된 session/metadata를 폐기합니다. 이것은 gzip 재개가 아니며 byte0부터 새 비용이 듭니다. 커널이 사라지면 이 중복 방지 기록도 사라지므로 ZIP과 이전 실행 기록을 먼저 확인합니다.
+이전10-code-cell notebook의 discovery/새 job 셀 흐름은 위 단일 JOB 방식으로 대체했습니다. 다음 실제 실행은 동일8MiB에서 **저장하지 않았던 member 순서 증거를 얻는 scan 1회**이며, 같은 범위를 반복해 반대쪽 이미지를 자동 확보하려는 실행이 아닙니다. 관측 목록과 새 목적 없이 동일 prefix를 반복하지 않습니다.
+
+결과 ZIP 셀은 현재 job/metadata/pilot·관측목록/완전 파일만 저장하며 `DOWNLOAD_RESULT_ZIP=True`로 내려받습니다. 이미 있으면 덮어쓰지 않고 다시 다운로드할 수 있습니다. ZIP에는 이후 파일을 자동 추가하지 않습니다. 최대17MiB 입력과 비슷한 별도 임시 ZIP 디스크가 필요하며 준비16MiB 통계와 구분합니다. 인증 실패로 `job.json`만 남아도 ZIP으로 보존할 수 있습니다.
 
 ```sh
 python -m rewind_archive plan-counterparts --extraction outputs/discovery/pilot --max-frames 8 --output outputs/counterpart_plan.json

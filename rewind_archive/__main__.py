@@ -25,11 +25,11 @@ def read_bounded_json(path, maximum=128*1024):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="분할 archive의 bounded 준비; 실제 학습 준비 판정 없음")
     sub = parser.add_subparsers(dest="command",required=True)
-    for command in ("extract","pilot"):
+    for command in ("extract","pilot","scan"):
         extract = sub.add_parser(command)
         extract.add_argument("--manifest",type=Path,required=True)
         extract.add_argument("--limits",type=Path,required=True)
-        extract.add_argument("--include",action="append",required=True,help="완전한 archive member path glob, 반복 가능")
+        extract.add_argument("--include",action="append",required=command!="scan",default=None,help="저장/선택 필터이며 gzip seek가 아님; scan은 payload 저장0")
         extract.add_argument("--output",type=Path,required=True)
     match = sub.add_parser("match")
     match.add_argument("--extraction",type=Path,action="append",required=True)
@@ -43,10 +43,11 @@ def main(argv=None):
     verify.add_argument("--manifest",type=Path,required=True,help="원본 manifest 동일성 검사; 네트워크는 읽지 않음")
     args = parser.parse_args(argv)
     try:
-        if args.command in ("extract","pilot"):
+        if args.command in ("extract","pilot","scan"):
             operation=prepare if args.command=="extract" else run_pilot
-            report = operation(read_bounded_json(args.manifest),args.output,args.include,
-                Limits.from_dict(read_bounded_json(args.limits)),base=args.manifest.parent)
+            report = operation(read_bounded_json(args.manifest),args.output,args.include or [],
+                Limits.from_dict(read_bounded_json(args.limits)),base=args.manifest.parent,
+                **({"mode":"scan"} if args.command=="scan" else {}))
             print(json.dumps({"stop_reason":report["stop_reason"],"complete_files":len(report["files"]) if args.command=="extract" else report["complete_files"],
                 "inspection_candidates_usable":report["inspection_candidates_usable"],
                 "whole_archive_integrity_verified":report["whole_archive_integrity_verified"],"train_ready":False,"stats":report["stats"]},indent=2))

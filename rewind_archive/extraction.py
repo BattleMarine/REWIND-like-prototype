@@ -16,7 +16,17 @@ from .sources import SplitStream
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
     "transfer_bytes_limit", "decompressed_bytes_limit", "elapsed_limit", "files_limit", "members_limit",
-    "metadata_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted"}
+    "metadata_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit"}
+
+
+MAX_OBSERVED_MEMBERS = 128
+
+
+def report_reserve_bytes(manifest, includes, limits):
+    # name JSON escape 최악은 UTF-8 경로 bytes의 2배. 관측목록은 pilot에 복사하지 않는다.
+    observation_reserve = min(MAX_OBSERVED_MEMBERS,limits.max_members)*(2*limits.max_path_bytes+512)
+    return (16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024
+        +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve)
 
 
 def code_hashes():
@@ -109,7 +119,7 @@ def pax_fields(data):
     return result
 
 
-def read_payload(reader, size, sink=None):
+def read_payload(reader, size, sink=None, on_chunk=None):
     remaining = size
     while remaining:
         chunk = reader.read(min(remaining,reader.budget.limits.io_chunk_bytes))
@@ -117,6 +127,8 @@ def read_payload(reader, size, sink=None):
             raise PreparationError("incomplete_payload")
         if sink is not None:
             sink(chunk)
+        if on_chunk is not None:
+            on_chunk(chunk)
         remaining -= len(chunk)
     padding = (-size)%512
     if padding:
@@ -124,15 +136,17 @@ def read_payload(reader, size, sink=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract"):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
-    includes = validate_includes(includes)
+    if mode not in ("extract","scan"):
+        raise PreparationError("preparation_mode")
+    includes = [] if mode=="scan" and includes==[] else validate_includes(includes)
     budget = Budget(limits,**({"clock":clock} if clock else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
-    reserve = 16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024+limits.max_files*(3*limits.max_path_bytes+1024)
+    reserve = report_reserve_bytes(manifest,includes,limits)
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -140,6 +154,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     partial_dir = output/".partials"
     partial_dir.mkdir()
     files, active, reason = [], None, "unknown"
+    observations, observation_cap_reached = [], False
     tar_eof = False
     source = reader = None
     try:
@@ -210,12 +225,27 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 continue
             if info.type not in (tarfile.REGTYPE,tarfile.AREGTYPE):
                 raise PreparationError("links_or_special_file")
+            selected = any(fnmatch.fnmatchcase(name,pattern) for pattern in includes)
+            if len(observations)>=min(MAX_OBSERVED_MEMBERS,limits.max_members):
+                observation_cap_reached = True
+                if mode=="scan":
+                    raise PreparationError("observed_members_limit")
+                observed = None  # 기존 extract는 관측목록 때문에 조기 중단하지 않는다.
+            else:
+                observed = {"header_ordinal":budget.members,"regular_ordinal":len(observations)+1,
+                    "member":name,"size_bytes":size,"selected":selected,"payload_complete":False,
+                    "payload_bytes_returned":0,"stored":False}
+                observations.append(observed)
+            def observe(chunk):
+                if observed is not None:
+                    observed["payload_bytes_returned"] += len(chunk)
+            active = {"member":name,"expected_bytes":size,"selected":selected,"written_bytes":0}
             if size > limits.max_file_bytes:
                 raise PreparationError("file_bytes_limit")
-            selected = any(fnmatch.fnmatchcase(name,pattern) for pattern in includes)
-            active = {"member":name,"expected_bytes":size,"selected":selected,"written_bytes":0}
-            if not selected:
-                read_payload(reader,size)
+            if mode=="scan" or not selected:
+                read_payload(reader,size,on_chunk=observe)
+                if observed is not None:
+                    observed["payload_complete"] = True
                 active = None
                 continue
             if budget.files >= limits.max_files:
@@ -237,7 +267,9 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                         fingerprint.update(chunk)
                         active["written_bytes"] += len(chunk)
                         budget.peak_payload_disk_bytes = max(budget.peak_payload_disk_bytes,budget.payload_disk_bytes+active["written_bytes"])
-                    read_payload(reader,size,write)
+                    read_payload(reader,size,write,on_chunk=observe)
+                    if observed is not None:
+                        observed["payload_complete"] = True
                 budget.check_time()
                 # Hard link 생성은 기존 파일을 덮어쓰지 않는다. 같은 filesystem 안에서만 사용.
                 if os.name == "nt":
@@ -248,6 +280,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 temporary = None
                 files.append({"member":name,"relative_path":"files/"+name,"size_bytes":size,"sha256":fingerprint.hexdigest(),
                     "tar_complete":True,"kind":manifest["kind"]})
+                if observed is not None:
+                    observed["stored"] = True
                 budget.files += 1
                 budget.payload_disk_bytes += size
                 active = None
@@ -275,6 +309,13 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "declared_source_complete":complete_source,
         "whole_archive_integrity_verified":reason=="complete" and complete_source and manifest["source_scope"]!="official_prefix_local",
         "inspection_candidates_usable":usable,"source_validation_pending":pending_validation,"train_ready":False,
+        "operation":mode,"member_observations":observations,
+        "member_observation_scope":"reached_regular_headers_only_not_a_seek_index",
+        "member_observation_limit":min(MAX_OBSERVED_MEMBERS,limits.max_members),
+        "member_observation_cap_reached":observation_cap_reached,
+        "member_observations_usable":usable,
+        "member_observation_trust":"bounded_observation_only" if usable else "untrusted_failed_source_or_parser",
+        "full_source_listing_claimed":False,
         "report_disk_reserve_bytes":reserve}
     raw = canonical({**report,"content_sha256":digest(report)})+b"\n"
     if len(raw)>reserve:

@@ -1,73 +1,43 @@
 # 다음 실제 데이터 준비 실행
 
-현재 확보한 실제 데이터는 기존 pose 32개이며, 대응 좌우 RGB와 독립 validation은 아직 확보하지 못했다. [변환기 안내](REAL_DATA_PREPARATION.md)와 함께 사용한다. 이 준비 작업은 CPU 런타임으로 실행하며 GPU 학습을 시작하지 않는다.
+이번 실행은 **archive 앞부분에서 실제로 만난 파일의 순서를 조사하는 scan 1회**다. CPU 런타임이면 충분하며 GPU는 필요 없다. 이미지 저장 수가 0인 것은 이 모드의 의도된 동작이다. [압축 준비 도구](ARCHIVE_PREPARATION.md)와 [Colab 환경 안내](COLAB_SETUP.md)를 함께 참고한다.
 
-## 네 번의 RGB 실행에서 확인한 문제
+## 지금까지 확인한 사실
 
-2026-10-16 제공된 `rewind_pilot_5dc9b9ba.zip`, `e2941e50`, `798b7bec`, `2b006838`의 ZIP CRC와 보고서를 대조했다. 모두 완전 선택 파일은 0개다.
+- 기존 pose JSON 32개와 별도 RGB discovery의 오른쪽 PNG 2개를 확보했다. RGB는 Serena `Getting_Up__1_`의 frame 10·1이며, 기존 pose와 sequence가 다르다. 완전한 좌우 RGB+pose triplet은 아직 없다.
+- `rewind_pilot_2c11fc10.zip`은 2파일 상한에서 중단한 성공적인 오른쪽 RGB 추출이었다. 이후 `5878434b`는 선택 설정이 discovery로 남아 같은 오른쪽 파일을 다시 받았다.
+- `5935e818`에서는 왼쪽 frame 1·10 선택이 정확히 적용됐지만 완전 선택 파일은 0개였다. 총96요청(media32+metadata64), 응답 본문 8,356,024bytes에서 전송 상한으로 중단했다. 마지막 진행 중 경로는 선택하지 않은 오른쪽 `final_7.png`였다.
+- `6fcdb708`와 `5935e818`의 32개 Range와 수신 hash가 모두 같다. 모두 `000`의 byte 0~8,350,135만 읽었으며, 크기 10GiB인 첫 조각의 끝에도 도달하지 않았다. 이 중단을 아직 다운로드하지 않은 후속 조각 탓으로 볼 근거는 없다.
+- 선택 glob은 **저장할 파일을 고르는 필터**다. 해당 경로로 gzip 안을 점프하지 않는다. 같은 예산으로 필터만 바꾸면 같은 앞부분을 다시 읽는다. 과거 보고서에는 모든 경로의 순서가 없어 왼쪽 파일이 더 뒤에 있는지, 다른 경로인지, 없는지를 확정하지 못했다.
 
-| 실행 | 압축 본문 수신 | 준비 단계 요청 수 | 중단 이유 |
-| --- | ---: | ---: | --- |
-| 5dc9b9ba | 1,638,400 bytes | 77 | `range_status_not_206` |
-| e2941e50 | 2,818,048 bytes | 128 | `ranges_limit` |
-| 798b7bec | 2,818,048 bytes | 128 | `ranges_limit` |
-| 2b006838 | 2,818,048 bytes | 128 | `ranges_limit` |
+## 새 notebook 실행 순서
 
-기존 코드에서는 media 64KiB마다 원본 변경 확인 metadata를 전후 두 번 요청했다. 후자의 세 실행은 media 43회와 metadata 85회로 128회에 도달했다. 43번째 media 본문은 수신했지만 후검사 요청을 시작하지 못해 해제기로 전달하지 않았다. 첫 실행의 실제 HTTP 상태 코드는 과거 보고서에 없으므로 인증·할당량·원본 손상 중 하나로 단정하지 않는다.
+기존 notebook에 셀을 덧붙이지 않고, 새로 제공되는 `archive_prepare` notebook을 Colab에 업로드해 새 CPU 세션에서 시작한다. 사용자용 사본에는 이번 ArchVis RGB `000` 선택이 들어 있다. 저장소의 일반 notebook은 개인 Drive ID가 없는 템플릿이다.
 
-세 반복 실행은 동일한 앞부분을 다시 읽었다. 누적 다운로드나 이어받기가 아니며, 기존 18 pose의 `Brutal_Assassination` RGB 경로에 도달하지 못했다. 관측된 앞부분은 다른 sequence인 `rp_serena_rigged_004_ue4/.../003/Getting_Up__1_`의 오른쪽 RGB다. 이 sequence는 공식 train 목록에 있지만, 해당 파일을 실제로 확보하고 pose·반대쪽 영상과 대조해야 한다.
+1. **소스 업로드**: 함께 제공한 `rewind-archive-source-<revision>.zip` 한 개를 업로드한다. 결과 ZIP이나 소스 ZIP을 담은 바깥 배포 묶음을 올리지 않는다. 표시되는 revision을 확인한다.
+2. **로컬 사전 검사**: 다음 셀을 실행한다. 이 단계는 Drive 인증·다운로드 없이 코드와 합성 동작을 확인한다. 실패하면 네트워크 실행으로 넘어가지 않는다.
+3. **단일 작업 설정**: `JOB` 설정 셀에서 `mode='scan'`, `purpose='prefix_inventory'`, 이번 작업 ID·사유·Drive selection·예산을 확인하고 실행한다. 이번 scan의 `includes=[]`는 정상이다. 별도 plan JSON 업로드나 추가 코드 셀은 필요 없다.
+4. **최종 사전 확인**: preflight 셀을 실행해 대상 조각·mode·예산·설정 요약을 확인한다. 여기까지 네트워크를 읽지 않는다. 설정을 바꾸면 이 셀부터 다시 확인해야 한다.
+5. **1회 실행**: 실행 셀의 `EXECUTE_ONCE=True`로 바꾸고 해당 셀을 한 번 실행한다. 인증 후 metadata 확인과 scan이 이어진다. 실행 직전 설정이 preflight와 다르면 중단한다. 중단·실패 후 같은 셀을 자동 반복하지 않는다.
+6. **결과 검토**: 결과 확인 셀을 실행한다. 읽은 regular member의 순서·경로·크기·payload 완료 여부와 중단 사유를 확인한다. `sample_acquired=False`와 저장 파일 0개는 scan에서는 정상이며, 목록의 신뢰 여부와 관측 범위를 별도로 본다.
+7. **ZIP 보관**: 마지막 결과 ZIP 셀의 `DOWNLOAD_RESULT_ZIP=True`로 바꾸고 실행한다. ZIP 생성과 다운로드가 진행된다. ZIP을 로컬과 Drive 프로젝트 `reports/`에 보관한다. Notebook 저장만으로 `/content`의 결과는 보존되지 않는다. 결과 ZIP은 분석을 위해 전달하고 여기서 멈춘다.
 
-## 새 실행 순서
+기존 오른쪽 RGB 결과 ZIP도 그대로 보관한다. 새 scan은 이미지 재추출을 목표로 하지 않는다. 기존 source revision의 검증 결과를 새 코드의 검증 성공으로 자동 바꾸지 않는다.
 
-1. 새 배포 묶음의 `archive_prepare.ipynb`와 소스 ZIP을 사용한다. 이전 소스가 import된 런타임에서는 결과를 먼저 보관하고 새 세션에서 시작한다. 소스 업로드 후 표시되는 revision을 확인하고 테스트·합성 진단을 실행한다. [Colab 안내](COLAB_SETUP.md)를 따른다.
-2. 첫 실제 작업은 **RGB discovery 한 번**이다. 기존 Brutal 프레임만 선택하지 않고, 지정한 ArchVis archive 앞부분에서 도달 가능한 완전 RGB를 찾는다. 아래 plan 입력을 metadata 셀 앞에 넣는다. 새 notebook의 사전 검사와 기본 상한을 유지한다.
-3. Metadata를 활성화하고 `manifest_ready=True`를 확인한 뒤 pilot을 한 번 실행한다. 기본 준비 예산은 응답 본문 합계 8MiB·60초·최대32파일·총 요청128회다. Discovery는 빠른 샘플 확인을 위해 파일 수를 최대2개로 더 낮춘다. Metadata builder는 별도 128KiB·30초이며 비용을 합산한다. 인증·DNS·OS를 포함한 hard deadline이나 전체 RSS 상한은 아니다.
-4. 파일 수, 검증된 sample 유무, 중단 사유, media/metadata 요청 수를 확인한다. 검증 통과라도 파일 0개면 샘플 확보 실패다. `train_ready=False`는 준비 sample을 학습 승인으로 취급하지 않는다는 뜻이다.
-5. **결과 ZIP 보관 셀**에서 `SAVE_RESULT_ZIP=True`, `DOWNLOAD_RESULT_ZIP=True`로 설정해 실행하고 ZIP을 다운로드한다. `metadata/`, `pilot/`의 보고서·manifest·완전 파일을 함께 보존한다. Notebook 저장만으로 `/content` 파일은 보존되지 않는다. ZIP을 Drive의 프로젝트 `reports/`에도 보관한다.
-6. 여기서 멈추고 보고서를 검토한다. 필요하면 네트워크를 읽지 않는 대응 계획 셀의 `MAKE_COUNTERPART_PLAN=True`로 관측 파일의 다음 선택 제안만 출력한다. 같은 작업을 다시 실행하지 않는다. 발견된 sequence/frame과 실제 저장 파일을 기준으로 다음 pose·반대쪽 RGB의 좁은 선택을 만든다. 각 후속 작업은 새 예산을 사용하는 별도 실행이며 자동으로 이어지지 않는다. 기존 검증 추출본을 우선 재사용한다.
+## 예산과 결과 해석
 
-## Plan 입력 셀
+준비 예산은 응답 본문 합계 **8MiB·60초·총128요청·임시 디스크16MiB**를 유지한다. HTTP Range는256KiB, 내부 읽기·해제 출력은64KiB다. Metadata builder는 별도128KiB·30초이며 두 단계의 비용을 합산한다. 인증·DNS·OS 지연을 포함한 hard deadline이나 전체 프로세스 RSS 상한은 아니다.
 
-새 묶음의 `archive_sample_plan_20261016.json`을 사용한다. 과거 `real_data_colab_plan_20261016.json`의 36개 좌우 개별 glob은 입력 상한32를 초과하므로 사용하지 않는다. 기존 18프레임을 다시 선택해야 할 때는 `camera_*`를 사용한 18개 glob으로 표현하지만, 32파일 상한에서 좌우36파일 전체 확보는 보장되지 않는다.
+Scan도 gzip payload를 읽고 해제한다. 파일을 저장하지 않는다고 전송 비용이 없어지는 것은 아니다. 같은 앞부분을 다시 읽는 비용을 들여, 이전 실행에 없던 **관측 경로 목록**을 얻는 진단이다. 목록은 최대128개 regular member로 제한되며, 상한에 도달하면 중단한다. 전체 archive 목록·seek offset 인덱스·이어받기 기능이 아니다.
 
-아래 셀은 notebook의 선택 입력 셀 **직후**, metadata 셀 **직전**에 넣는다.
-
-```python
-from google.colab import files
-from rewind_data.audit import read_json
-from rewind_archive.drive_metadata import validate_selection
-from rewind_archive.contracts import Limits
-
-uploaded_plan = files.upload()
-assert len(uploaded_plan) == 1
-plan_bytes = next(iter(uploaded_plan.values()))
-assert len(plan_bytes) <= 128 * 1024
-plan = read_json(plan_bytes)
-assert plan['schema_version'] == 'archive_sample_plan_v1'
-JOB = 'rgb_discovery'
-job = plan['jobs'][JOB]
-validate_selection(job['selection'])
-assert Limits.from_dict(plan['limits']) == Limits.from_dict(
-    read_json(open('configs/archive_limits_smoke.json', 'rb').read()))
-assert 1 <= len(job['includes']) <= 32
-INPUT_MODE = 'dict'
-DRIVE_SELECTION = job['selection']
-SELECTED_MEMBER_GLOBS = job['includes']
-PILOT_PURPOSE = 'discovery'
-print({'job': JOB, 'selected_patterns': len(SELECTED_MEMBER_GLOBS)})
-```
-
-Plan은 관측한 Drive file ID와 기대 이름만 포함한다. Size/version과 다운로드 권한은 실행 시 다시 조회한다. 첫 실행이 끝나도 `JOB`을 바꿔 자동 반복하지 않는다. Notebook은 같은 `PILOT_JOB_ID`의 재실행을 차단한다. 후속 작업을 검토한 뒤에만 새 작업 셀의 `START_NEW_PILOT_JOB=True`와 `NEW_JOB_REASON`을 설정한다. 발견 결과에 따라 다음 선택과 예상 준비 비용을 검토한다. 중간 gzip 조각으로 점프하거나 이전 런타임의 해제 상태를 자동 복원하는 기능은 없다.
-
-## 결과별 다음 행동
-
-| 결과 | 다음 행동 |
+| 관측 결과 | 해석과 다음 행동 |
 | --- | --- |
-| 완전 파일 0개 | 보고서를 보관하고 중단. 실제 HTTP 상태, 발견 경로, byte/time/request 제한을 검토한다. 같은 prefix 반복은 해결책이 아니다. |
-| RGB만 일부 확보 | 실제 sequence/frame 목록과 hash를 보존하고 같은 프레임의 pose·반대쪽 RGB 후보를 만든다. Stereo/학습 완료로 취급하지 않는다. |
-| 원본 변경·프로토콜 실패 | 추출본을 재사용하지 않는다. 원인을 확인하기 전에 자동 재시도하지 않는다. |
-| 좌우 RGB+pose 확보 | 이름 대응, hash, 영상 크기·내용·재투영 overlay, timestamp·split을 검증한다. |
+| 신뢰 가능한 목록, byte/time/member 상한 중단 | 해당 범위에서 확인한 경로를 검토한다. 일부 파일의 payload는 미완료일 수 있다. |
+| 왼쪽 경로가 목록에 있음 | frame·sequence와 payload 완료 여부를 확인하고 다음 선택 추출 비용을 검토한다. 목록만으로 이미지를 확보한 것은 아니다. |
+| 왼쪽 경로가 목록에 없음 | 읽은 범위에서 못 만났다는 뜻이다. archive 전체에 없다고 단정하거나 동일 설정으로 반복하지 않는다. |
+| 원본 변경·parser·후검사 실패로 목록이 untrusted | 진단 증거로만 보관한다. 검증된 데이터 목록이나 학습 입력으로 사용하지 않는다. |
+| Metadata 단계에서 실패 | pilot을 실행하지 않는다. metadata 보고서와 설정을 보관한다. |
 
-RGB와 pose의 archive 순서는 다르다. 첫 RGB discovery 성공도 대응 pose가 같은 예산 안에서 발견된다는 보장은 아니다. 필요한 파일이 먼 위치에 있다면 실제 측정 결과를 바탕으로 다음 준비 예산이나 인덱스·재사용 방식을 별도로 결정한다. 전체 다운로드·상한 확대는 기본 동작이 아니다.
+이번 결과를 검토한 뒤 다음 준비 전략을 결정한다. 동일 예산 재시도, 예산 확대, 전체 다운로드를 자동 실행하지 않는다. 새로운 작업이 필요하면 단일 `JOB` 셀에서 새 ID와 구체적인 사유를 지정한다. 재실행 방지는 현재 런타임과 같은 소스 작업 폴더의 job 기록 범위 안에서 동작하며 새 Colab 세션 전체를 가로지르는 중앙 실행 이력은 아니다.
 
-독립 validation과 원본 motion 중복 검증은 별도로 남아 있다. 기존 train 18프레임을 나눠 validation처럼 사용하지 않는다. 현재 converter는 candidate만 만들며 학습 계약 연결, 실제 regression → body → hand 학습과 GPU 성능 검증은 아직 실행하지 않았다. M0/M1/M2/M3 전체 완료를 선언하지 않는다.
+대응 RGB·pose, 재투영 overlay, 시간·split 및 원본 motion 독립성 확인, 독립 validation, 학습 계약 연결이 남아 있다. 실제 regression → body → hand 학습과 GPU 성능은 아직 검증하지 않았으며 M0/M1/M2/M3 전체 완료가 아니다.

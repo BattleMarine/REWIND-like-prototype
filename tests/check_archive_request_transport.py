@@ -15,6 +15,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--dependency-dir",type=Path)
     parser.add_argument("--output",type=Path,required=True)
+    parser.add_argument("--mode",choices=("extract","scan"),default="extract")
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     sys.path.insert(0,str(root))
@@ -78,7 +79,7 @@ def main():
     try:
         for mode in ("normal","post_change","media_200","media_401","media_403","media_429"):
             server.mode=mode;server.calls=[];server.ranges=[]
-            pilot=run_pilot(manifest,args.output/mode,["*/json/*.json"],Limits(),session)
+            pilot=run_pilot(manifest,args.output/mode,[] if args.mode=="scan" else ["*/json/*.json"],Limits(),session,mode=args.mode)
             stats=pilot["stats"]
             core=json.loads((args.output/mode/"extraction_manifest.json").read_text())
             assert stats["http_requests_total"]==len(server.calls)==stats["ranges"]
@@ -97,12 +98,20 @@ def main():
                 assert server.ranges[0][0]==0
                 assert all(a[1]+1==b[0] for a,b in zip(server.ranges,server.ranges[1:]))
                 assert server.ranges[-1][1]-server.ranges[-1][0]+1<256*1024
-                assert len(verify_extraction(args.output/mode)["files"])>=3
-                assert pilot["sample_acquired"] and not pilot["source_validation_pending"]
+                if args.mode=="extract":
+                    assert len(verify_extraction(args.output/mode)["files"])>=3
+                    assert pilot["sample_acquired"]
+                else:
+                    assert pilot["complete_files"]==0 and not pilot["sample_acquired"]
+                    assert not (args.output/mode/"files").exists()
+                    assert sum(r["payload_complete"] for r in core["member_observations"])>=3
+                    assert core["member_observations_usable"]
+                assert not pilot["source_validation_pending"]
             elif mode=="post_change":
                 assert pilot["stop_reason"]=="source_changed"
                 assert len(server.calls)==3 and pilot["source_validation_pending"]
                 assert not pilot["inspection_candidates_usable"] and not pilot["sample_acquired"]
+                assert not core["member_observations_usable"]
             else:
                 assert pilot["stop_reason"]=="range_status_not_206"
                 assert len(server.calls)==2 and core["compressed_bytes_received"]==0
@@ -114,7 +123,7 @@ def main():
                 "stats":stats,"last_range":server.ranges[-1],"source_validation_pending":pilot["source_validation_pending"]})
     finally:
         session.close();server.shutdown();server.server_close();thread.join()
-    report={"scope":"AnonymousCredentials loopback only","actual_google_requests":0,"actual_authentication":False,
+    report={"scope":"AnonymousCredentials loopback only","operation":args.mode,"actual_google_requests":0,"actual_authentication":False,
         "versions":{"requests":requests.__version__,"urllib3":urllib3.__version__,"google_auth":google.auth.__version__},"cases":cases}
     (args.output/"request_transport_report.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"cases_passed":len(cases),"actual_google_requests":0,"normal":{k:v for k,v in cases[0].items() if k!="stats"},

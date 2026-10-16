@@ -13,7 +13,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - 2026-10-14 M1 학습 기반을 추가했습니다. 명시적 tensor 계약, 작은 single-frame/causal temporal regression, loss·평가·checkpoint 재개와 train-only 합성 RGB 예측 캐시 연결을 구현했습니다. 당시 Python 테스트 59개와 합성 CPU 학습·재개·평가를 통과했습니다. 실제 데이터 baseline·EfficientNet front-end·Colab GPU는 미검증이며 M1 전체 완료가 아닙니다.
 - [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 초기 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했습니다. 이후 사용자 Colab의 소스 업로드·CPU 실행은 아래 후속 결과로 확인했으며 GPU 검증은 남아 있습니다.
 - `rewind_archive`에 분할 gzip/tar의 상한 있는 순차 읽기·선택 추출·이름 대응·hash 재사용 검사를 추가했습니다. 당시 Python 테스트 83개(기존 59+archive 24)를 통과했고, 실제 HTTP 검증은 로컬 loopback 서버입니다. M0/M1 전체 완료가 아닙니다.
-- Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 당시 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 dict/작은 선택 JSON → 기본 비활성 metadata/auth → 별도 기본 비활성 pilot/verify 순서로 실행할 수 있습니다.
+- Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 당시 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 단일 JOB 설정 → 네트워크 없는 preflight → 기본 비활성 1회 metadata/pilot → 결과 검토·ZIP 보관 순서로 실행합니다. 별도 선택 JSON 업로드는 필요하지 않습니다.
 - 2026-10-15 사용자 Colab에서 metadata HTTP 200·chunked·Content-Length 없음 때문에 `metadata_protocol` 실패가 관측됐습니다. 양쪽 metadata 경로를 byte/시간 상한 내 EOF 읽기로 수정했고 전체 97개 회귀와 실제 라이브러리 loopback 오류 검사를 통과했습니다. Media의 strict 206 Range 조건은 유지합니다. 후속 사용자 Colab 보고서에서 metadata 생성과 pose 32개 추출·verify 성공을 확인했습니다. 원본 앞 512KiB를 읽고 파일 수 상한에서 정상 중단했으며, 당시 관절·좌표·RGB 대응과 실제 학습은 미검증이었으며, 후속 JSON 감사는 아래에 구분합니다.
 - JSON·window 도구는 Python 표준 라이브러리로 실행합니다. M1은 별도 PyTorch 환경이 필요하며 이번 검증은 Python 3.12.14 / torch 2.7.1+cpu입니다. 실행법과 한계는 [M1 안내](docs/M1_BASELINE.md)에 기록합니다. 기존 실제 sample 이력은 [M0 도구 안내](docs/M0_JSON_TOOLS.md)에 있으며 실제 브라우저 화면·조작 확인은 브라우저 URL 보안 정책으로 미실행입니다.
 - 2026-10-15 후속 [ArchVis sample 감사](docs/ARCHVIS_POSE_AUDIT.md)에서 Drive ZIP의 32 JSON hash·87관절 필수 배열을 대조했습니다. 연속 18프레임 smoke와 실제 causal window 검사를 통과했고, 산재된 Opening 14개는 gap 진단을 유지합니다. 좌표 사이의 수치 관계를 확인했으며 단위·시간·RGB/calibration·split과 학습은 미검증입니다.
@@ -34,7 +34,10 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 2026-10-16 사용자 RGB pilot 4개 ZIP을 대조했습니다. 모두 완전 파일 0개이며, 3회는 64KiB media마다 전후 metadata를 요청해 약 2.69MiB에서 총128회 상한에 도달했습니다. 같은 prefix 반복이어서 이어받기가 아닙니다. 첫 실행의 HTTP 비206 오류는 당시 실제 상태 코드가 기록되지 않아 원인을 확정하지 않습니다. [실행 결과와 다음 준비 순서](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
 
-- 요청 효율 개선에서 HTTP Range는 기본256KiB, 내부 read1·해제 출력은64KiB로 분리했습니다. 총128요청·8MiB·60초 상한과 원본 전후 검사는 유지합니다. 로컬 실제 전송 라이브러리 시험은 총96요청에서 byte 상한으로 중단했고, 별도 저장된 공식 prefix HTTP 재생에서 PNG2·JSON16의 기존 hash가 모두 일치했습니다. 새 코드의 실제 Drive/Colab 실행과 대응 stereo sample 확보는 아직 미검증입니다. Notebook은 discovery 최대2파일, 0파일 명시, 같은 작업 재실행 차단과 결과 ZIP 보관을 제공합니다. 전체 141개 테스트와 notebook 10개 코드 셀의 로컬 검증을 통과했습니다.
+- 요청 효율 개선에서 HTTP Range는 기본256KiB, 내부 read1·해제 출력은64KiB로 분리했습니다. 총128요청·8MiB·60초 상한과 원본 전후 검사는 유지합니다. 로컬 실제 전송 라이브러리 시험은 총96요청에서 byte 상한으로 중단했고, 별도 저장된 공식 prefix HTTP 재생에서 PNG2·JSON16의 기존 hash가 모두 일치했습니다. 당시 전체 141개 테스트와 notebook 10개 코드 셀의 로컬 검증을 통과했습니다. 이후 실제 Drive/Colab에서 오른쪽 RGB2개 추출은 확인됐으나 대응 stereo sample은 아직 없습니다. 아래 후속 검토를 따릅니다.
+
+- 2026-10-16 후속 사용자 결과에서 Serena `Getting_Up__1_` 오른쪽 frame10·1 확보를 확인했습니다. 왼쪽만 선택한 `5935e818`은 8,356,024bytes·96요청에서 0파일로 중단했습니다. 기존 실행과 같은 000 앞부분만 읽었고 후속 조각까지 도달하지 않아, 불완전 다운로드가 직접 원인이라는 근거는 없습니다. 필터는 gzip seek 기능이 아닙니다.
+- `archive_prepare`를 단일 설정과 위에서 아래로 실행하는 흐름으로 재작성했습니다. 새 기본 scan은 기존8MiB·60초 상한에서 저장0파일로 regular member 순서·경로·완료 여부를 기록하는 진단입니다. 전체 archive 인덱스가 아닙니다. 전체155개 로컬 테스트와 저장된 실제 prefix scan 재생에서 RGB3·pose17개 경로 관측, 완료payload2·16개와 저장0파일을 확인했습니다. 새 notebook의 실제 Colab 실행은 사용자 재검증 항목입니다. [다음 실행 안내](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
 
 ## 문서 안내
 
@@ -46,7 +49,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [실제 관절 대응표](docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
 | [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) | 실제 변환 수치 검증, 단위 근거의 강도, body22+finger40 권고와 학습 진입 조건 |
 | [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md) | 채택한 초기 규격, mm·mask·camera·손목 상대 특징 변환과 candidate 검증 |
-| [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md) | 현재 확보 상태, 다음 Colab의 train RGB·validation pose 선택과 남은 학습 조건 |
+| [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md) | 현재 확보 상태, 다음 Colab의 bounded prefix scan 순서와 남은 학습 조건 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |

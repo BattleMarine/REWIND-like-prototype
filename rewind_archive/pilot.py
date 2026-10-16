@@ -13,11 +13,11 @@ PENDING = ["live_drive_colab_validation","joints","units","coordinates","calibra
     "split","original_motion_duplicates","stereo_rgb_pose_content_alignment","m1_actual_data_training"]
 
 
-def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None):
+def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract"):
     """새 output에서 1회 prepare 후 검사·pilot report 저장. 자동 retry/확대 없음."""
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
-    extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session)
+    extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session,mode=mode)
     verification={"status":"not_usable","reason":None,"verified_complete_files":0}
     if extraction["inspection_candidates_usable"]:
         try:
@@ -36,6 +36,9 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         "sample_status":"verified_candidates" if verification["status"]=="passed" and extraction["files"] else "no_sample" if not extraction["files"] else "unusable_candidates",
         "sample_acquired":verification["status"]=="passed" and bool(extraction["files"]),
         "source_validation_pending":extraction["source_validation_pending"],
+        "operation":mode,"observed_regular_members":len(extraction["member_observations"]),
+        "member_observations_usable":extraction["member_observations_usable"],
+        "member_observation_trust":extraction["member_observation_trust"],
         "train_ready":False,"pending_verifications":PENDING,"scope":"single_archive_preparation_only"}
     if metadata_report is not None:
         report["metadata_report_content_sha256"]=metadata_report["content_sha256"]
@@ -52,8 +55,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
     return report
 
 
-def run_metadata_pilot(result, output, includes, limits, authorized_session):
+def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract"):
     """성공한 metadata 결과의 hash/code를 대조한 뒤에만 media 경로를 시작한다."""
     manifest=validate_metadata_result(result)
     return run_pilot(manifest,output,includes,limits,authorized_session,
-        metadata_report=result["report"])
+        metadata_report=result["report"],mode=mode)

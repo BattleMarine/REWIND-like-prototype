@@ -32,11 +32,21 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-16 현재 상태와 우선 실행 계획
 
+**2026-10-16 후속 RGB 결과와 notebook 재작성**
+
+- 실제 Colab `2c11fc10`은 Serena Getting_Up의 오른쪽 frame10·1을 확보했고 2파일 상한에서 중단했다. 기존 pose와는 다른 sequence여서 stereo triplet이나 학습 완료가 아니다. `5878434b`는 discovery 설정이 남아 동일 파일을 재추출했다.
+- 올바른 왼쪽 frame1·10 설정인 `5935e818`은 총96요청·8,356,024bytes에서 `transfer_bytes_limit`, 완전 선택파일0으로 중단했다. `6fcdb708`과 source metadata 및 32개 Range·수신hash가 같다. 모두 10GiB짜리000의 앞8,350,136bytes만 읽었다. 아직 없는 후속 조각에 도달한 실패가 아니다.
+- glob 변경은 저장 필터 변경이며 gzip을 해당 파일 위치로 이동시키지 않는다. 기존 보고서는 전체 도달 경로를 남기지 않아 왼쪽 파일의 부재·위치를 확정하지 못했다. 같은 예산 반복 대신 관측 경로를 기록하는 제한된 scan을 다음 진단으로 삼는다.
+- 사용자 요청에 따라 notebook을 단일 JOB 설정 → frozen preflight → 명시적1회 metadata/pilot → 결과 검토·ZIP 순서로 재작성했다. 설정 변경은 preflight 재확인을 요구하고 같은 설정 반복을 차단한다. 별도 plan 업로드·아래 새job 셀·위쪽으로 돌아가는 실행 안내를 제거한다.
+- 기본 scan은 payload 저장0이며 순차 읽기·해제 비용은 계속 발생한다. 기존8MiB·60초·총128요청·디스크16MiB를 유지하고 regular member 관측기록을 최대128개로 제한한다. 원본·parser 검사가 실패하면 목록은 untrusted다. 전체 archive index·중간 seek·resume가 아니다. [실행 순서](REAL_DATA_NEXT_RUN.md)를 따른다.
+- 전체155개 로컬 회귀를 통과했고, 마지막 extract 호환 보완 뒤 관련46개를 다시 통과했다. Fresh 소스 ZIP의 notebook7개 코드 셀 모의 실행에서 설정 변경·중복 실행의 인증 전 차단, 실패 결과 ZIP 보관과 재다운로드를 확인했다. 오케스트레이션은 저장된 공식 prefix를 네트워크 없이 scan 재생해 RGB3/pose17개 관측, 완료payload2/16개 순서 일치, 저장0파일을 확인했다. 잘린 마지막payload를 완료로 표시하지 않았으며 이번 Google요청은0이다. 최초 localhost차단과 테스트 fixture의 GNU metadata64KiB초과는 로컬 서버 허용·fixture 경로범위 조정 후 해소했다. 운영 예산은 늘리지 않았다.
+- 새 흐름의 실제 Drive/Colab 실행, 좌우RGB+pose 확보·독립validation·실제학습은 남아 있다. 이전 오른쪽 추출 성공과 이번 진단 구현의 검증 범위를 구분한다.
+
 **2026-10-16 RGB pilot 요청 상한 원인 검토**
 
 - 사용자 제공 RGB pilot 4개 ZIP은 CRC를 통과했지만 완전 선택 파일은 모두0개다. 3회는 media43 + metadata85 = 총128요청, 압축본문2,818,048bytes·42~45초에서 `ranges_limit`로 중단했다. 43번째 media의 후검사 요청이 시작되지 않아 해당 본문은 해제기로 전달되지 않았다. 별도1회는 `range_status_not_206`였으며 과거 보고서에 HTTP 상태가 없어 할당량·인증·원본 손상으로 단정하지 않는다.
 - 기존64KiB마다 전후metadata2회를 실행한 요청 증폭과 고정Brutal 선택의 무수확이 원인이다. 관측한 앞부분은 다른 Serena/Getting_Up sequence다. 세 번 반복해도 같은 prefix를 처음부터 다시 읽었으므로 누적 준비 진전은 없다.
-- 다음 준비는 bounded RGB discovery → 완전 파일 hash·sequence/frame 확인 → 별도 pose/반대쪽 RGB 선택 검토 순서다. 재실행·상한 확대·전체 다운로드를 자동 수행하지 않으며, 검증 통과0파일은 sample 성공으로 보고하지 않는다. [수정 실행 가이드](REAL_DATA_NEXT_RUN.md)를 따른다. 실제 stereo triplet·독립 validation·학습 완료는 아직 아니다.
+- 당시 다음 준비를 bounded RGB discovery → 완전 파일 hash·sequence/frame 확인 → 별도 pose/반대쪽 RGB 선택 검토로 정했다. 이후 실제 결과와 새 준비 순서는 위 후속 기록을 따른다. 재실행·상한 확대·전체 다운로드를 자동 수행하지 않으며, 검증 통과0파일은 sample 성공으로 보고하지 않는다. [수정 실행 가이드](REAL_DATA_NEXT_RUN.md)를 따른다. 실제 stereo triplet·독립 validation·학습 완료는 아직 아니다.
 
 **요청 효율 개선 구현·로컬 검증**
 
@@ -45,7 +55,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - 오케스트레이션은 저장된 공식 CityPark prefix를 localhost HTTP로 재생해 PNG 2개·JSON 16개의 과거 hash 일치를 독립 확인했다(RGB 8요청·pose 1요청). 최초 sandbox의 loopback 차단은 0bytes 실패였고 로컬 서버 허용 환경에서 재검증했다. 이번에 공식 서버나 Drive에서 새 sample을 받은 결과가 아니며, 서로 다른 sequence로 triplet은 0개다.
 - Notebook은 인증 전 1~32개 glob 검사, discovery 최대 2파일, `sample_acquired`를 통한 0파일 구분, 같은 job 재실행 차단을 제공한다. 사유를 적는 별도 새 job 선언, ZIP 저장·재다운로드와 검증된 추출본의 counterpart 선택 제안도 추가했다. 제안은 자동 실행하지 않으며 새 job은 byte 0부터 읽는다. 기존 36개 glob plan 대신 새 discovery plan을 배포한다.
 - 전체 141개 회귀 테스트를 통과했다. 기존 chunked 전송 15조건과 신규 요청 예산 6조건은 별도 검사이며 합산하지 않는다. Fresh ZIP notebook 10개 코드 셀의 문법·기본 인증 0·잘못된 glob 사전 차단·같은 job 재실행 차단·ZIP 재다운로드를 모의 검증했다. 오케스트레이션도 전체 141개와 문서 링크·설정·plan 셀·prefix 재생을 독립 확인했다.
-- 이번 수정의 실제 Drive/Colab 재실행, 대응 RGB+pose·독립 validation 확보, 실제 학습은 남아 있다. 관측 sample과 전송 효율 개선을 M0/M1/M2/M3 전체 완료로 확대하지 않는다.
+- 이 요청 효율 수정의 후속 실제 Drive/Colab 결과는 위에 기록했다. 대응 RGB+pose·독립 validation 확보와 실제 학습은 남아 있다. 관측 sample과 전송 효율 개선을 M0/M1/M2/M3 전체 완료로 확대하지 않는다.
 
 **2026-10-16 실제 입력 규격·변환기 후속 묶음 — 실제 학습 전 준비**
 
