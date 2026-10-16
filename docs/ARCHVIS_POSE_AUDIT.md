@@ -57,3 +57,7 @@ Git 제외 로컬 보관 위치는 다음과 같다. 새 checkout에는 자동�
 - Git 제외 `outputs/m0_next_evidence_20261015/`에 공식 파일·수신 log·split/재투영 결과·독립 검토·RGB 실패 보고서를 보존한다. `root/archvis_rgb_selection.json`은 기존 Colab notebook의 `INPUT_MODE=json_upload`에 넣을 개인용 선택 입력이며 metadata를 새로 확인해야 한다. `root/colab_target.json`의 glob은 목표 sequence frame 0의 좌우 PNG만 선택한다. 형식과 이름 계약만 검사했으며 Drive RGB 실행은 미완료다. 상한 내 결과가 0이어도 원본에 해당 frame이 없다는 뜻은 아니다.
 
 M0에서 남은 실제 RGB·좌표/단위·시간·skeleton·원본 motion 검증을 유지한다. 후속 M2/M3의 합성 구현 검증은 이 데이터의 학습 준비 완료와 구분한다.
+
+## 후속 관절 이름 대응 (2026-10-16)
+
+[관절 대응표](JOINT_MAPPING.md)에서 본 sample의 32개 JSON에 공통인 87개 이름을 전부 기록했다. 기존 개발용 고유 62개는 모두 존재하며 나머지 25개도 표에 보존한다. 부모 연결·해부학적 의미·최종 모델 subset의 검증과 이름 존재 대조를 구분한다. 원본 좌표·개발용 설정·학습 입력 계약은 변경하지 않았다.

@@ -38,6 +38,10 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - 사용자가 결과·notebook·소스의 Drive 보관 완료를 알렸다. Drive 사본을 이번에 직접 가져와 hash 대조한 것은 아니다. 검토한 원본 사본과 `verification.json`은 Git 제외 `outputs/colab_m3_review_20261016/`에 보존한다.
 - Colab의 **합성 CPU 실행**이 확인된 상태로 갱신한다. 실제 데이터의 M0/M1/M2/M3 전체 완료, GPU 성능 또는 M4 착수로 확대하지 않는다.
 
+**2026-10-16 관절 대응표 작성 — 이름 대조 완료, 모델 규격은 후보**
+
+[실제 관절 대응표](JOINT_MAPPING.md)에 32개 JSON의 raw 87개 전체 이름과 관측 순서, 기존 개발용 62개·공식 평가 후보 16개 포함 여부, body/upper·좌우 wrist/finger 역할 후보와 미선택 항목을 기록했다. 원본 이름 대조와 명명에 따른 해석을 구분하고 합성10관절의 모호한 이름을 강제 치환하지 않았다. 아래 1번의 표 작성은 완료했지만 최종 관절 선택·부모 연결·단위·좌표·시간 검증, 변환기 구현·실제 학습은 남아 있다. 설정·학습 가드는 변경하지 않았다.
+
 **다음 순서 — 실제 pose 입력 규격 준비**
 
 1. 확보한 Brutal_Assassination 연속 18프레임의 87개 raw 관절을 body·upper·좌우 wrist·finger 역할로 대응하고 근거·제외 관절을 기록한다. 72/87/개발용62/합성10개를 같은 관절 집합으로 취급하지 않는다.
@@ -45,7 +49,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 3. 확인된 규격으로 실제 pose → 모델 특징 변환기를 준비하고 원본 hash·전처리 버전·mask·sequence/split을 보존한다. GT 2D 진단과 RGB 예측 입력 baseline을 구분한다. 현재 필수 입력 guard를 우회하거나 미확인 항목을 verified로 채우지 않는다.
 4. 진입 조건이 충족된 뒤 작은 train subset으로 regression → body → hand 과적합을 확인한다. 18프레임 내부 분할을 일반화 평가로 사용하지 않으며 독립 validation 시퀀스는 별도로 준비한다. 대응 RGB·overlay와 예측 2D baseline은 계속 남은 작업이다.
 
-위 항목은 다음 작업 순서이며 이번 문서 갱신으로 규격 확정·변환기 구현·실제 학습이 완료된 것은 아니다.
+위 항목 중 이름 대응표 작성만 완료했다. 규격 확정·변환기 구현·실제 학습이 완료된 것은 아니다.
 
 **2026-10-15 공식 근거 확인 및 M2/M3 구현 진행 범위**
 

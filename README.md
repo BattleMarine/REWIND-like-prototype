@@ -26,6 +26,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 2026-10-16 사용자 제공 Colab 결과 ZIP·실행 notebook을 검토했습니다. Python 3.13.16 / torch 2.11.0+cpu에서 전체 119개 테스트, named-body 80·upper/none hand 각 100 update, upper hand 110까지 재개·평가 성공을 확인했습니다. 실행 소스는 `5e52aa3`이고 31개 코드 hash와 checkpoint 참조가 일치합니다. 실제 데이터·GPU 검증과 구분하며 [M3 검토 기록](docs/M3_WHOLE_BODY_TEACHER.md#사용자-colab-cpu-검증-2026-10-16)을 따릅니다.
 
+- 2026-10-16 실제 ArchVis 32개 JSON의 87개 관절을 대조한 [관절 대응표](docs/JOINT_MAPPING.md)를 작성했습니다. 기존 개발용 62개·평가 후보 16개의 포함 여부와 body/upper/손목/손가락 후보, 미선택 25개를 구분했습니다. 이름 존재 확인과 모델 역할·부모 연결의 확정은 구분하며 학습 설정은 변경하지 않았습니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
@@ -33,6 +35,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [프로젝트 로드맵](docs/ROADMAP.md) | 단계별 목표, 완료 기준, 실험 계획과 검토할 결정 사항 |
 | [에이전트 작업 지침](AGENTS.md) | 구현·실험·검증·문서 수정 시 지켜야 할 원칙 |
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
+| [실제 관절 대응표](docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
