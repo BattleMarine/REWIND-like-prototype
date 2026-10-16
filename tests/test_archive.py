@@ -38,7 +38,7 @@ class ArchiveTestCase(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory(dir=temporary_root)
         self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name).resolve()
-        self.limits=Limits(io_chunk_bytes=512,max_ranges=128)
+        self.limits=Limits(io_chunk_bytes=512,media_range_bytes=512,max_ranges=128)
         self.counter=0
 
     def manifest(self, raw=None, entries=None, kind="pose", split=None, total=None):
@@ -199,7 +199,7 @@ class ArchiveTests(ArchiveTestCase):
                 self.assertLessEqual(report['stats']['transfer_bytes'],limits.max_transfer_bytes)
                 self.assertLessEqual(report['stats']['decompressed_bytes'],limits.max_decompressed_bytes)
                 self.assertFalse(list(out.rglob('*.partial')))
-        reserve=16384+2*len(canonical(manifest))+len(canonical(['**']))+self.limits.max_ranges*512+self.limits.max_files*(3*self.limits.max_path_bytes+1024)
+        reserve=16384+2*len(canonical(manifest))+len(canonical(['**']))+self.limits.max_ranges*1024+self.limits.max_files*(3*self.limits.max_path_bytes+1024)
         report,out=self.run_extract(manifest,base,replace(self.limits,max_disk_bytes=reserve+1600))
         self.assertEqual(report['stop_reason'],'payload_disk_bytes_limit')
         logical=sum(f.stat().st_size for f in out.rglob('*') if f.is_file())

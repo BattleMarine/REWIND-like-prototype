@@ -123,13 +123,17 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 ### Drive 파일 선택부터 소량 읽기까지
 
-1. **CPU 런타임**에서 준비 노트북의 환경·소스 ZIP·사전 테스트 38개·합성 진단을 실행합니다.
+1. **CPU 런타임**에서 준비 노트북의 환경·최신 소스 ZIP·사전 테스트 46개(archive24+metadata14+planning8)·합성 진단을 실행합니다. 이미 import한 구모듈이 있으면 필요한 결과를 먼저 보관한 뒤 커널을 재시작합니다.
 2. 선택 입력에 `archive_id`, `dataset_version`, `kind`(`rgb` 또는 `pose`), 원본의 `total_parts`, 읽을 조각의 `index`·`name`·`file_id`를 넣습니다. `drive_part_selection_v1` JSON을 업로드하거나 노트북에서 직접 입력할 수 있습니다. 파일 공유 URL의 `/d/` 뒤 식별자가 file ID이며, 폴더 ID와 혼동하지 않습니다. 목록은 `000`부터 연속해야 합니다. `total_parts`는 현재 다운로드된 개수가 아니라 공식 배포 목록 등으로 확인한 원본 조각 수입니다.
-3. `INPUT_MODE`를 직접 입력이면 `"dict"`, 선택 JSON 업로드이면 `"json_upload"`로 정합니다. **`RUN_DRIVE_METADATA = True`만 활성화**해 계정을 인증합니다. 파일 ID·이름·유형·다운로드 가능 여부·크기·version·modifiedTime을 검사하고, 모두 통과한 경우에만 `archive_manifest.json`과 `metadata_report.json`을 만듭니다. 이 단계는 압축 본문을 읽지 않습니다. 실패하면 보고서의 중단 이유를 확인합니다.
-4. manifest와 읽기 상한을 확인하고, `SELECTED_MEMBER_GLOBS`에 저장할 member glob을 입력한 뒤 **`RUN_DRIVE_PILOT = True`를 별도로 활성화**합니다. 원본 내부 시퀀스 경로를 아직 모르면 작은 조사 목적의 glob을 명시적으로 선택할 수 있지만, 기존 전송·시간·파일 수 상한을 유지합니다. 실패·0개 추출 시 자동으로 범위를 늘리거나 재시도하지 않습니다. Glob만 바꿀 때는 별도 셀에서 해당 변수만 설정합니다. 입력 셀 전체를 다시 실행하면 metadata 결과가 초기화되므로 metadata부터 다시 실행합니다.
-5. `pilot_report.json`에서 완전 파일 수, 재사용 검사, 전송량·시간, 중단 이유와 gzip CRC 상태를 확인합니다. 추출 manifest·metadata 보고서·pilot 보고서를 함께 보관합니다. `train_ready=false`는 유지되며 한 archive의 읽기 성공만으로 좌우 RGB·pose 대응이나 학습 준비가 완료되지 않습니다.
+3. `INPUT_MODE`를 직접 입력이면 `"dict"`, 선택 JSON 업로드이면 `"json_upload"`로 정합니다. `SELECTED_MEMBER_GLOBS` 1~32개와 `PILOT_PURPOSE`를 **인증 전에** 입력합니다. 시퀀스 경로를 모르면 `"discovery"`로 지정하고 RGB `<archive-prefix>/*/fisheye_final_image/camera_*/final_*.png` 또는 pose `<archive-prefix>/*/json/frame_*.json`처럼 조사 glob을 명시합니다. Discovery는 완전 파일을 최대2개만 저장합니다. 18frame 좌우는36개 glob 대신 `camera_*`18개로 표현할 수 있으며36개는 인증 전 거부합니다.
+4. **`RUN_DRIVE_METADATA = True`만 활성화**해 계정을 인증합니다. 파일 ID·이름·유형·다운로드 가능 여부·크기·version·modifiedTime을 검사하고, 모두 통과한 경우에만 `archive_manifest.json`과 `metadata_report.json`을 만듭니다. 이 단계는 압축 본문을 읽지 않습니다. 실패하면 중단 이유를 확인합니다. Metadata가 성공한 뒤 읽기 상한을 확인하고 **`RUN_DRIVE_PILOT = True`를 별도로 활성화**해 작업당1회만 실행합니다.
+5. `pilot_report.json`에서 `complete_files`, `sample_acquired`, `sample_status`, verify, 전송량·시간·중단·CRC를 확인합니다. **0개/verify passed는 sample 확보 성공이 아닙니다.** 실패·0개면 ZIP을 보관하고 중단·검토하며 같은 byte0 입력을 반복하지 않습니다. 완전 파일이 있으면 아래 `MAKE_COUNTERPART_PLAN=True`로 hash를 검사해 실제 관측 sequence/frame에 대한 대응 RGB/pose glob만 제안합니다. 제안은 화면 출력만이며 후속 요청은 자동 실행하지 않습니다.
+6. **결과 ZIP** 셀의 `SAVE_RESULT_ZIP=True`, `DOWNLOAD_RESULT_ZIP=True`로 현재 작업의 metadata·manifest·pilot·완전 파일을 저장하고 내려받습니다. 저장 뒤에는 다운로드만 다시 켤 수 있습니다. 기존 ZIP은 덮어쓰지 않으며 이후 만든 제안은 자동 추가되지 않습니다. 저장은 최대17MiB 입력과 비슷한 별도 임시 ZIP 공간을 사용합니다. 결과 ZIP은 개인 ID/sample을 포함할 수 있어 개인 보관합니다.
+7. 기존 결과는 verify 후 재사용합니다. 대응 파일을 읽는 별도 실행이 필요하면 검토 후 **새 작업 선언** 셀의 `START_NEW_PILOT_JOB=True`, `NEW_JOB_REASON`을 명시하고 다음 입력/glob·`PILOT_PURPOSE="targeted"`로 metadata부터 시작합니다. 입력·metadata·pilot 셀을 다시 실행해도 이미 시작한 `PILOT_JOB_ID`는 차단되며 새 출력 폴더만 만들어 우회하지 않습니다. 커널 재시작 후에는 기록이 사라지므로 먼저 이전 ZIP을 확인합니다. 새 job도 gzip 중간 재개가 아니라 byte0에서 다시 읽는 비용을 냅니다.
 
-Metadata 기본값은 최대 8개 파일·8회 요청·응답당 16 KiB·누적 본문 128 KiB·30초입니다. 이후 압축 준비 기본값은 별도로 본문 8 MiB·60초이며 두 단계 비용은 합쳐서 판단합니다. 이 값은 개발용 시작점이며 실제 Colab에서 측정한 처리량이나 운영 예산이 아닙니다. 최초 인증, transport 내부 처리와 원본을 앞에서부터 다시 읽는 비용도 고려합니다.
+모든 보고서는 `train_ready=false`를 유지합니다. 한 archive에서 완전 파일을 얻은 것과 좌우 RGB·pose 내용·시간·split/원본 motion 대응, 실제 학습 준비는 구분합니다. 대응 경로가 다른 archive의 예산 안에서 나올지는 unknown입니다. 구체적인 다음 선택은 [다음 실제 데이터 준비 실행](REAL_DATA_NEXT_RUN.md)을 따릅니다.
+
+Metadata 기본값은 최대8개 파일·8회 요청·응답당16KiB·누적 본문128KiB·30초입니다. 이후 준비는 본문8MiB·60초·disk16MiB·총 요청128을 유지하고 HTTP Range256KiB, 내부 read1/해제64KiB로 구분합니다. Drive media마다 전후 metadata 검사3요청·metadata32KiB를 예약하며 `media_requests`/`metadata_requests`/`http_requests_total`을 보고합니다. 이전64KiB Range는 media43+metadata85=128회에서 먼저 멈췄습니다. 수정은 이 요청 수를 줄이지만 실제 Colab의 처리량·성공·운영 예산을 보장하지 않습니다. 최초 인증, transport 내부 처리와 앞에서부터 다시 읽는 비용도 고려합니다.
 
 Metadata 조회와 media 읽기는 모두 기본 비활성입니다. 같은 커널에서 이전 실행 결과가 남아 있더라도 선택 입력을 바꿨다면 metadata부터 다시 생성합니다. 셀 실패 이후의 오래된 manifest를 그대로 사용하지 않습니다.
 

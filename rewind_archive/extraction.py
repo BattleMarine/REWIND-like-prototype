@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
-from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest
+from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes
 from .sources import SplitStream
 
 
@@ -129,11 +129,10 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
-    if not isinstance(includes,list) or not 1 <= len(includes) <= 32 or any(not isinstance(p,str) or not p or len(p.encode())>1024 for p in includes):
-        raise PreparationError("explicit_selection_required")
+    includes = validate_includes(includes)
     budget = Budget(limits,**({"clock":clock} if clock else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
-    reserve = 16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*512+limits.max_files*(3*limits.max_path_bytes+1024)
+    reserve = 16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024+limits.max_files*(3*limits.max_path_bytes+1024)
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -265,7 +264,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         partial_dir.rmdir()
     complete_source = len(manifest["parts"])==manifest["total_parts"]
     malformed_complete_tar = bool(reader and reader.gzip_eof_crc_valid and not tar_eof and reason in {"prefix_exhausted","incomplete_header","incomplete_payload","incomplete_padding"})
-    usable = (reason=="complete" or reason in BENIGN_STOPS) and not malformed_complete_tar
+    pending_validation = bool(source and any(getattr(s,"pending_validation",False) for s in source.sources))
+    usable = (reason=="complete" or reason in BENIGN_STOPS) and not malformed_complete_tar and not pending_validation
     failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason=="interrupted" else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
     report = {"schema_version":"archive_extraction_v1","extractor_version":__version__,"code_sha256":code_hashes(),
         "archive_manifest":manifest,"archive_manifest_sha256":digest(manifest),"selection":includes,"limits":asdict(limits),
@@ -274,7 +274,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "gzip_eof_crc_valid":reader.gzip_eof_crc_valid if reader else False,"tar_end_blocks_seen":tar_eof,
         "declared_source_complete":complete_source,
         "whole_archive_integrity_verified":reason=="complete" and complete_source and manifest["source_scope"]!="official_prefix_local",
-        "inspection_candidates_usable":usable,"train_ready":False,
+        "inspection_candidates_usable":usable,"source_validation_pending":pending_validation,"train_ready":False,
         "report_disk_reserve_bytes":reserve}
     raw = canonical({**report,"content_sha256":digest(report)})+b"\n"
     if len(raw)>reserve:

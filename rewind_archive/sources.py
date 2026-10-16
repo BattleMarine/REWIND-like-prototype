@@ -23,8 +23,9 @@ def http_open(url, headers, timeout):
     try:
         return opener.open(request, timeout=timeout)
     except urllib.error.HTTPError as exc:
+        diagnostic = metadata_diagnostic(exc)
         exc.close()
-        raise PreparationError("http_status_rejected") from None
+        raise PreparationError("http_status_rejected", diagnostic) from None
     except (OSError, urllib.error.URLError):
         raise PreparationError("http_open_failed") from None
 
@@ -146,7 +147,7 @@ class LocalSource:
         self.path = (Path(base)/part["source"]["path"]).resolve()
 
     def read_range(self, start, end, budget, on_chunk):
-        budget.check_time()
+        budget.request("local")
         try:
             with self.path.open("rb") as f:
                 before = os.fstat(f.fileno())
@@ -172,16 +173,20 @@ class HttpSource:
     def __init__(self, part, opener=http_open):
         self.part, self.opener = part, opener
         self.url = part["source"]["url"]
+        self.last_diagnostic = None
 
     def read_range(self, start, end, budget, on_chunk):
+        self.last_diagnostic = None
         headers = {"Range":f"bytes={start}-{end}","Accept-Encoding":"identity"}
         identity = self.part["identity"]
         if identity.get("etag"):
             headers["If-Match"] = identity["etag"]
         if identity.get("last_modified"):
             headers["If-Unmodified-Since"] = identity["last_modified"]
+        budget.request("media")
         response = self.opener(self.url, headers, budget.timeout())
         try:
+            self.last_diagnostic = metadata_diagnostic(response)
             if response.status != 206:
                 # Range를 무시한 200 본문은 읽지 않는다.
                 raise PreparationError("range_status_not_206")
@@ -210,9 +215,13 @@ class DriveSource(HttpSource):
         file_id = part["source"]["file_id"]
         self.url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
         self.metadata_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=size,version,modifiedTime"
+        self.last_diagnostic = None
+        self.pending_validation = False
+
+    METADATA_RESPONSE_BYTES = 16384
 
     def check_metadata(self, budget):
-        budget.add("ranges",1,budget.limits.max_ranges)
+        budget.request("metadata")
         response = self.opener(self.metadata_url, {"Accept-Encoding":"identity"}, budget.timeout())
         try:
             if not hasattr(budget,"metadata_response_audit"):
@@ -221,7 +230,7 @@ class DriveSource(HttpSource):
             budget.metadata_response_audit.append(audit)
             def received(chunk):
                 audit["bytes_received"]+=len(chunk)
-            raw = read_metadata_body(response,budget,16384,received,protocol_reason="drive_metadata_response")
+            raw = read_metadata_body(response,budget,self.METADATA_RESPONSE_BYTES,received,protocol_reason="drive_metadata_response")
             try:
                 doc = json.loads(raw)
             except (ValueError,UnicodeError):
@@ -234,11 +243,16 @@ class DriveSource(HttpSource):
             response.close()
 
     def read_range(self, start, end, budget, on_chunk):
-        self.check_metadata(budget)
-        if end-start+1 > budget.limits.max_transfer_bytes-budget.transfer_bytes:
+        self.last_diagnostic = None
+        # 전후 metadata 둘 다 끝낼 여유를 media를 열기 전에 예약한다.
+        budget.reserve_requests(3)
+        if end-start+1+2*self.METADATA_RESPONSE_BYTES > budget.limits.max_transfer_bytes-budget.transfer_bytes:
             raise PreparationError("transfer_bytes_limit")
+        self.check_metadata(budget)
+        self.pending_validation = True
         chunk = super().read_range(start,end,budget,on_chunk)
         self.check_metadata(budget)
+        self.pending_validation = False
         return chunk
 
 
@@ -266,8 +280,16 @@ class SplitStream:
         remaining = budget.limits.max_transfer_bytes-budget.transfer_bytes
         if remaining <= 0:
             raise PreparationError("transfer_bytes_limit")
-        size = min(budget.limits.io_chunk_bytes, part["size_bytes"]-self.offset, remaining)
-        budget.add("ranges",1,budget.limits.max_ranges)
+        source = self.sources[self.part_index]
+        if isinstance(source, DriveSource):
+            budget.reserve_requests(3)
+            remaining -= 2*source.METADATA_RESPONSE_BYTES
+            if remaining <= 0:
+                raise PreparationError("transfer_bytes_limit")
+        else:
+            budget.reserve_requests(1)
+        size = min(budget.limits.io_chunk_bytes if isinstance(source,LocalSource) else budget.limits.media_range_bytes,
+            part["size_bytes"]-self.offset, remaining)
         record = {"part_index":self.part_index,"start":self.offset,"end":self.offset+size-1,"bytes_received":0,"status":"pending"}
         self.audit.append(record)
         hash_ = hashlib.sha256()
@@ -276,12 +298,16 @@ class SplitStream:
             self.compressed_bytes_received += len(chunk)
             hash_.update(chunk)
         try:
-            chunk = self.sources[self.part_index].read_range(self.offset,self.offset+size-1,budget,received)
+            chunk = source.read_range(self.offset,self.offset+size-1,budget,received)
             record["status"] = "complete"
         except PreparationError as exc:
             record["status"], record["reason"] = "failed", exc.reason
+            if exc.diagnostic is not None:
+                record["response"] = exc.diagnostic
             raise
         finally:
+            if getattr(source,"last_diagnostic",None) is not None and "response" not in record:
+                record["response"] = source.last_diagnostic
             record["sha256_received_bytes"] = hash_.hexdigest()
         budget.peak_input_chunk_bytes = max(budget.peak_input_chunk_bytes,len(chunk))
         self.offset += len(chunk)

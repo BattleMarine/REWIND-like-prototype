@@ -30,7 +30,11 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 2026-10-16 후속 [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md)에서 실제 32개 JSON의 world↔camera/device 변환과 카메라 degree/device radian 관계를 수치 대조했습니다. 거리 단위 cm는 논문의 rig 간격과 실제 baseline으로 강하게 지지되지만 UE2 raw 필드 직접 선언과는 구분합니다. Body22+finger40, upper13을 초기 학습 구성으로 권고하며, 모델 연결에는 좌표계의 축 반전 처리와 별도 변환기가 필요합니다. 설정·학습 가드는 유지했고 실제 학습은 실행하지 않았습니다.
 
-2026-10-16 후속 작업으로 [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md)와 별도 `real_archvis62_v1` 규격을 추가했습니다. Body22+finger40·upper13·평가16 및 graph를 프로젝트 가정으로 채택하고, cm 근거를 명시해 출력은 mm로 통일합니다. 기존 개발용 설정은 유지합니다. 변환 산출물은 검토용 candidate이며 학습 입력으로 자동 승인하지 않습니다. 대응 RGB·독립 validation·원본 motion 검증이 남아 있어 실제 학습은 아직 실행하지 않았습니다. 현재 Colab 런타임이 없으므로 [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md)에 Drive 선택 입력과 실행 순서를 준비했습니다. 전체 133개 테스트와 실제 32파일 변환·독립 수치 대조를 통과했습니다.
+2026-10-16 후속 작업으로 [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md)와 별도 `real_archvis62_v1` 규격을 추가했습니다. Body22+finger40·upper13·평가16 및 graph를 프로젝트 가정으로 채택하고, cm 근거를 명시해 출력은 mm로 통일합니다. 기존 개발용 설정은 유지합니다. 변환 산출물은 검토용 candidate이며 학습 입력으로 자동 승인하지 않습니다. 대응 RGB·독립 validation·원본 motion 검증이 남아 있어 실제 학습은 아직 실행하지 않았습니다. [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md)에 Drive 선택 입력과 실행 순서를 준비했습니다. 이후 네 번의 RGB 실행 실패와 개선 흐름은 아래 기록을 따릅니다. 전체 133개 테스트와 실제 32파일 변환·독립 수치 대조를 통과했습니다.
+
+- 2026-10-16 사용자 RGB pilot 4개 ZIP을 대조했습니다. 모두 완전 파일 0개이며, 3회는 64KiB media마다 전후 metadata를 요청해 약 2.69MiB에서 총128회 상한에 도달했습니다. 같은 prefix 반복이어서 이어받기가 아닙니다. 첫 실행의 HTTP 비206 오류는 당시 실제 상태 코드가 기록되지 않아 원인을 확정하지 않습니다. [실행 결과와 다음 준비 순서](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
+
+- 요청 효율 개선에서 HTTP Range는 기본256KiB, 내부 read1·해제 출력은64KiB로 분리했습니다. 총128요청·8MiB·60초 상한과 원본 전후 검사는 유지합니다. 로컬 실제 전송 라이브러리 시험은 총96요청에서 byte 상한으로 중단했고, 별도 저장된 공식 prefix HTTP 재생에서 PNG2·JSON16의 기존 hash가 모두 일치했습니다. 새 코드의 실제 Drive/Colab 실행과 대응 stereo sample 확보는 아직 미검증입니다. Notebook은 discovery 최대2파일, 0파일 명시, 같은 작업 재실행 차단과 결과 ZIP 보관을 제공합니다. 전체 141개 테스트와 notebook 10개 코드 셀의 로컬 검증을 통과했습니다.
 
 ## 문서 안내
 

@@ -155,7 +155,7 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
         opener=session_opener(authorized_session)
         validated=[]
         for part in selection["parts"]:
-            budget.add("ranges",1,limits.max_requests)
+            budget.request("metadata", limits.max_requests)
             record={"part_index":part["index"],"bytes_received":0,"status":"pending"}
             request_audit.append(record)
             received=hashlib.sha256()

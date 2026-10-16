@@ -106,10 +106,10 @@ Notebook의 입력은 다음 `drive_part_selection_v1` dict 또는 128KiB 이하
 }
 ```
 
-1. 입력 셀의 `INPUT_MODE=dict`와 `DRIVE_SELECTION`을 채웁니다. 선택 JSON이 있으면 `json_upload`를 택합니다. 아직 media를 읽지 않습니다.
+1. 입력 셀의 `INPUT_MODE=dict`와 `DRIVE_SELECTION`, `SELECTED_MEMBER_GLOBS` 1~32개를 채웁니다. 선택 JSON이 있으면 `json_upload`를 택합니다. Glob 개수·경로·중복을 인증 전에 검사합니다. 아직 media를 읽지 않습니다.
 2. `RUN_DRIVE_METADATA=True`로 metadata 셀만 실행합니다. 상한은 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답당16KiB·누적128KiB, 협력적30초·요청5초입니다. Files.get의 id/name/size/version/modifiedTime/mimeType/trashed/capabilities.canDownload만 조회하고 검색·media는 호출하지 않습니다.
 3. `manifest_ready`와 stop_reason/stats를 확인합니다. 연속 000-prefix·동일 `.tar.gz` stem·고유 ID/이름과 실제 metadata를 검사합니다. Native Docs/shortcut/folder·trash·다운로드 불가·빈/누락/비정상 size/version을 거부하고 실패 시 `metadata_report.json`만 남깁니다. Version은 변경마다 증가하는 API 값입니다. [Files.get](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/get), [File metadata 규격](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
-4. 성공 manifest와 기존 준비 smoke 상한을 확인하고 `SELECTED_MEMBER_GLOBS`를 명시한 후 별도로 `RUN_DRIVE_PILOT=True`를 실행합니다. 한 archive만 읽어도 pilot입니다. RGB/pose pair 완성·학습·범위 확대·retry는 시작하지 않습니다. Metadata 재실행은 이전 결과를 먼저 폐기하며 현재 선택 digest가 바뀌면 pilot을 차단합니다.
+4. 성공 manifest와 기존 준비 smoke 상한을 확인하고 별도로 `RUN_DRIVE_PILOT=True`를 실행합니다. 한 archive만 읽어도 pilot입니다. RGB/pose pair 완성·학습·범위 확대·retry는 시작하지 않습니다. Metadata 재실행은 이전 결과를 먼저 폐기하며 현재 선택 digest가 바뀌면 pilot을 차단합니다. 이미 시작한 작업 ID는 metadata/pilot 재실행을 거부합니다.
 
 `build_drive_manifest(selection, session, MetadataLimits)`는 manifest 또는 None과 sanitized report를 반환합니다. `save_metadata_bundle`은 새 디렉터리만 사용하고 기존 파일을 덮어쓰지 않습니다. 성공이면 `metadata/archive_manifest.json`·`metadata_report.json`, 실패이면 report만 보존합니다. Code/revision/hash·실행 환경·metadata snapshot·요청 body 범위와 stats를 기록합니다. 실패한 부분 snapshot에서 유효 manifest를 만들지 않습니다.
 
@@ -117,14 +117,15 @@ Notebook의 입력은 다음 `drive_part_selection_v1` dict 또는 128KiB 이하
 
 ## 작업 상한과 측정 범위
 
-`--limits`는 [archive_limits_smoke.json](../configs/archive_limits_smoke.json)처럼 **모든 필드가 명시된** JSON입니다. 아래는 작은 개발용 기본값이며 Colab 실측으로 정한 운영 예산은 아닙니다.
+`--limits`는 [archive_limits_smoke.json](../configs/archive_limits_smoke.json)처럼 필드를 명시한 JSON입니다. 새 `media_range_bytes`만 생략 가능하며 생략 시256KiB를 사용하므로 기존 limits JSON도 읽습니다. 아래는 작은 개발용 기본값이며 Colab 실측으로 정한 운영 예산은 아닙니다.
 
 | 필드 | 기본값 | 적용 범위 |
 | --- | --- | --- |
 | max_transfer_bytes | 8 MiB | 반환된 source 응답 body/로컬 읽기 + Drive metadata body 누적 |
 | max_elapsed_seconds | 60 s | 준비코어의 요청·읽기·해제·쓰기 사이 협력적 deadline |
 | request_timeout_seconds | 5 s | HTTP 요청 timeout; 현재 남은 시간보다 길게 설정하지 않음 |
-| io_chunk_bytes | 64 KiB | Range 단위, 개별 read/write와 zlib max_length |
+| io_chunk_bytes | 64 KiB | 개별 read1/write·local 읽기와 zlib max_length |
+| media_range_bytes | 256 KiB | HTTP/Drive 한 Range의 최대 반환 buffer. 마지막 Range는 잔여 예산에 맞게 축소 |
 | max_decompressed_bytes | 32 MiB | 반환된 tar stream bytes 누적; skip 파일·padding·metadata 포함 |
 | max_file_bytes | 4 MiB | 선택 여부와 관계없는 regular member 선언 크기 |
 | max_disk_bytes | 16 MiB | 선택 파일(완료+현재 임시 파일)의 logical bytes와 report 예약량 |
@@ -132,17 +133,19 @@ Notebook의 입력은 다음 `drive_part_selection_v1` dict 또는 128KiB 이하
 | max_members | 1000 | 읽은 nonzero tar header 수; metadata header 포함 |
 | max_metadata_bytes | 64 KiB | GNU/PAX payload 누적; 읽기 전에 선언 크기 검사 |
 | max_path_bytes | 1024 | Archive member UTF-8 경로 길이 |
-| max_ranges | 128 | Source Range 시도 + Drive metadata 요청 수 |
+| max_ranges | 128 | HTTP media + Drive metadata + local 읽기의 총 시도 수 |
 
 Manifest 입력은 128 KiB, part 수는 최대 1000, selection은 최대 32개/각 1024 bytes입니다. Report 공간은 manifest·selection·최대 range/file record 수에 맞춰 사전 예약하고, 여유가 부족하면 추출 전에 거부합니다. 파일 크기·완료 수뿐 아니라 **현재 작성 중인 .partial도** disk 상한 안에 들어갑니다. Physical filesystem block·directory/ACL overhead와 다른 프로세스의 사용량은 logical bytes에 포함하지 않습니다.
 
-Stats는 transfer/decompressed/payload_disk bytes, members/metadata/files/ranges, elapsed, 관측 최대 input/output chunk와 현재 파일을 포함한 peak payload bytes를 남깁니다. 준비 report는 예약량 이내의 `extraction_manifest.json`과 선택적 `pilot_report.json`이고 실제 출력 파일 bytes는 payload_disk_bytes와 이 report 크기를 합해 확인합니다. 최초 metadata bundle은 별도 단계입니다. 실패 후 partial을 제거하고 report를 남기는 정리 작업은 deadline이 지나도 수행합니다.
+Stats는 transfer/decompressed/payload_disk bytes, members/metadata/files/ranges, elapsed, 관측 최대 input/output chunk와 현재 파일을 포함한 peak payload bytes를 남깁니다. 새 `media_requests`, `metadata_requests`, `http_requests_total`(앞의 둘 합), `local_reads`를 함께 기록합니다. `ranges`는 이전 보고서와 같은 총 동작 카운터입니다. Source 호출을 시작한 시도도 실패 여부와 관계없이 셉니다. 준비 report는 예약량 이내의 `extraction_manifest.json`과 선택적 `pilot_report.json`이고 실제 출력 파일 bytes는 payload_disk_bytes와 이 report 크기를 합해 확인합니다. 최초 metadata bundle은 별도 단계입니다. 실패 후 partial을 제거하고 report를 남기는 정리 작업은 deadline이 지나도 수행합니다.
+
+Drive media를 열기 전에 전후 metadata를 포함한 **3요청과 metadata 최대32KiB**를 사전 예약합니다. Metadata는 각각16KiB 이내이며 실제 수신량만 누적하므로 사용하지 않은 예약 bytes는 다음 Range에서 다시 고려합니다. 남은 body 예산에서32KiB를 뺀 크기까지만 media를 읽고, 여유가 없으면 `transfer_bytes_limit`로 중단합니다. 따라서 본문 상한을 정확히 모두 채우지 않을 수 있습니다. 원본 size/version/modifiedTime의 전후 비교는 Range마다 유지하며 후검사 중 시간·응답·원본 오류가 나면 `source_validation_pending=true`이고 후보 전체의 reuse/match를 거부합니다. 총 요청 여유가3회 미만이면 새 media를 시작하지 않습니다.
 
 Transfer는 **이 adapter에 반환된 응답 본문** 기준입니다. HTTP/TLS header, 인증 교환, network transport 선수신·TCP 재전송은 측정하지 않습니다. 부분 body를 받은 후 오류가 나면 이미 반환된 bytes와 예외의 byte partial을 누적하며 retry로 초기화하지 않습니다. 숨은 transport/auth 교환까지 포함한 전체 wire 바이트의 하드 상한은 아닙니다.
 
 Elapsed는 DNS/auth/OS syscall을 강제 중단하는 전체 프로세스 hard timeout이 아닙니다. URL open 및 read에는 남은 시간을 제한하고 slow/trickle 응답을 검사했지만 DNS나 접근 불가능한 socket·disk syscall은 deadline을 넘겨 반환할 수 있습니다. 준비 전 인증·notebook 업로드 비용도 별도입니다.
 
-Input/output/metadata buffer와 path/record 개수에 상한을 두고 `zlib.decompress(..., max_length=...)`를 사용합니다. zlib 내부 상태, Python object/allocator, HTTP/TLS buffer, 라이브러리·프로세스 RSS는 별도이므로 **임의 프로세스 RAM 상한을 보장하지 않습니다.** Gzip의 중간 조각은 독립 해제하지 않으며 restart state를 만들지 않습니다. [Python zlib streaming API](https://docs.python.org/3.12/library/zlib.html)
+Input/output/metadata buffer와 path/record 개수에 상한을 두고 `zlib.decompress(..., max_length=...)`를 사용합니다. HTTP 반환/pending 입력은 최대256KiB이며 read1·해제 출력은64KiB입니다. Bytearray→bytes 변환 등의 일시 복사도 있어 전체 메모리가64KiB/256KiB로 제한되는 것은 아닙니다. zlib 내부 상태, Python object/allocator, HTTP/TLS buffer, 라이브러리·프로세스 RSS는 별도이므로 **임의 프로세스 RAM 상한을 보장하지 않습니다.** Gzip의 중간 조각은 독립 해제하지 않으며 restart state를 만들지 않습니다. [Python zlib streaming API](https://docs.python.org/3.12/library/zlib.html)
 
 ## 추출 파일과 신뢰 범위
 
@@ -173,6 +176,28 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 `verify`는 extraction manifest 내용 hash, 원본 manifest 동일성, extractor code hash, 개별 완료 파일의 길이·SHA-256·안전한 경로를 확인합니다. Hash 읽기는 기록된 크기만 bounded로 수행하고 fd 변화도 검사합니다. 실제 원격 원본을 다시 다운로드하거나 source가 이후 변하지 않았음을 증명하지 않습니다. 같은 런타임에서 검사된 추출본은 반복 학습 전에 재사용할 수 있지만 M1 입력 준비 조건은 별도입니다. 코드가 바뀌거나 임시 추출본이 소실되면 새 준비를 검토합니다. 원본 압축 조각은 유지합니다.
 
 ## 실행한 검증과 남은 일
+
+### 2026-10-16 요청 상한 원인과 다음 sample 확보 절차
+
+사용자 RGB 보고서3개는 모두 동일한 byte0 시작 입력에서 media43회×64KiB=2,818,048bytes를 수신했습니다. 당시 `ranges`는 media와 전후 metadata를 같은128회 상한에 더했고, metadata85회+media43회=128에서 마지막 후검사가 막혔습니다. 마지막64KiB는 이미 전송했지만 해제기로 반환되지 않았습니다. 별도1개는 `range_status_not_206`으로 실패했으며 당시 HTTP status는 기록되지 않아200/403/429 등을 확정할 수 없습니다. 이는 원인 대조이며 이 수정본의 실제 Drive 성공 검증이 아닙니다.
+
+새 기본값은 요청 상한을 올리지 않고 HTTP Range를256KiB로 묶습니다. 로컬 실제 requests/urllib3/AuthorizedSession+AnonymousCredentials loopback에서 기본8MiB/60초/128회로 media32+metadata64=96회, 본문8,355,952bytes 후 `transfer_bytes_limit`로 중단했고 완전 합성 파일3개의 hash를 확인했습니다. 마지막 Range 축소·64KiB 해제·200/401/403/429 body 미읽기·후검사 원본 변경 거부·예약 여유 부족 시 네트워크0을 확인했습니다. 실제 Google 요청·인증·새 RGB sample 확보는 포함하지 않습니다.
+
+최신 전체 unittest는141개(기존133+planning/예약8개)이며 기존 실제 라이브러리 chunked/오류15조건과 신규 요청 예산6조건을 별도로 통과했습니다. Fresh source ZIP의 notebook10개 code cell 문법·빈 출력, 기본 인증0,36glob 인증 전 차단, targeted4개/discovery2개 합성 파일, 같은 job metadata/media 재실행 차단, 명시적 새 job·실패 결과 폐기·JSON 입력·ZIP 재다운로드·원본 미접근 대응 제안을 모의 검증했습니다. 이 notebook 검증은 실제 Colab 인증이 아닙니다. 근거는 Git 제외 `outputs/archive_request_review_20261016/developer/`에 보관합니다.
+
+1. 경로를 모르면 **discovery 1회**를 선언합니다. `PILOT_PURPOSE="discovery"`, RGB는 `<archive-prefix>/*/fisheye_final_image/camera_*/final_*.png`, pose는 `<archive-prefix>/*/json/frame_*.json`처럼 명시합니다. Notebook은 이 모드에서 파일 수만 최대2개로 낮추고8MiB/60초/16MiB/128회를 유지합니다. 이미 실제 sample에서 관측한 경로라도 다른 archive에서 앞쪽에 있다는 보장은 없습니다.
+2. `complete_files`, `sample_acquired`, `sample_status`, `stop_reason`, 카운터를 읽습니다. **파일0개와 verification passed는 sample 확보 성공이 아닙니다.** 이때는 ZIP 보관 후 중단·검토합니다. 실패 원인 확인 없이 동일 byte0 입력을 다시 실행하지 않습니다. 잘린 active member는 완전 파일 목록과 구분합니다.
+3. 완전 파일이 있으면 원본을 읽지 않는 `counterpart_plan`으로 hash 재검사 → 실제 sequence/frame → 누락 RGB/pose glob 제안을 만듭니다. 최대16관측 frame/종류별16glob이며 기본8frame입니다. RGB는 `camera_*`1개로 두 view를 표현합니다. 18frame×좌우의36glob은 preflight에서 거부하며18개의 `camera_*`로 표현할 수 있습니다. Archive의 내부 순서가 좌우/pose에서 같다는 가정은 하지 않습니다.
+4. 제안과 해당 archive·split·예산을 검토한 뒤에만 별도 `targeted` 작업을 선언합니다. 제안 함수와 notebook은 후속 metadata/media를 자동 호출하지 않습니다. 이미 있는 파일은 verify 후 재사용하며, 대응이 예산 안에 도달할지는 unknown입니다. 같은 범위 반복·상한 자동 확대·전체 다운로드를 하지 않습니다.
+5. Notebook **결과 ZIP** 셀에서 `SAVE_RESULT_ZIP=True`로 저장하고 `DOWNLOAD_RESULT_ZIP=True`로 내려받습니다. 저장 후 다운로드만 재실행할 수 있으며 기존 ZIP은 덮어쓰지 않습니다. 이후 만든 counterpart 제안은 화면 출력만이며 기존 ZIP에 자동 추가되지 않습니다. ZIP 저장에는 작은 결과 묶음 최대17MiB와 비슷한 별도 임시 디스크가 필요하며 준비 단계16MiB 통계와 구분합니다.
+6. 입력/metadata 셀을 다시 실행해도 `PILOT_JOB_ID`와 `_PILOT_JOBS`는 커널에 남습니다. 시작한 작업은 실패해도 다시 소비하지 않습니다. 검토 후 **새 작업 선언** 셀에서 `START_NEW_PILOT_JOB=True`와 `NEW_JOB_REASON`을 명시해야 새 ID가 생기며 오래된 session/metadata를 폐기합니다. 이것은 gzip 재개가 아니며 byte0부터 새 비용이 듭니다. 커널이 사라지면 이 중복 방지 기록도 사라지므로 ZIP과 이전 실행 기록을 먼저 확인합니다.
+
+```sh
+python -m rewind_archive plan-counterparts --extraction outputs/discovery/pilot --max-frames 8 --output outputs/counterpart_plan.json
+python tests/check_archive_request_transport.py --dependency-dir outputs/drive_pilot_review/transport_deps --output outputs/request_transport_check
+```
+
+`plan-counterparts`는 기존 code/manifest/완전 파일 hash를 검사하고 새 출력 파일만 생성합니다. `member_globs_by_kind`의 빈 목록은 해당 종류의 다음 선택이 없다는 뜻이며 빈 목록으로 pilot을 실행하지 않습니다. 서로 다른 dataset version·중복 view·변경/잘린 파일은 거부합니다. 관측 이름 대응은 split/content/시간 정합성이나 학습 준비 완료를 뜻하지 않습니다.
 
 2026-10-14 로컬 검증:
 

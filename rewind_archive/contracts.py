@@ -11,8 +11,9 @@ from urllib.parse import urlsplit
 
 
 class PreparationError(ValueError):
-    def __init__(self, reason):
+    def __init__(self, reason, diagnostic=None):
         self.reason = reason
+        self.diagnostic = diagnostic
         super().__init__(reason)
 
 
@@ -22,6 +23,19 @@ def canonical(doc):
 
 def digest(doc):
     return hashlib.sha256(canonical(doc)).hexdigest()
+
+
+def validate_includes(includes):
+    """인증·metadata 전에 공유하는 선택 preflight. 중복도 입력 오류다."""
+    if not isinstance(includes,list) or not 1 <= len(includes) <= 32:
+        raise PreparationError("explicit_selection_required")
+    for pattern in includes:
+        if not isinstance(pattern,str) or not pattern or len(pattern.encode("utf-8"))>1024:
+            raise PreparationError("explicit_selection_required")
+        safe_path(pattern)
+    if len(set(includes)) != len(includes):
+        raise PreparationError("duplicate_selection")
+    return list(includes)
 
 
 def safe_path(name, max_bytes=1024):
@@ -107,6 +121,7 @@ class Limits:
     max_elapsed_seconds: float = 60.0
     request_timeout_seconds: float = 5.0
     io_chunk_bytes: int = 64*1024
+    media_range_bytes: int = 256*1024
     max_decompressed_bytes: int = 32*1024**2
     max_file_bytes: int = 4*1024**2
     max_disk_bytes: int = 16*1024**2
@@ -123,14 +138,15 @@ class Limits:
                     raise PreparationError("invalid_limits")
             elif type(value) is not int or value < 1:
                 raise PreparationError("invalid_limits")
-        if not 512 <= self.io_chunk_bytes <= 1024**2 or self.max_path_bytes > 4096 or self.max_members > 100000 or self.max_files > 10000 or self.max_ranges > 10000:
+        if not 512 <= self.io_chunk_bytes <= 1024**2 or not 512 <= self.media_range_bytes <= 1024**2 or self.max_path_bytes > 4096 or self.max_members > 100000 or self.max_files > 10000 or self.max_ranges > 10000:
             raise PreparationError("unsafe_limits")
         if self.request_timeout_seconds > min(30, self.max_elapsed_seconds):
             raise PreparationError("request_timeout_limit")
 
     @classmethod
     def from_dict(cls, doc):
-        if not isinstance(doc, dict) or set(doc) != set(asdict(cls())):
+        fields = set(asdict(cls()))
+        if not isinstance(doc, dict) or set(doc) not in (fields, fields-{"media_range_bytes"}):
             raise PreparationError("limits_fields_required")
         return cls(**doc)
 
@@ -140,6 +156,7 @@ class Budget:
         self.limits, self.clock, self.started = limits, clock, clock()
         self.transfer_bytes = self.decompressed_bytes = self.payload_disk_bytes = 0
         self.members = self.metadata_bytes = self.files = self.ranges = 0
+        self.media_requests = self.metadata_requests = self.local_reads = 0
         self.peak_output_chunk_bytes = self.peak_input_chunk_bytes = 0
         self.peak_payload_disk_bytes = 0
 
@@ -159,4 +176,15 @@ class Budget:
         setattr(self, field, getattr(self,field)+amount)
 
     def stats(self):
-        return {key:value for key,value in vars(self).items() if key not in ("limits", "clock", "started")} | {"elapsed_seconds":self.clock()-self.started}
+        return {key:value for key,value in vars(self).items() if key not in ("limits", "clock", "started")} | {"elapsed_seconds":self.clock()-self.started,
+            "http_requests_total":self.media_requests+self.metadata_requests}
+
+    def request(self, kind, maximum=None):
+        self.add("ranges", 1, self.limits.max_ranges if maximum is None else maximum)
+        field = {"media":"media_requests", "metadata":"metadata_requests", "local":"local_reads"}[kind]
+        setattr(self, field, getattr(self, field)+1)
+
+    def reserve_requests(self, count):
+        self.check_time()
+        if self.ranges+count > self.limits.max_ranges:
+            raise PreparationError("ranges_limit")

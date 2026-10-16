@@ -3,6 +3,7 @@
   "max_elapsed_seconds": 60.0,
   "request_timeout_seconds": 5.0,
   "io_chunk_bytes": 65536,
+  "media_range_bytes": 262144,
   "max_decompressed_bytes": 33554432,
   "max_file_bytes": 4194304,
   "max_disk_bytes": 16777216,

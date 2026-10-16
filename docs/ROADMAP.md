@@ -32,6 +32,21 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-16 현재 상태와 우선 실행 계획
 
+**2026-10-16 RGB pilot 요청 상한 원인 검토**
+
+- 사용자 제공 RGB pilot 4개 ZIP은 CRC를 통과했지만 완전 선택 파일은 모두0개다. 3회는 media43 + metadata85 = 총128요청, 압축본문2,818,048bytes·42~45초에서 `ranges_limit`로 중단했다. 43번째 media의 후검사 요청이 시작되지 않아 해당 본문은 해제기로 전달되지 않았다. 별도1회는 `range_status_not_206`였으며 과거 보고서에 HTTP 상태가 없어 할당량·인증·원본 손상으로 단정하지 않는다.
+- 기존64KiB마다 전후metadata2회를 실행한 요청 증폭과 고정Brutal 선택의 무수확이 원인이다. 관측한 앞부분은 다른 Serena/Getting_Up sequence다. 세 번 반복해도 같은 prefix를 처음부터 다시 읽었으므로 누적 준비 진전은 없다.
+- 다음 준비는 bounded RGB discovery → 완전 파일 hash·sequence/frame 확인 → 별도 pose/반대쪽 RGB 선택 검토 순서다. 재실행·상한 확대·전체 다운로드를 자동 수행하지 않으며, 검증 통과0파일은 sample 성공으로 보고하지 않는다. [수정 실행 가이드](REAL_DATA_NEXT_RUN.md)를 따른다. 실제 stereo triplet·독립 validation·학습 완료는 아직 아니다.
+
+**요청 효율 개선 구현·로컬 검증**
+
+- Network Range 256KiB와 내부 read1·해제 출력 64KiB를 분리한다. Media 1회와 전후 metadata 2회의 요청 여유, metadata 최대 32KiB를 먼저 확보한다. 전체 8MiB·60초·총 128회·디스크 상한은 늘리지 않는다. `ranges`는 HTTP 요청과 로컬 읽기 연산의 합이며 media·metadata·local 카운터도 별도로 보고한다. 입력 buffer는 기본 최대 256KiB로 커진다. 복사·라이브러리·zlib 메모리는 별도이므로 전체 RAM hard limit은 아니다.
+- 실제 requests/urllib3/google-auth와 AnonymousCredentials를 사용한 loopback 신규 6조건을 통과했다. 정상 조건은 media 32회 + metadata 64회 = 96회, 응답 본문 8,355,952bytes로 byte 상한에 도달했고 합성 완전 파일 3개를 보존했다. HTTP 200/401/403/429의 media 본문을 읽지 않고 실제 status를 안전하게 기록한다. 원본 변경과 미완료 후검사는 unusable로 처리한다. 실제 Google 인증·요청은 0이다.
+- 오케스트레이션은 저장된 공식 CityPark prefix를 localhost HTTP로 재생해 PNG 2개·JSON 16개의 과거 hash 일치를 독립 확인했다(RGB 8요청·pose 1요청). 최초 sandbox의 loopback 차단은 0bytes 실패였고 로컬 서버 허용 환경에서 재검증했다. 이번에 공식 서버나 Drive에서 새 sample을 받은 결과가 아니며, 서로 다른 sequence로 triplet은 0개다.
+- Notebook은 인증 전 1~32개 glob 검사, discovery 최대 2파일, `sample_acquired`를 통한 0파일 구분, 같은 job 재실행 차단을 제공한다. 사유를 적는 별도 새 job 선언, ZIP 저장·재다운로드와 검증된 추출본의 counterpart 선택 제안도 추가했다. 제안은 자동 실행하지 않으며 새 job은 byte 0부터 읽는다. 기존 36개 glob plan 대신 새 discovery plan을 배포한다.
+- 전체 141개 회귀 테스트를 통과했다. 기존 chunked 전송 15조건과 신규 요청 예산 6조건은 별도 검사이며 합산하지 않는다. Fresh ZIP notebook 10개 코드 셀의 문법·기본 인증 0·잘못된 glob 사전 차단·같은 job 재실행 차단·ZIP 재다운로드를 모의 검증했다. 오케스트레이션도 전체 141개와 문서 링크·설정·plan 셀·prefix 재생을 독립 확인했다.
+- 이번 수정의 실제 Drive/Colab 재실행, 대응 RGB+pose·독립 validation 확보, 실제 학습은 남아 있다. 관측 sample과 전송 효율 개선을 M0/M1/M2/M3 전체 완료로 확대하지 않는다.
+
 **2026-10-16 실제 입력 규격·변환기 후속 묶음 — 실제 학습 전 준비**
 
 - 사용자의 후속 작업 전체 진행 지시로 첫 실험용 body22+finger40(고유62), upper13·평가16과 61개 graph 연결을 별도 `real_archvis62_v1`에 프로젝트 가정으로 채택했다. Native rig 부모 관계 검증이나 최종 D1~D5 확정으로 확대하지 않는다. cm는 12cm rig 근거에 따른 명시적 채택이며 raw 필드 직접 선언과 구분한다. 출력 GT와 camera translation은 mm로 통일한다.

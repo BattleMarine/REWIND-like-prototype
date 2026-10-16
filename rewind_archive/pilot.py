@@ -33,6 +33,9 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         "inspection_candidates_usable":extraction["inspection_candidates_usable"] and verification["status"]=="passed",
         "gzip_eof_crc_valid":extraction["gzip_eof_crc_valid"],"tar_end_blocks_seen":extraction["tar_end_blocks_seen"],
         "whole_archive_integrity_verified":extraction["whole_archive_integrity_verified"],
+        "sample_status":"verified_candidates" if verification["status"]=="passed" and extraction["files"] else "no_sample" if not extraction["files"] else "unusable_candidates",
+        "sample_acquired":verification["status"]=="passed" and bool(extraction["files"]),
+        "source_validation_pending":extraction["source_validation_pending"],
         "train_ready":False,"pending_verifications":PENDING,"scope":"single_archive_preparation_only"}
     if metadata_report is not None:
         report["metadata_report_content_sha256"]=metadata_report["content_sha256"]
