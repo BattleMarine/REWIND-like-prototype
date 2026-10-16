@@ -61,3 +61,9 @@ M0에서 남은 실제 RGB·좌표/단위·시간·skeleton·원본 motion 검�
 ## 후속 관절 이름 대응 (2026-10-16)
 
 [관절 대응표](JOINT_MAPPING.md)에서 본 sample의 32개 JSON에 공통인 87개 이름을 전부 기록했다. 기존 개발용 고유 62개는 모두 존재하며 나머지 25개도 표에 보존한다. 부모 연결·해부학적 의미·최종 모델 subset의 검증과 이름 존재 대조를 구분한다. 원본 좌표·개발용 설정·학습 입력 계약은 변경하지 않았다.
+
+## 후속 단위·좌표 변환 검토 (2026-10-16)
+
+[별도 검토 문서](COORDINATE_AND_TRAINING_REVIEW.md)에 world↔camera/device 변환식과 회전 표현, 물리 단위 근거, 학습 관절 권고를 기록했다. 오케스트레이션은 32파일의 camera/device forward·inverse와 거리 보존을 독립 계산해 최대 약8.53e-14 raw units 이내의 수치 일치를 확인했다. Camera open3d Euler는 degree, device open3d Euler는 그 radian 변환과 일치한다. UE world→camera에는 반사가 포함되어 proper rotation만 허용하는 M2 계약에 그대로 넣을 수 없으며, right-handed world를 명시하는 변환이 필요하다.
+
+이는 저장된 annotation의 내부 정합성 검증이다. cm는 공식 rig와 baseline의 강한 간접 근거이며 UE2 필드의 직접 단위 선언·RGB overlay·시간·전체 데이터 검증과 구분한다. 기존 원본/보고서/config와 `train_ready=false`는 유지했다.

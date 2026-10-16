@@ -8,6 +8,8 @@
 
 ## 관절 집합을 구분하는 기준
 
+2026-10-16 후속 [단위·좌표계 및 학습 관절 검토](COORDINATE_AND_TRAINING_REVIEW.md)는 실제 32파일에서 world↔camera/device 변환, camera degree/device radian, UE world의 축 반전을 수치 검증했다. 거리 cm는 공식 rig의 12cm와 raw baseline 약12의 강한 간접 근거로 구분하며, 아래 10월 13일의 미확인 기록을 소급 변경하지 않는다. Runtime의 단위·검증 flag는 그대로이고 RGB 정합성·시간·실제 학습은 남아 있다.
+
 | 범위 | 근거와 확인 수준 | 프로젝트 적용 |
 | --- | --- | --- |
 | 공식 body 평가 16개 | [S1] Evaluation 및 [S2] `predict_pose.py` 15~32행의 이름·순서 | 평가 후보 규격. REWIND whole-body 관절 규격으로 확정하지 않음 |

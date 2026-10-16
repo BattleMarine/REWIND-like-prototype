@@ -4,6 +4,8 @@
 
 ## 근거와 확인 범위
 
+같은 날 후속 [단위·좌표계 및 학습 관절 검토](COORDINATE_AND_TRAINING_REVIEW.md)에서 이 이름 목록의 body22+finger40/upper13을 초기 학습 구성으로 권고했다. 기존 M3 역할 계약의 이름·소유 구조 검사와 실제 좌표 변환을 대조했으며, 해부학적 parent·공식72 목록을 확정한 것은 아니다. 아래 표의 raw/Dev/Eval 순서와 기존 설정은 유지한다.
+
 | 구분 | 근거 | 이 문서에서의 취급 |
 | --- | --- | --- |
 | 실제 관측 | `data/raw/colab_archvis_pose_20261015/bundle/pilot/files/`의 32 JSON | 이름·직렬화 순서·필드·shape·finite·파일 hash를 이번에 직접 확인 |

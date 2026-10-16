@@ -28,6 +28,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 - 2026-10-16 실제 ArchVis 32개 JSON의 87개 관절을 대조한 [관절 대응표](docs/JOINT_MAPPING.md)를 작성했습니다. 기존 개발용 62개·평가 후보 16개의 포함 여부와 body/upper/손목/손가락 후보, 미선택 25개를 구분했습니다. 이름 존재 확인과 모델 역할·부모 연결의 확정은 구분하며 학습 설정은 변경하지 않았습니다.
 
+- 2026-10-16 후속 [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md)에서 실제 32개 JSON의 world↔camera/device 변환과 카메라 degree/device radian 관계를 수치 대조했습니다. 거리 단위 cm는 논문의 rig 간격과 실제 baseline으로 강하게 지지되지만 UE2 raw 필드 직접 선언과는 구분합니다. Body22+finger40, upper13을 초기 학습 구성으로 권고하며, 모델 연결에는 좌표계의 축 반전 처리와 별도 변환기가 필요합니다. 설정·학습 가드는 유지했고 실제 학습은 실행하지 않았습니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
@@ -36,6 +38,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [에이전트 작업 지침](AGENTS.md) | 구현·실험·검증·문서 수정 시 지켜야 할 원칙 |
 | [M0 JSON 도구 안내](docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
 | [실제 관절 대응표](docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
+| [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) | 실제 변환 수치 검증, 단위 근거의 강도, body22+finger40 권고와 학습 진입 조건 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |

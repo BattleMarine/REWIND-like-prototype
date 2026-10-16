@@ -44,12 +44,14 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 **다음 순서 — 실제 pose 입력 규격 준비**
 
+**2026-10-16 단위·좌표계 및 학습 관절 검토:** [상세 문서](COORDINATE_AND_TRAINING_REVIEW.md)에서 실제 32파일의 world↔camera/device 수치 변환과 camera degree/device radian 관계를 확인했다. UE world의 축 반사와 camera world 위치→extrinsic translation 변환을 분리해야 M2 proper-rotation 계약에 연결할 수 있다. cm는 UE2 논문의 12cm rig와 raw baseline 약12로 강하게 지지되는 간접 검증이며, UE2 raw 필드 직접 선언은 미확보다. UE2 논문의 명목25FPS도 확인했지만 이 sample의 timestamp·RGB 시간 대응은 미검증이다. 초기 학습 구성으로 body22+finger40(고유62), 상체 조건 upper13, 별도 body 평가16을 권고한다. 이는 검토 결론이며 config·변환기·학습 적용 완료나 D1~D5 확정이 아니다.
+
 1. 확보한 Brutal_Assassination 연속 18프레임의 87개 raw 관절을 body·upper·좌우 wrist·finger 역할로 대응하고 근거·제외 관절을 기록한다. 72/87/개발용62/합성10개를 같은 관절 집합으로 취급하지 않는다.
 2. 거리 단위, 좌표 축·camera 변환 방향과 회전 표현, frame/FPS·timestamp 근거를 확인한다. 확인하지 못한 항목은 unknown으로 유지하고 frame 번호에서 시간을 임의 생성하지 않는다.
 3. 확인된 규격으로 실제 pose → 모델 특징 변환기를 준비하고 원본 hash·전처리 버전·mask·sequence/split을 보존한다. GT 2D 진단과 RGB 예측 입력 baseline을 구분한다. 현재 필수 입력 guard를 우회하거나 미확인 항목을 verified로 채우지 않는다.
 4. 진입 조건이 충족된 뒤 작은 train subset으로 regression → body → hand 과적합을 확인한다. 18프레임 내부 분할을 일반화 평가로 사용하지 않으며 독립 validation 시퀀스는 별도로 준비한다. 대응 RGB·overlay와 예측 2D baseline은 계속 남은 작업이다.
 
-위 항목 중 이름 대응표 작성만 완료했다. 규격 확정·변환기 구현·실제 학습이 완료된 것은 아니다.
+위 항목 중 이름 대응표와 확보 sample의 좌표 변환 수치 검증·학습 관절 구성 검토를 완료했다. 물리 단위 근거의 강도와 미확정 항목은 별도 검토 문서를 따른다. 실제 RGB 정합성·시간·원본 motion 독립성 및 적용할 모델 규격, 변환기 구현·실제 학습은 남아 있다. 현재 학습기는 독립 train/validation을 요구하므로 연속18프레임을 나누어 일반화 검증용 validation처럼 사용하지 않는다.
 
 **2026-10-15 공식 근거 확인 및 M2/M3 구현 진행 범위**
 
