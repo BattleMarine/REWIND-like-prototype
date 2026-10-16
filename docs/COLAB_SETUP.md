@@ -4,7 +4,7 @@
 
 오케스트레이션 검토에서는 노트북의 환경 확인·테스트·합성 학습·재개·평가·캐시 셀을 Windows CPU에서 실행했습니다. 59개 테스트가 통과했고, 결과 17개 파일의 로컬 복사·SHA-256 일치를 확인했습니다. 업로드·Drive 인증 셀은 실행하지 않았으며 로컬 복사 검증을 실제 Drive 전송 성공으로 해석하지 않습니다.
 
-Chunked metadata 수정까지 포함한 최신 Python 회귀검사는 97개가 통과했습니다(기존 59개 + 압축 준비 24개 + metadata/pilot 14개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 추출 성공을 검증한 수치는 아닙니다.
+Chunked metadata 수정 당시 Python 회귀검사는 97개가 통과했습니다(기존 59개 + 압축 준비 24개 + metadata/pilot 14개). HTTP 응답·느린 전송 검사는 로컬 loopback 서버를 사용했습니다. 실제 Drive·Colab 추출 성공을 검증한 수치는 아닙니다.
 
 압축 준비 노트북은 별도 로컬 ZIP·임시 폴더에서 코드 추출·커널 import와 합성 추출/재사용/매칭을 실행해 RGB 8개·pose 4개, 대응 triplet 4개를 확인했습니다. 업로드 UI는 모의 호출했고 실제 Drive 분기는 비활성으로 검사했습니다. 노트북 구문 검증과 로컬 실행 결과를 실제 Colab 인증 성공으로 해석하지 않습니다.
 
@@ -69,7 +69,7 @@ python -m rewind_m1 train --config configs/m1_single_synthetic.json --output out
 
 ### M2·M3 합성 teacher 실행
 
-M2/M3가 포함된 최신 소스 ZIP을 새 디렉터리에 풀고 그 프로젝트 root로 이동한 뒤, 노트북에 코드 셀을 추가해 아래 CLI를 호출할 수 있습니다. 기존 M1 노트북이 자동으로 M3를 실행하지는 않습니다. M3는 현재 CPU float32만 지원하므로 GPU 런타임을 요구하지 않습니다. 다음 명령의 모델 경로는 로컬 CPU에서 검증했으며 실제 Colab에서의 M2/M3 실행은 아직 검증하지 않았습니다.
+M2/M3가 포함된 최신 소스 ZIP을 새 디렉터리에 풀고 그 프로젝트 root로 이동한 뒤, 노트북에 코드 셀을 추가해 아래 CLI를 호출할 수 있습니다. 기존 M1 노트북이 자동으로 M3를 실행하지는 않습니다. M3는 현재 CPU float32만 지원하므로 GPU 런타임을 요구하지 않습니다. 다음 명령의 모델 경로는 로컬 CPU에서 검증했고, 이후 사용자 Colab CPU에서 named-body80·hand 각100·upper110 재개 및 119개 테스트 성공을 확인했습니다. Python 3.13.16 / torch 2.11.0+cpu에서의 결과이며 GPU 실행 검증은 아닙니다. [보고서 검토 기록](M3_WHOLE_BODY_TEACHER.md#사용자-colab-cpu-검증-2026-10-16)을 참고합니다.
 
 ```python
 import subprocess

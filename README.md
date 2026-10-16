@@ -11,7 +11,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - 2026-10-14 Drive 목록을 재확인했고, 별도로 공식 서버 CityPark 원본에서 부분 다운로드·추출 가능성을 시험했습니다. RGB 앞 2MiB에서 PNG 2개, pose 앞 256KiB에서 JSON 16개를 완전히 읽었습니다. 이후 새 준비 도구로 저장된 prefix를 로컬 재생해 18개 hash 일치를 확인했습니다. 서로 다른 sequence여서 완전 RGB 좌우+pose triplet은 0개이며 당시 Drive 복사본 실행·Colab 연결은 미검증이었으며, 후속 pose 시험은 아래에 구분합니다. 전체 무결성은 미검증입니다. 세부 근거와 한계는 [로드맵](docs/ROADMAP.md#부분-다운로드-조사와-실행-계획)에 기록합니다.
 - 데이터 없이 공식 규격 근거와 M1 준비용 causal window 조립·streaming API를 추가했습니다. 합성 테스트 40개(기존 17 + window 23)와 fixture 실행을 통과했으며 실제 데이터 검증·모델 학습은 포함하지 않습니다.
 - 2026-10-14 M1 학습 기반을 추가했습니다. 명시적 tensor 계약, 작은 single-frame/causal temporal regression, loss·평가·checkpoint 재개와 train-only 합성 RGB 예측 캐시 연결을 구현했습니다. 당시 Python 테스트 59개와 합성 CPU 학습·재개·평가를 통과했습니다. 실제 데이터 baseline·EfficientNet front-end·Colab GPU는 미검증이며 M1 전체 완료가 아닙니다.
-- [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했으며 실제 Colab 업로드·인증·Drive/GPU 실행은 아직 하지 않았습니다.
+- [Colab notebook](notebooks/m1_baseline.ipynb)을 준비했습니다. 로컬 소스 ZIP 업로드를 기본으로 하고 임시 디스크에서 합성 실행 후 선택적으로 결과를 Drive에 export합니다. 초기 코드 셀의 로컬 CPU 실행과 로컬 복사 검증을 통과했습니다. 이후 사용자 Colab의 소스 업로드·CPU 실행은 아래 후속 결과로 확인했으며 GPU 검증은 남아 있습니다.
 - `rewind_archive`에 분할 gzip/tar의 상한 있는 순차 읽기·선택 추출·이름 대응·hash 재사용 검사를 추가했습니다. 당시 Python 테스트 83개(기존 59+archive 24)를 통과했고, 실제 HTTP 검증은 로컬 loopback 서버입니다. M0/M1 전체 완료가 아닙니다.
 - Drive의 명시한 part ID·기대 이름만 조회해 size/version을 자동 확인하는 metadata→manifest builder와 별도 pilot 보고서를 추가했습니다. 당시 전체 테스트 93개를 통과했습니다. [준비 notebook](notebooks/archive_prepare.ipynb)에서 dict/작은 선택 JSON → 기본 비활성 metadata/auth → 별도 기본 비활성 pilot/verify 순서로 실행할 수 있습니다.
 - 2026-10-15 사용자 Colab에서 metadata HTTP 200·chunked·Content-Length 없음 때문에 `metadata_protocol` 실패가 관측됐습니다. 양쪽 metadata 경로를 byte/시간 상한 내 EOF 읽기로 수정했고 전체 97개 회귀와 실제 라이브러리 loopback 오류 검사를 통과했습니다. Media의 strict 206 Range 조건은 유지합니다. 후속 사용자 Colab 보고서에서 metadata 생성과 pose 32개 추출·verify 성공을 확인했습니다. 원본 앞 512KiB를 읽고 파일 수 상한에서 정상 중단했으며, 당시 관절·좌표·RGB 대응과 실제 학습은 미검증이었으며, 후속 JSON 감사는 아래에 구분합니다.
@@ -23,6 +23,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 - M2 body diffusion teacher의 [합성 구현 묶음](docs/M2_BODY_TEACHER.md)을 추가했습니다. Graph convolution·spatial attention·RoPE causal denoiser, x0/DDIM, 명시적 camera 계약·checkpoint 재개·streaming을 구현했습니다. 전체 107개 테스트와 CPU 합성 100→110 update 재개를 통과했습니다. 실제 body baseline·regression 대비 효과·GPU 성능은 미검증이며 M2 전체 완료가 아닙니다.
 
 - M3 body–hand cascade의 [합성 구현 묶음](docs/M3_WHOLE_BODY_TEACHER.md)을 추가했습니다. 학습된 body checkpoint 고정, GT 상체 조건 hand 학습, 예측 상체 평가, 독립 none 모델·GT 진단 비교와 손목 상대/전체 좌표 지표를 구현했습니다. 전체 119개 테스트, CPU body 80·hand 각 100 update와 조건부 hand 110까지 재개를 통과했습니다. 실제 UnrealEgo whole-body teacher·Colab GPU·cascade 성능 개선은 미검증이며 M3 전체 완료가 아닙니다.
+
+- 2026-10-16 사용자 제공 Colab 결과 ZIP·실행 notebook을 검토했습니다. Python 3.13.16 / torch 2.11.0+cpu에서 전체 119개 테스트, named-body 80·upper/none hand 각 100 update, upper hand 110까지 재개·평가 성공을 확인했습니다. 실행 소스는 `5e52aa3`이고 31개 코드 hash와 checkpoint 참조가 일치합니다. 실제 데이터·GPU 검증과 구분하며 [M3 검토 기록](docs/M3_WHOLE_BODY_TEACHER.md#사용자-colab-cpu-검증-2026-10-16)을 따릅니다.
 
 ## 문서 안내
 

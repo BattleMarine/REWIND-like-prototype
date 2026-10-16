@@ -77,7 +77,7 @@ python -m unittest discover -s tests -v
 python -m rewind_m3.fixture --output outputs/m3_named_new --body-steps 80 --hand-steps 100
 ```
 
-Fixture는 새 output을 요구하고 `whole.json`·`body.json`, `body/`, `hand_upper/`, `hand_none/`, 세 평가 JSON과 `comparison.json`을 만든다. 실제 archive를 읽거나 외부 데이터를 다운로드하지 않는다. Colab에서도 같은 모듈/소스가 준비된 CPU 환경에서 실행할 수 있도록 명령을 제공했으나 **이번에는 실제 Colab 업로드·런타임 실행을 하지 않았다.**
+Fixture는 새 output을 요구하고 `whole.json`·`body.json`, `body/`, `hand_upper/`, `hand_none/`, 세 평가 JSON과 `comparison.json`을 만든다. 실제 archive를 읽거나 외부 데이터를 다운로드하지 않는다. Colab에서도 같은 모듈/소스가 준비된 CPU 환경에서 실행할 수 있도록 명령을 제공했으나 **초기 개발 검증에서는 실제 Colab 실행을 하지 않았으며, 이후 사용자 CPU 실행은 문서 끝의 후속 검토에 기록한다.**
 
 학습 위치를 110 updates까지 이어가는 예시는 다음과 같다. Body checkpoint는 바꾸지 않는다. `--steps`는 추가 수가 아니라 총 update 수다.
 
@@ -117,4 +117,22 @@ Git 제외 증거는 `outputs/m3_evidence_20261015/developer/`의 `execution.jso
 
 오케스트레이션의 독립 검토는 `outputs/m3_root_review/review.py`·`review.json`에 기록했다. 저장된 upper110 checkpoint를 불러와 GT 좌표와 valid mask 모두를 바꿔도 예측 cascade가 정확히 동일하고 GT 진단만 반응함을 확인했다. Validation 12 anchor의 batch/stream 최대 성분 차이는 `3.57628e-5 mm`, body/hand history는 각각 최대 4다. 왼쪽 손목 이동의 왼손가락 전파, 결측 GT 손목의 local mask 제외와 global GT 유지, frozen body 불변을 독립 대조했다. 이 수치는 실제 정답 대비 정확도가 아니라 같은 합성 추론 경로의 수치 일치 범위다. 최종 checkpoint에 기록된 31개 Python 파일의 hash를 현재 코드와 대조했다.
 
-실제 skeleton·body/hand 대응 RGB/예측 2D·camera/단위/시간 gate, 실제 데이터의 GT 상체 기반 hand 학습·예측 body 기반 평가, 손 40개·전체 body-hand 범위·failure benchmark, 여러 seed/논문 규모·GPU/AMP/VRAM/latency·Colab 실행은 남아 있다. 이번에는 합성 구현 묶음을 검토 가능하게 완료했으며 M3 마일스톤 전체 성능 완료를 선언하지 않는다.
+실제 skeleton·body/hand 대응 RGB/예측 2D·camera/단위/시간 gate, 실제 데이터의 GT 상체 기반 hand 학습·예측 body 기반 평가, 손 40개·전체 body-hand 범위·failure benchmark, 여러 seed/논문 규모·GPU/AMP/VRAM/latency·Colab GPU 실행은 남아 있다. 이번에는 합성 구현 묶음을 검토 가능하게 완료했으며 M3 마일스톤 전체 성능 완료를 선언하지 않는다.
+
+## 사용자 Colab CPU 검증 (2026-10-16)
+
+사용자가 실행한 notebook과 결과 ZIP을 2026-10-16에 재검토했다. 이전 절의 Windows 개발 실행과 별개이며 다음은 제공된 Colab 실행 산출물에 근거한다.
+
+- `m3_check_0c3343b1.zip`: 1,797,066 bytes, SHA-256 `9c88fc5ec2facc2027bd6b6a72f183735a15d8507591d9e23eef7a587f5185ab`.
+- 실행 `m1_baseline.ipynb` SHA-256: `94683cc85f327e5a924932185f1720493bda6c2f4183c413ece665f9b9416e17`.
+- 환경: revision `5e52aa3b0b1e27e7d0cb2697629e8acfc63d38c3`, Python 3.13.16 / torch 2.11.0+cpu / CPU float32 / thread1 / AMP off.
+- `tests.log`: 119 tests, 37.687초, OK, 실패·skip 없음. Notebook에 저장된 오류 출력도 없다. Notebook에는 별도 M1 합성 셀 실행이 있으나 M3 결과 경로와 분리되어 있다.
+- Body80 → 고정 → upper/none hand 각각100 → 세 조건 평가를 확인했다. 비교용 upper100은 `at_100.pt`, 최종 upper110은 `last.pt`로 보존되어 있다. 재개 구간은 `(0,100)`·`(100,110)`이고 원 checkpoint SHA와 일치한다.
+- 보고서의 소스 31개 파일 hash를 배포 소스 ZIP의 bytes와 대조했다. 평가가 참조하는 checkpoint 파일 SHA, frozen body identity와 실제 저장 파일이 일치한다. Checkpoint의 step·model 유한 값·optimizer/scheduler/scaler/RNG 저장도 확인했다. 로컬 환경에서 Colab checkpoint를 재학습하거나 환경 불일치 guard를 우회하지 않았다.
+- ZIP CRC와 원본 보관 사본 hash를 검사했다. 결과 검사는 보고서의 상호 일치 확인이며 실행 출처의 암호학적 인증을 뜻하지 않는다.
+
+100 update validation의 손목 상대/global hand MPJPE(mm)는 none `3.055925/8.173986`, GT upper 진단 `2.965118/8.587166`, 예측 upper `2.978817/8.570183`이다. Upper110 재개 후에는 `3.104896/9.107649`다. 추가 update에서 오차가 증가했지만 재개 실패가 아니며, 재개 검증과 성능 향상 검증을 구분한다. 모든 결과는 `synthetic_code_check`다.
+
+사용자는 결과·notebook·소스를 Drive에 업로드했다고 확인했다. 안내한 보관 위치는 `REWIND-like prototype/reports/m3_colab_validation_20261015`이며 실제 Drive 경로·사본 bytes를 이번 검토에서 직접 조회하지는 않았다. 로컬 검토 원본과 요약은 Git 제외 `outputs/colab_m3_review_20261016/`에 보존한다. 해당 소스 ZIP을 다시 실행하거나 이 문서 커밋에 맞춰 기존 결과의 revision을 변경할 필요는 없다.
+
+Colab CPU 합성 실행·학습 재개는 확인했다. 실제 데이터 규격·학습·일반화 성능, 예측 RGB front-end baseline, GPU/AMP/VRAM·latency 검증은 계속 남아 있다.
