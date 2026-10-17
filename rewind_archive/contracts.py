@@ -38,6 +38,37 @@ def validate_includes(includes):
     return list(includes)
 
 
+def validate_exact_targets(targets, includes, limits, mode):
+    if targets is None:
+        return []
+    if not isinstance(targets,list) or len(targets)>32:
+        raise PreparationError("exact_targets_list")
+    if not targets:
+        return []
+    if mode!="extract" or len(targets)>limits.max_files:
+        raise PreparationError("exact_targets_mode_or_file_limit")
+    for target in targets:
+        if not isinstance(target,str) or any(c in target for c in "*?[]") or safe_path(target,limits.max_path_bytes)!=target:
+            raise PreparationError("exact_targets_canonical_literal_path")
+    if len({t.casefold() for t in targets})!=len(targets):
+        raise PreparationError("exact_targets_duplicate")
+    validate_includes(includes)
+    if set(includes)!=set(targets):
+        raise PreparationError("selection_exact_targets_mismatch")
+    return list(targets)
+
+
+def target_summary(targets, files, usable):
+    stored_names={entry["member"] for entry in files}
+    stored=[t for t in targets if t in stored_names]
+    completed=stored if usable else []
+    missing=[t for t in targets if t not in completed]
+    complete=bool(targets) and not missing
+    return {"exact_targets":list(targets),"stored_targets":stored,"completed_targets":completed,
+        "missing_targets":missing,"targets_complete":complete,
+        "targets_status":"not_requested" if not targets else "unusable" if not usable else "complete" if complete else "incomplete"}
+
+
 def safe_path(name, max_bytes=1024):
     if not isinstance(name, str) or not name or len(name.encode("utf-8")) > max_bytes:
         raise PreparationError("invalid_or_long_path")

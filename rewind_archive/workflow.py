@@ -7,15 +7,17 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from rewind_data.audit import read_json
-from .contracts import Limits, PreparationError, canonical, digest, validate_includes
+from .contracts import Limits, PreparationError, canonical, digest, validate_includes, validate_exact_targets, target_summary
 from .drive_metadata import MetadataLimits, build_drive_manifest, provenance, save_metadata_bundle, validate_selection
 from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
+from .profiles import COUNTERPART_PROFILE, validate_profile_limits
 
 
-NOTEBOOK_API_VERSION = 2
-CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
+NOTEBOOK_API_VERSION = 3
+LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
+CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 
 
 def read_report(path, maximum=8*1024**2):
@@ -46,9 +48,11 @@ def load_history(outputs):
 
 
 def make_preflight(config, history):
-    if not isinstance(config,dict) or set(config)!=CONFIG_FIELDS:
+    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
         raise PreparationError("workflow_config_fields")
     config=copy.deepcopy(config)
+    config.setdefault("profile",None)
+    config.setdefault("exact_targets",[])
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -59,9 +63,17 @@ def make_preflight(config, history):
         raise PreparationError("workflow_mode_purpose")
     limits=Limits.from_dict(config["limits"])
     metadata=MetadataLimits.from_dict(config["metadata_limits"])
-    # 이 notebook 재작성 범위에서는 기존 개발 예산을 늘리지 않는다.
-    if any(value>asdict(Limits())[key] for key,value in asdict(limits).items()) or any(value>asdict(MetadataLimits())[key] for key,value in asdict(metadata).items()):
+    if config["profile"] is None:
+        # 이전9필드/정규화된 legacy는 기존 smoke 이하만. 고정 preset 이름을 붙이지 않는다.
+        if any(value>asdict(Limits())[key] for key,value in asdict(limits).items()):
+            raise PreparationError("workflow_budget_increase_not_supported")
+    else:
+        validate_profile_limits(config["profile"],limits)
+    if any(value>asdict(MetadataLimits())[key] for key,value in asdict(metadata).items()):
         raise PreparationError("workflow_budget_increase_not_supported")
+    config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode)
+    if config["profile"]==COUNTERPART_PROFILE and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
+        raise PreparationError("counterpart_profile_requires_targeted_pair")
     config["limits"]=asdict(limits)
     config["metadata_limits"]=asdict(metadata)
     if not isinstance(config["previous_result"],str) or len(config["previous_result"].encode("utf-8"))>4096:
@@ -80,6 +92,8 @@ def make_preflight(config, history):
         if purpose=="discovery" and limits.max_files>2:
             raise PreparationError("workflow_discovery_set_max_files_at_most_2")
     effective={k:config[k] for k in ("mode","purpose","selection","includes","limits","metadata_limits")}
+    if config["profile"] is not None or config["exact_targets"]:
+        effective.update(profile=config["profile"],exact_targets=config["exact_targets"])
     fingerprint=digest(effective)
     repeats=[r["job_id"] for r in history.values() if r.get("effective_sha256")==fingerprint]
     selection_hash=digest(config["selection"])
@@ -87,6 +101,13 @@ def make_preflight(config, history):
     return {"config":config,"config_sha256":digest(config),"effective_sha256":fingerprint,
         "summary":{"job_id":config["job_id"],"reason":reason,"mode":mode,"purpose":purpose,
             "selection":config["selection"],"includes":config["includes"],"limits":config["limits"],
+            "profile":config["profile"] if config["profile"] is not None else "custom_limits",
+            "exact_targets":config["exact_targets"],
+            "stop_when_targets_stored":bool(config["exact_targets"]),
+            "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,
+            "total_cooperative_stage_upper_bound_seconds":limits.max_elapsed_seconds+metadata.max_elapsed_seconds if mode!="review" else 0,
+            "total_request_upper_bound":limits.max_ranges+metadata.max_requests if mode!="review" else 0,
+            "excluded_costs":"authentication; whole wire; OS/RSS hard limits; separate result ZIP",
             "metadata_limits":config["metadata_limits"],"same_config_previous_jobs":repeats,
             "same_selection_previous_jobs":same_source,"job_id_already_used":config["job_id"] in history,
             "source_size_version_modified_time":"not_checked_until_metadata" if mode!="review" else "no_network",
@@ -112,6 +133,8 @@ def claim_workflow_job(config, preflight, history):
         "config_sha256":current["config_sha256"],"effective_sha256":current["effective_sha256"],
         "selection_sha256":digest(config["selection"]),"repeat_of":[r["job_id"] for r in previous],
         "status":"started","stage":"before_authentication","source":provenance(),"code_sha256":code_hashes(),
+        "profile":config["profile"] if config["profile"] is not None else "custom_limits","limits":config["limits"],
+        **target_summary(config["exact_targets"],[],True),
         "reads_from_byte_zero":True,"train_ready":False}
     history[config["job_id"]]=record
     return record
@@ -148,9 +171,11 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
             # 선택 ID만의 preflight와 실제 metadata snapshot을 구분해 실행 직전에 표시한다.
             print({"source_identity_after_metadata":metadata["manifest"],"reads_from_byte_zero":True})
             record["stage"]="pilot"
-            pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,mode=config["mode"])
+            pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,
+                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"])
             record.update(status="finished",stop_reason=pilot["stop_reason"],sample_acquired=pilot["sample_acquired"],
-                observed_regular_members=pilot["observed_regular_members"])
+                observed_regular_members=pilot["observed_regular_members"],profile=pilot["profile"],limits=pilot["limits"],
+                **{k:pilot[k] for k in ("exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status")})
     except KeyboardInterrupt:
         record.update(status="interrupted",stop_reason="interrupted")
     except Exception as exc:
@@ -176,7 +201,8 @@ def review_run(path):
         report=read_report(extraction_root/"extraction_manifest.json")
         result["extraction"]={k:report[k] for k in ("operation","stop_reason","inspection_candidates_usable",
             "source_validation_pending","stats","member_observations","member_observation_trust",
-            "member_observation_cap_reached","full_source_listing_claimed") if k in report}
+            "member_observation_cap_reached","full_source_listing_claimed","profile","limits",
+            "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
         try:
             verify_extraction(extraction_root)
@@ -187,6 +213,7 @@ def review_run(path):
         pilot=read_report(extraction_root/"pilot_report.json")
         result["sample_acquired"]=pilot.get("sample_acquired",False)
         result["sample_status"]=pilot.get("sample_status","legacy_report")
+        result["target_verification"]={k:pilot[k] for k in ("completed_targets","missing_targets","targets_complete","targets_status") if k in pilot}
     if len(result)==3:
         raise PreparationError("workflow_no_result_reports")
     return result

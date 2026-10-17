@@ -3,7 +3,7 @@
 from pathlib import Path
 import copy
 
-from .contracts import Limits, PreparationError, digest
+from .contracts import Limits, PreparationError, digest, target_summary
 from .drive_metadata import environment, provenance, validate_metadata_result, write_new_json
 from .extraction import prepare
 from .matching import verify_extraction
@@ -13,11 +13,12 @@ PENDING = ["live_drive_colab_validation","joints","units","coordinates","calibra
     "split","original_motion_duplicates","stereo_rgb_pose_content_alignment","m1_actual_data_training"]
 
 
-def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract"):
+def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract", profile=None, exact_targets=None):
     """새 output에서 1회 prepare 후 검사·pilot report 저장. 자동 retry/확대 없음."""
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
-    extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session,mode=mode)
+    extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session,mode=mode,
+        profile=profile,exact_targets=exact_targets)
     verification={"status":"not_usable","reason":None,"verified_complete_files":0}
     if extraction["inspection_candidates_usable"]:
         try:
@@ -39,6 +40,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         "operation":mode,"observed_regular_members":len(extraction["member_observations"]),
         "member_observations_usable":extraction["member_observations_usable"],
         "member_observation_trust":extraction["member_observation_trust"],
+        "profile":extraction["profile"],"limits":extraction["limits"],
+        **target_summary(extraction["exact_targets"],extraction["files"],verification["status"]=="passed"),
         "train_ready":False,"pending_verifications":PENDING,"scope":"single_archive_preparation_only"}
     if metadata_report is not None:
         report["metadata_report_content_sha256"]=metadata_report["content_sha256"]
@@ -55,8 +58,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
     return report
 
 
-def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract"):
+def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract", profile=None, exact_targets=None):
     """성공한 metadata 결과의 hash/code를 대조한 뒤에만 media 경로를 시작한다."""
     manifest=validate_metadata_result(result)
     return run_pilot(manifest,output,includes,limits,authorized_session,
-        metadata_report=result["report"],mode=mode)
+        metadata_report=result["report"],mode=mode,profile=profile,exact_targets=exact_targets)

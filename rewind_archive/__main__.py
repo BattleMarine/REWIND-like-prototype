@@ -10,6 +10,7 @@ from .extraction import prepare
 from .matching import match_extractions, verify_extraction
 from .pilot import run_pilot
 from .planning import counterpart_plan
+from .profiles import PROFILES
 
 
 def read_bounded_json(path, maximum=128*1024):
@@ -31,6 +32,8 @@ def main(argv=None):
         extract.add_argument("--limits",type=Path,required=True)
         extract.add_argument("--include",action="append",required=command!="scan",default=None,help="저장/선택 필터이며 gzip seek가 아님; scan은 payload 저장0")
         extract.add_argument("--output",type=Path,required=True)
+        extract.add_argument("--profile",choices=tuple(PROFILES),default=None,help="고정 preset과 limits의 정확한 일치 검사")
+        extract.add_argument("--exact-target",action="append",default=None,help="완료 시 즉시 중단할 literal member; include와 같은 집합")
     match = sub.add_parser("match")
     match.add_argument("--extraction",type=Path,action="append",required=True)
     match.add_argument("--output",type=Path,required=True)
@@ -47,10 +50,12 @@ def main(argv=None):
             operation=prepare if args.command=="extract" else run_pilot
             report = operation(read_bounded_json(args.manifest),args.output,args.include or [],
                 Limits.from_dict(read_bounded_json(args.limits)),base=args.manifest.parent,
+                profile=args.profile,exact_targets=args.exact_target,
                 **({"mode":"scan"} if args.command=="scan" else {}))
             print(json.dumps({"stop_reason":report["stop_reason"],"complete_files":len(report["files"]) if args.command=="extract" else report["complete_files"],
                 "inspection_candidates_usable":report["inspection_candidates_usable"],
-                "whole_archive_integrity_verified":report["whole_archive_integrity_verified"],"train_ready":False,"stats":report["stats"]},indent=2))
+                "whole_archive_integrity_verified":report["whole_archive_integrity_verified"],"train_ready":False,"stats":report["stats"],
+                **{k:report[k] for k in ("profile","completed_targets","missing_targets","targets_complete","targets_status")}},indent=2))
             return 0 if report["inspection_candidates_usable"] else 1
         if args.command=="verify":
             report = verify_extraction(args.extraction,read_bounded_json(args.manifest))

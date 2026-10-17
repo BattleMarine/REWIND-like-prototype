@@ -10,23 +10,25 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
-from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes
+from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
+from .profiles import COUNTERPART_PROFILE, validate_profile_limits
 from .sources import SplitStream
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
     "transfer_bytes_limit", "decompressed_bytes_limit", "elapsed_limit", "files_limit", "members_limit",
-    "metadata_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit"}
+    "metadata_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete"}
 
 
 MAX_OBSERVED_MEMBERS = 128
 
 
-def report_reserve_bytes(manifest, includes, limits):
+def report_reserve_bytes(manifest, includes, limits, exact_targets=None):
     # name JSON escape 최악은 UTF-8 경로 bytes의 2배. 관측목록은 pilot에 복사하지 않는다.
     observation_reserve = min(MAX_OBSERVED_MEMBERS,limits.max_members)*(2*limits.max_path_bytes+512)
     return (16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024
-        +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve)
+        +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve
+        +(6*len(canonical(exact_targets))+1024 if exact_targets else 0))
 
 
 def code_hashes():
@@ -136,7 +138,7 @@ def read_payload(reader, size, sink=None, on_chunk=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract"):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
@@ -144,9 +146,14 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     if mode not in ("extract","scan"):
         raise PreparationError("preparation_mode")
     includes = [] if mode=="scan" and includes==[] else validate_includes(includes)
+    exact_targets = validate_exact_targets(exact_targets,includes,limits,mode)
+    if profile is not None:
+        validate_profile_limits(profile,limits)
+        if profile==COUNTERPART_PROFILE and (mode!="extract" or len(exact_targets)!=2):
+            raise PreparationError("counterpart_profile_requires_two_exact_targets")
     budget = Budget(limits,**({"clock":clock} if clock else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
-    reserve = report_reserve_bytes(manifest,includes,limits)
+    reserve = report_reserve_bytes(manifest,includes,limits,exact_targets)
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -285,6 +292,9 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 budget.files += 1
                 budget.payload_disk_bytes += size
                 active = None
+                if exact_targets and set(exact_targets).issubset({entry["member"] for entry in files}):
+                    reason = "targets_complete"
+                    break  # 다음 tar header/Range를 읽지 않는다. 받은 Range의 선수신은 별도다.
             finally:
                 if temporary is not None and temporary.exists():
                     temporary.unlink()
@@ -300,7 +310,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     malformed_complete_tar = bool(reader and reader.gzip_eof_crc_valid and not tar_eof and reason in {"prefix_exhausted","incomplete_header","incomplete_payload","incomplete_padding"})
     pending_validation = bool(source and any(getattr(s,"pending_validation",False) for s in source.sources))
     usable = (reason=="complete" or reason in BENIGN_STOPS) and not malformed_complete_tar and not pending_validation
-    failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason=="interrupted" else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
+    failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason in {"interrupted","targets_complete"} else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
     report = {"schema_version":"archive_extraction_v1","extractor_version":__version__,"code_sha256":code_hashes(),
         "archive_manifest":manifest,"archive_manifest_sha256":digest(manifest),"selection":includes,"limits":asdict(limits),
         "stop_reason":reason,"failure_class":failure_class,"active_incomplete_member":active,"files":files,"range_audit":source.audit if source else [],
@@ -316,6 +326,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "member_observations_usable":usable,
         "member_observation_trust":"bounded_observation_only" if usable else "untrusted_failed_source_or_parser",
         "full_source_listing_claimed":False,
+        "profile":profile if profile is not None else "custom_limits",
+        **target_summary(exact_targets,files,usable),
         "report_disk_reserve_bytes":reserve}
     raw = canonical({**report,"content_sha256":digest(report)})+b"\n"
     if len(raw)>reserve:

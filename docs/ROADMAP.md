@@ -30,6 +30,16 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-17 다음 준비 묶음 — 대응 왼쪽 RGB 목표 추출
+
+- 사용자의 다음 단계 진행 지시에 따라, scan과 후속 재추출을 분리하지 않고 기존 오른쪽 frame1·10에 대응하는 왼쪽 exact member2개를 찾으면 바로 저장하는 경로를 구현했다. 두 목표가 모두 완전히 저장되면 다음 header/Range를 추가로 읽지 않고 종료한다. 기존 byte0 순차 해제·원본 전후 검증·잘린 파일 제외·train_ready=false를 유지한다.
+- 별도 고정 프로파일의 준비 상한은 body64MiB·300초·총768요청·해제128MiB다. Range256KiB/IO64KiB·파일4MiB·disk16MiB·metadata64KiB·members1000은 유지하고 저장max_files는2다. 최초 metadata128KiB/30초는 별도다. 기본8MiB smoke의 상한을 전역 변경하지 않으며 허용한 프로파일 밖 수치 확대는 거부한다.
+- 이전 한 번의 실제29.116846초/8,356,024bytes를 단순 환산하면64MiB 약234초다. 이는 보장이 아닌 비용 참고값이며 300초·byte·요청·해제 상한 중 먼저 닿는 조건에서 종료한다. 최대256회 media에 전후metadata를 더한768회로 요청 상한을 맞춘다. 압축본문과 metadata body 합에 byte상한을 적용하므로64MiB 압축본문 확보를 보장하지 않는다. 첫8MiB를 다시 읽는 비용도 포함한다.
+- 기존 오른쪽sample과같은 Serena Getting_Up의 왼쪽final_1.png/final_10.png만 exact targets로 지정한다. 목표·선택 불일치를 사전 거부하고 완료/미확보 목록을 남긴다. Header 관측·파일 저장·원본 신뢰·hash 검증·stereo/학습 준비를 분리한다. 다음 pose 추출과 독립validation·실제학습은 자동 실행하지 않는다.
+- 사용자용 notebook과 고정 소스ZIP을 검토·로컬커밋 후 테스트 세션에 인계한다. 사용자와의 실행 안내·중간 질문은 테스트 세션에서 처리하고 오케스트레이션은 취합 결과를 검토한다. [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다. 이번 구현·로컬 검증과 실제64MiB Colab 실행/목표 확보는 구분하며 후자는 아직 미검증이다.
+
+- 로컬 검증: 전체165개 회귀 검사 통과(오케스트레이션38.495초), 이후 review 모드 보완 후 관련10개 재검증도 통과했다. 독립 모의 Drive에서 비선택9MiB 뒤 목표2개를 배치했을 때 기본smoke는8,356,252bytes/96요청/0파일, counterpart는9,714,572bytes/111요청/2파일로 `targets_complete` 중단했다. 목표 PNG hash가 일치하고 후속 불필요 member는 읽지 않았다. 실제 Google 요청은0이다. 근거는 Git 제외 `outputs/counterpart_prepare_20261017/root/`에 보존한다.
+
 ### 2026-10-17 사용자 Colab scan 결과 검토
 
 - 테스트 세션이 취합한 `archive_job_archvis_prefix_scan_001.zip`을 오케스트레이션에서 독립 확인했다. 실행 revision은 `af6961a`, CPU/Python3.13.16이며 ZIP CRC·4개 자체hash·보고서/설정 연결·배포 소스11개 hash가 일치한다. 근거는 Git 제외 `outputs/test_archvis_prefix_scan_20261017/verification.json`과 `orchestrator_review.json`이다. 원본 ZIP SHA256은 `b9fbd9187cd627cc8b83c876ca99c620628d0a1e9f8d75d5d87c84358ded4a33`이다.
@@ -37,7 +47,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - `transfer_bytes_limit`/`bounded_stop`, 목록 trust는 bounded_observation_only, 원본 후검사 미완료는false다. 준비 단계96요청(media32+metadata64)·8,356,024bytes·29.116846초, 최초 metadata 별도1요청·292bytes·0.218707초다. 합계97요청·8,356,316bytes·29.335553초는 인증·전체wire/end-to-end 측정이 아니다.
 - 이전 왼쪽 선택 실행 `5935e818`과 원본 parts 및32개 Range/수신hash가 같다. 왼쪽 경로는 읽은 구간에서 관측되지 않았으며 아직000의 끝에도 도달하지 않았다. 필터 무시나 후속 다운로드 조각 누락 때문에 중단했다는 증거는 없다. 전체 archive의 왼쪽 부재·정확한 위치는 미확정이다.
 - 새 notebook의 실제 metadata→scan→보고서 경로는 확인했다. Colab 사전60개 테스트의 상세 로그는 미확보여서 통과 근거에 포함하지 않는다. 로컬 ZIP과 검토 사본은 보존했고 이번 ZIP의 Drive 영구 보관 완료는 미확인이다. 전체 gzip 무결성·stereo triplet·학습 준비는 미검증이다.
-- **다음 검토 범위:** 동일8MiB 반복을 종료한다. 현재 병목은 저장 필터가 아니라 읽을 수 있는 prefix 범위다. 더 넓은 순차 탐색이 필요하다면 byte·시간·요청·해제량·관측 수 상한과 재읽기 비용을 함께 산정하고, 검토한 고정 버전·예산을 테스트 세션에 인계한다. 현 notebook은 기본 예산 확대를 거부하므로 숫자만 임의 변경하도록 안내하지 않는다. 인덱스/재포장도 최초 순차 읽기 비용이 있어 즉시 해결된 기능으로 취급하지 않는다. 이번 결과 수령은 추가 다운로드·예산 확대·구현 착수 승인이 아니며 새 실행은 시작하지 않았다.
+- **다음 검토 범위:** 동일8MiB 반복을 종료한다. 현재 병목은 저장 필터가 아니라 읽을 수 있는 prefix 범위다. 더 넓은 순차 탐색이 필요하다면 byte·시간·요청·해제량·관측 수 상한과 재읽기 비용을 함께 산정하고, 검토한 고정 버전·예산을 테스트 세션에 인계한다. 현 notebook은 기본 예산 확대를 거부하므로 숫자만 임의 변경하도록 안내하지 않는다. 인덱스/재포장도 최초 순차 읽기 비용이 있어 즉시 해결된 기능으로 취급하지 않는다. 당시 결과 수령만으로 새 실행을 시작하지 않았다. 이후 사용자 다음 단계 지시로 위 별도 고정 프로파일 준비를 진행하며 실제 실행은 테스트 세션에 인계한다.
 
 ### 2026-10-16 현재 상태와 우선 실행 계획
 
