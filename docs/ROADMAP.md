@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 16일 운영·검증 상태 보완
+검토 초안 v0.2   |   2026년 10월 17일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -30,6 +30,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-17 사용자 Colab scan 결과 검토
+
+- 테스트 세션이 취합한 `archive_job_archvis_prefix_scan_001.zip`을 오케스트레이션에서 독립 확인했다. 실행 revision은 `af6961a`, CPU/Python3.13.16이며 ZIP CRC·4개 자체hash·보고서/설정 연결·배포 소스11개 hash가 일치한다. 근거는 Git 제외 `outputs/test_archvis_prefix_scan_20261017/verification.json`과 `orchestrator_review.json`이다. 원본 ZIP SHA256은 `b9fbd9187cd627cc8b83c876ca99c620628d0a1e9f8d75d5d87c84358ded4a33`이다.
+- 동일000의 byte0~8,350,135에서 Serena Getting_Up 오른쪽 경로를 `final_10 → 1 → 6 → 8 → 11 → 9 → 7.png` 순으로 관측했다. 앞6개는 payload+padding 소비 완료, 마지막7은 선언1,241,546bytes 중786,432bytes 반환 뒤 미완료다. 저장0·sample_acquired=false는 scan의 의도된 동작이며 PNG 내용 검증이나 새 sample 확보가 아니다.
+- `transfer_bytes_limit`/`bounded_stop`, 목록 trust는 bounded_observation_only, 원본 후검사 미완료는false다. 준비 단계96요청(media32+metadata64)·8,356,024bytes·29.116846초, 최초 metadata 별도1요청·292bytes·0.218707초다. 합계97요청·8,356,316bytes·29.335553초는 인증·전체wire/end-to-end 측정이 아니다.
+- 이전 왼쪽 선택 실행 `5935e818`과 원본 parts 및32개 Range/수신hash가 같다. 왼쪽 경로는 읽은 구간에서 관측되지 않았으며 아직000의 끝에도 도달하지 않았다. 필터 무시나 후속 다운로드 조각 누락 때문에 중단했다는 증거는 없다. 전체 archive의 왼쪽 부재·정확한 위치는 미확정이다.
+- 새 notebook의 실제 metadata→scan→보고서 경로는 확인했다. Colab 사전60개 테스트의 상세 로그는 미확보여서 통과 근거에 포함하지 않는다. 로컬 ZIP과 검토 사본은 보존했고 이번 ZIP의 Drive 영구 보관 완료는 미확인이다. 전체 gzip 무결성·stereo triplet·학습 준비는 미검증이다.
+- **다음 검토 범위:** 동일8MiB 반복을 종료한다. 현재 병목은 저장 필터가 아니라 읽을 수 있는 prefix 범위다. 더 넓은 순차 탐색이 필요하다면 byte·시간·요청·해제량·관측 수 상한과 재읽기 비용을 함께 산정하고, 검토한 고정 버전·예산을 테스트 세션에 인계한다. 현 notebook은 기본 예산 확대를 거부하므로 숫자만 임의 변경하도록 안내하지 않는다. 인덱스/재포장도 최초 순차 읽기 비용이 있어 즉시 해결된 기능으로 취급하지 않는다. 이번 결과 수령은 추가 다운로드·예산 확대·구현 착수 승인이 아니며 새 실행은 시작하지 않았다.
+
 ### 2026-10-16 현재 상태와 우선 실행 계획
 
 **2026-10-16 후속 RGB 결과와 notebook 재작성**
@@ -40,7 +49,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 - 사용자 요청에 따라 notebook을 단일 JOB 설정 → frozen preflight → 명시적1회 metadata/pilot → 결과 검토·ZIP 순서로 재작성했다. 설정 변경은 preflight 재확인을 요구하고 같은 설정 반복을 차단한다. 별도 plan 업로드·아래 새job 셀·위쪽으로 돌아가는 실행 안내를 제거한다.
 - 기본 scan은 payload 저장0이며 순차 읽기·해제 비용은 계속 발생한다. 기존8MiB·60초·총128요청·디스크16MiB를 유지하고 regular member 관측기록을 최대128개로 제한한다. 원본·parser 검사가 실패하면 목록은 untrusted다. 전체 archive index·중간 seek·resume가 아니다. [실행 순서](REAL_DATA_NEXT_RUN.md)를 따른다.
 - 전체155개 로컬 회귀를 통과했고, 마지막 extract 호환 보완 뒤 관련46개를 다시 통과했다. Fresh 소스 ZIP의 notebook7개 코드 셀 모의 실행에서 설정 변경·중복 실행의 인증 전 차단, 실패 결과 ZIP 보관과 재다운로드를 확인했다. 오케스트레이션은 저장된 공식 prefix를 네트워크 없이 scan 재생해 RGB3/pose17개 관측, 완료payload2/16개 순서 일치, 저장0파일을 확인했다. 잘린 마지막payload를 완료로 표시하지 않았으며 이번 Google요청은0이다. 최초 localhost차단과 테스트 fixture의 GNU metadata64KiB초과는 로컬 서버 허용·fixture 경로범위 조정 후 해소했다. 운영 예산은 늘리지 않았다.
-- 새 흐름의 실제 Drive/Colab 실행, 좌우RGB+pose 확보·독립validation·실제학습은 남아 있다. 이전 오른쪽 추출 성공과 이번 진단 구현의 검증 범위를 구분한다.
+- 당시 새 흐름의 실제 Drive/Colab 실행은 미검증이었으며 위10월17일 결과로 후속 확인했다. 좌우RGB+pose 확보·독립validation·실제학습은 남아 있다. 이전 오른쪽 추출 성공과 이번 진단 구현의 검증 범위를 구분한다.
 
 **2026-10-16 RGB pilot 요청 상한 원인 검토**
 
