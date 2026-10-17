@@ -30,13 +30,22 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-17 대응 왼쪽 RGB 실제 확보 결과
+
+- 테스트 세션이 취합한 `84e86ae`/API3, `archvis_left_1_10_64m_001` 실행에서 Serena Getting_Up의 왼쪽 frame1·10 두 PNG 확보를 확인했다. `targets_complete`/bounded_stop, pilot 검증 passed·완료2·미확보0이며 원본 후검사 미완료=false다. 오케스트레이션도 원본 ZIP CRC·보고서 자체hash·설정hash·배포 소스12개 hash·두 payload hash를 독립 대조했다.
+- 원본 ZIP SHA256은 `61a64a6ef635dec46f8582708c425ef4af4956f43b078839ea635c2edf22697a`다. 로컬 원본 사본·테스트 검토·독립 검토는 Git 제외 `outputs/test_archvis_left_counterpart_20261017/`에 보존했다. 두 PNG는1024×1024 RGB이며 테스트 세션에서 PNG chunk/IDAT 구조·디코딩을 확인했다. 기존 오른쪽과 이름상 sequence/frame이 대응하지만 이번 오른쪽 원본 재검사·좌우 overlay·시간 검증은 미실행이다.
+- 준비 단계는 압축27.5MiB(28,835,840bytes)를110개 Range로 읽고, 전후 metadata 포함330요청·28,856,080bytes·150.501255초·해제28,694,119bytes·저장2,422,594bytes로 종료했다. 최초 metadata는 별도1요청·292bytes·0.260077초다. 합계331요청·28,856,372bytes·150.761332초이며 인증·업로드·사전검사·ZIP·전체wire 비용을 제외한다. 정한 예산 안에서 성공했으며64MiB를 전부 소비하지 않았다.
+- Regular member23개 중 앞16개는 오른쪽, 이후7개는 왼쪽이다. 목표left10은21번째, left1은23번째에서 저장했다. 기존8MiB 이후 왼쪽이 존재한다는 근거이며 seek index나 전체 archive 무결성 증명은 아니다.
+- 이번70개 Colab 사전검사 전체로그·실행 notebook·별도 최종 화면은 미제공이고 Drive 영구보관도 미확인이다. 해당 항목을 확인한 것으로 표시하지 않는다. 전체gzip CRC/무결성과 train_ready는false다. 기존 pose32개는 다른 sequence이므로 대응 pose·triplet·실제 학습은 아직 미완료다.
+- 같은 왼쪽 추출 테스트는 종료한다. 다음 준비 후보는 기존 오른쪽 원본 보존본 확인과 동일 sequence/frame의 pose 확보·변환·좌우 영상 및 시간 대조다. 새 Drive 실행이나 학습은 별도 작업으로 준비하며 이번 결과 수령만으로 자동 시작하지 않는다.
+
 ### 2026-10-17 다음 준비 묶음 — 대응 왼쪽 RGB 목표 추출
 
 - 사용자의 다음 단계 진행 지시에 따라, scan과 후속 재추출을 분리하지 않고 기존 오른쪽 frame1·10에 대응하는 왼쪽 exact member2개를 찾으면 바로 저장하는 경로를 구현했다. 두 목표가 모두 완전히 저장되면 다음 header/Range를 추가로 읽지 않고 종료한다. 기존 byte0 순차 해제·원본 전후 검증·잘린 파일 제외·train_ready=false를 유지한다.
 - 별도 고정 프로파일의 준비 상한은 body64MiB·300초·총768요청·해제128MiB다. Range256KiB/IO64KiB·파일4MiB·disk16MiB·metadata64KiB·members1000은 유지하고 저장max_files는2다. 최초 metadata128KiB/30초는 별도다. 기본8MiB smoke의 상한을 전역 변경하지 않으며 허용한 프로파일 밖 수치 확대는 거부한다.
 - 이전 한 번의 실제29.116846초/8,356,024bytes를 단순 환산하면64MiB 약234초다. 이는 보장이 아닌 비용 참고값이며 300초·byte·요청·해제 상한 중 먼저 닿는 조건에서 종료한다. 최대256회 media에 전후metadata를 더한768회로 요청 상한을 맞춘다. 압축본문과 metadata body 합에 byte상한을 적용하므로64MiB 압축본문 확보를 보장하지 않는다. 첫8MiB를 다시 읽는 비용도 포함한다.
 - 기존 오른쪽sample과같은 Serena Getting_Up의 왼쪽final_1.png/final_10.png만 exact targets로 지정한다. 목표·선택 불일치를 사전 거부하고 완료/미확보 목록을 남긴다. Header 관측·파일 저장·원본 신뢰·hash 검증·stereo/학습 준비를 분리한다. 다음 pose 추출과 독립validation·실제학습은 자동 실행하지 않는다.
-- 사용자용 notebook과 고정 소스ZIP을 검토·로컬커밋 후 테스트 세션에 인계한다. 사용자와의 실행 안내·중간 질문은 테스트 세션에서 처리하고 오케스트레이션은 취합 결과를 검토한다. [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다. 이번 구현·로컬 검증과 실제64MiB Colab 실행/목표 확보는 구분하며 후자는 아직 미검증이다.
+- 사용자용 notebook과 고정 소스ZIP을 검토·로컬커밋 후 테스트 세션에 인계한다. 사용자와의 실행 안내·중간 질문은 테스트 세션에서 처리하고 오케스트레이션은 취합 결과를 검토한다. [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다. 이번 구현·로컬 검증과 실제64MiB Colab 실행/목표 확보는 구분하며 후자는 당시 미검증이었으며 후속 실제 결과는 위 항목에 기록했다.
 
 - 로컬 검증: 전체165개 회귀 검사 통과(오케스트레이션38.495초), 이후 review 모드 보완 후 관련10개 재검증도 통과했다. 독립 모의 Drive에서 비선택9MiB 뒤 목표2개를 배치했을 때 기본smoke는8,356,252bytes/96요청/0파일, counterpart는9,714,572bytes/111요청/2파일로 `targets_complete` 중단했다. 목표 PNG hash가 일치하고 후속 불필요 member는 읽지 않았다. 실제 Google 요청은0이다. 근거는 Git 제외 `outputs/counterpart_prepare_20261017/root/`에 보존한다.
 
