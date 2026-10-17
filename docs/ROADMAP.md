@@ -30,6 +30,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-17 다음 테스트 준비 — 동일 frame pose 두 파일
+
+- 사용자 지시에 따라 기존 Serena Getting_Up RGB frame1·10과 같은 pose JSON2개를 확보하는 1회 테스트를 준비한다. 기존 API3/counterpart64MiB_v1의64MiB·300초·768요청·해제128MiB·member1000 상한과 목표 완료 중단을 재사용하며 새 코어·예산 확대는 없다.
+- Pose와 RGB archive는 같은 파일명을 사용하지만 별도 Drive 원본이다. 기존 pose metadata/선택 이력에서 ID를 확인해 사용자용 JOB에만 채운다. RGB 순서와 pose 순서를 동일시하지 않으며 후보 json/frame_1.json·frame_10.json의 실제 존재·도달 여부는 미확정이다.
+- CPU에서 사전검사→단일 JOB/preflight→1회 metadata/추출→결과 ZIP 보관으로 진행한다. Pose 압축률에 따라 해제량/member 상한이 먼저 닿을 수 있어 RGB 실측으로 완료 시간을 예측하지 않는다. 동일 왼쪽 추출은 반복하지 않는다.
+- 결과 회수 뒤 기존 오른쪽 보존본 hash 확인·JSON 관절/단위/좌표·62관절 변환·영상 대조를 로컬에서 검토한다. 사용자에게 반복 진단 셀 실행을 요구하지 않는다. 두 frame은 연속clip이나 독립validation이 아니며 실제 학습은 시작하지 않는다. 고정 실행 파일은 검토·로컬 커밋 후 테스트 세션에 인계한다. [실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다.
+
 ### 2026-10-17 대응 왼쪽 RGB 실제 확보 결과
 
 - 테스트 세션이 취합한 `84e86ae`/API3, `archvis_left_1_10_64m_001` 실행에서 Serena Getting_Up의 왼쪽 frame1·10 두 PNG 확보를 확인했다. `targets_complete`/bounded_stop, pilot 검증 passed·완료2·미확보0이며 원본 후검사 미완료=false다. 오케스트레이션도 원본 ZIP CRC·보고서 자체hash·설정hash·배포 소스12개 hash·두 payload hash를 독립 대조했다.

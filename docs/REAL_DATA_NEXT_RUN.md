@@ -1,73 +1,56 @@
 # 다음 실제 데이터 준비 실행
 
-## 현재 결과와 다음 준비 후보
+## 이번 테스트: 확보한 RGB에 대응하는 pose 두 파일
 
-2026-10-17 `84e86ae`의 1회 사용자 실행에서 목표 왼쪽 frame1·10 두 PNG를 확보했다. Pilot 검증 passed·targets_complete=true·missing=[]이며, 원본 ZIP과 보고서·배포 코드·payload hash를 독립 확인했다. 압축27.5MiB를 읽고 준비150.50초에 종료했다. **아래 실행은 완료된 이력이며 같은 설정으로 다시 실행하지 않는다.**
+2026-10-17 사용자 지시에 따라 Serena `Getting_Up__1_`의 frame1·10 pose를 확보하는 **한 번의 사용자 테스트**를 준비한다. 왼쪽 RGB 추출은 성공했고 같은 작업을 반복하지 않는다. 기존 오른쪽 결과와 새 왼쪽 결과는 보존한다. 이번에는 pose 결과 ZIP만 회수하고 관절·좌표 변환·영상 대조는 오케스트레이션과 디벨로퍼가 로컬에서 이어서 검토한다. 사용자가 추가 진단 셀을 작성할 필요는 없다.
 
-다음 후보는 기존 오른쪽 원본 보존본을 확인하고 동일 sequence/frame의 pose를 확보해 변환·영상/시간 정합성을 대조하는 것이다. 기존 pose32개는 다른 sequence여서 아직 triplet과 학습 입력이 완성되지 않았다. 새 실행 파일·예산·검증 기준을 준비해 테스트 세션에 별도 인계하기 전에는 pose나 학습을 시작하지 않는다. 이번 Colab70검사 전체로그와 Drive 영구보관은 미확인이다. 상세 근거는 [로드맵의 실제 확보 결과](ROADMAP.md#2026-10-17-대응-왼쪽-rgb-실제-확보-결과)를 따른다.
+기존 API3의 `counterpart64MiB_v1`과 정확한 두 목표 완료 중단을 재사용한다. 코어·예산·학습 guard는 변경하지 않는다. Pose의 archive 순서는 RGB와 다를 수 있으며 해당 파일을 이번 예산 안에서 만날지는 아직 모른다.
 
-## 완료된 작업: 대응 왼쪽 RGB 두 파일의 제한된 추출
+## 고정 설정
 
-2026-10-17 사용자가 다음 단계 진행을 요청했다. 완료된 8MiB scan을 반복하지 않고, **최대64MiB 범위에서 기존 오른쪽 frame1·10에 대응하는 왼쪽 두 파일을 추출**하는 별도 작업을 준비한다. 두 목표가 완전히 저장되면 즉시 멈추며, 하나도 찾지 못해도 정해진 상한에서 종료한다. CPU 런타임을 사용하고 GPU는 필요 없다.
-
-사용자 실행은 **테스트 세션**이 고정 revision·소스 ZIP·사용자용 notebook을 받아 안내한다. 이 문서의 계획만 보고 구버전 notebook의 숫자를 바꾸거나 새 셀을 추가하지 않는다. 코드와 실행 파일 검토 후 전달한 버전만 사용한다. 이 절차의 실제 Colab 실행과 왼쪽 확보는 위 후속 결과로 확인했다.
-
-## 근거와 목적
-
-- 기존 오른쪽 PNG는 Serena `Getting_Up__1_`의 frame10·1이다. 기존 pose32개는 다른 sequence이므로 아직 RGB 좌우+pose triplet이 없다.
-- `af6961a` scan은 같은000의 앞8,350,136bytes에서 오른쪽 경로10→1→6→8→11→9→7만 관측했다. 앞6개는 payload+padding을 소비했고 마지막7은 미완료다. 저장0은 scan의 정상 동작이다.
-- 이전 왼쪽 선택 실행과 source parts 및32개 Range/수신hash가 같다. 선택이 무시된 것이 아니라 이 prefix에서 왼쪽 경로를 만나지 못했다. 전체 archive의 왼쪽 부재나 정확한 위치는 미확정이다.
-- 다음 작업은 넓어진 범위에서 **찾은 목표를 바로 저장**한다. 목록 조사 후 같은 범위를 다시 읽는 별도 추출을 기본 절차로 두지 않는다. Gzip은 여전히 byte0부터 순차 해제하며 중간 점프·이어받기는 없다.
-
-## 대상과 예산
-
-두 목표의 공통 sequence는 다음과 같다.
+- `job_id="archvis_pose_1_10_64m_001"`, `mode="extract"`, `purpose="targeted"`, `profile="counterpart64MiB_v1"`.
+- `selection.kind="pose"`, `total_parts=1`, index0의 `ArchVisInterior_ArchVis_RT.tar.gz000`을 사용한다. RGB archive와 파일명이 같아도 Drive ID와 원본이 다르다. 개인 Drive ID는 검토한 사용자용 notebook에만 채우고 저장소에는 기록하지 않는다.
+- 과거 pose metadata의 크기368,145,316bytes/version1은 참고 이력이다. 실행 당시 metadata와 각 Range 전후 검사를 다시 거치며 과거 값을 현재 상태로 간주하지 않는다.
+- 아래 두 exact 경로를 `exact_targets`와 `includes`에 동일하게 지정한다. 기존 JSON 규칙에서 파생한 후보 경로이며 아직 이번 sequence의 실제 pose payload를 확보한 것은 아니다.
 
 ```text
-ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Shape_01/003/Getting_Up__1_
+ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Shape_01/003/Getting_Up__1_/json/frame_1.json
+ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Shape_01/003/Getting_Up__1_/json/frame_10.json
 ```
 
-`profile="counterpart64MiB_v1"`, `mode="extract"`, `purpose="targeted"`를 사용한다. `exact_targets`와 `includes`에는 동일한 두 경로를 지정한다. 이름 있는 프로파일은 실제 `limits`가 고정 preset과 정확히 같아야 한다.
+## 예산과 중단
 
-해당 sequence 아래 `fisheye_final_image/camera_left/final_1.png`와 `final_10.png`를 정확한 파일명으로 지정한다. `camera_*` glob으로 다시 오른쪽을 선택하지 않는다. 기존 오른쪽 결과 ZIP은 그대로 보존한다.
-
-| 항목 | 이번 작업 상한 |
+| 항목 | 상한 |
 | --- | --- |
-| 준비 응답 본문 합계 | 64MiB, media와 전후 metadata 포함 |
-| 준비 경과 시간 | 300초, 협력적 중단 |
-| 준비 총 요청 | 768회 |
-| 해제 출력 누적 | 128MiB |
-| HTTP Range / 내부 IO·해제 chunk | 256KiB / 64KiB 유지 |
-| 개별 파일 / 준비 디스크 | 4MiB / 16MiB 유지 |
-| 저장 파일 | 정확한 목표2개 |
-| 최초 metadata builder | 별도128KiB·30초·최대8요청 유지 |
+| 준비 응답 body 합계 | 64MiB, media와 전후 metadata 포함 |
+| 준비 시간 / 총 요청 | 협력적300초 / 768회 |
+| 해제 출력 / tar member | 128MiB / 1000 |
+| 개별 파일 / 준비 disk | 4MiB / 16MiB |
+| 저장 목표 | 정확한2개 |
+| HTTP Range / 내부 IO | 256KiB / 64KiB |
+| 최초 metadata builder | 별도128KiB·30초·8요청 |
 
-64MiB를256KiB로 나누면256회이며 media마다 전후 metadata를 더한 총3요청 기준으로768회를 둔다. 실제 전송 상한에는 metadata body도 포함되므로 압축본문64MiB 수신을 보장하지 않는다. 이전 준비29.116846초·8,356,024bytes를 단순 환산하면 약234초지만 한 번의 관측에 따른 참고값이며 처리량·목표 발견·완료 시간을 보장하지 않는다.
+두 단계 합계는64.125MiB·협력적330초·776요청이다. 인증·업로드·사전검사·ZIP 생성·전체wire 비용은 별도이며 OS hard deadline/RSS 상한이 아니다. 결과ZIP은 최대17MiB와 그에 필요한 별도 디스크 공간을 사용한다. Pose의 압축률에 따라 byte보다 해제량·member 상한이 먼저 닿을 수 있다. RGB의150.5초 실측을 pose 예상 시간으로 환산하지 않는다.
 
-첫8MiB도 다시 읽는 비용에 포함된다. 인증·소스 업로드·로컬 사전 검사·ZIP 생성은 준비 시간과 별도이며 DNS/auth/OS 전체 hard deadline이나 프로세스 RSS 상한은 아니다. Job·초기 metadata 기록과 결과 ZIP의 추가 디스크도 필요하다. 예산 확대는 이번 이름 있는 고정 프로파일에 한정하며 기본8MiB 설정은 유지한다.
+새 실행은 byte0부터 다시 읽는다. 중간 gzip 조각의 독립 해제·seek·resume가 아니다. 두 목표를 완전히 저장하면 즉시 종료하고, 미확보·부분·오류도 보고 후 중단한다. 실패를 이유로 사용자나 테스트 세션이 예산·필터·코드를 바꾸거나 반복 실행하지 않는다.
 
-## 사용자 실행 흐름
+## 사용자 실행과 결과 회수
 
-1. 테스트 세션이 전달한 **사용자용 notebook을 새 CPU 세션**에서 연다. 기존 `/content` 결과는 먼저 보관한다.
-2. 첫 소스 업로드 셀에 같은 revision의 **직접 소스 ZIP** 한 개를 올린다. 바깥 배포 묶음·결과 ZIP을 올리지 않는다.
-3. 로컬 사전 검사 후 단일 `JOB` 셀을 실행한다. 사용자용 사본에는 해당 Drive000, 이번 프로파일, 왼쪽 exact targets2개, 작업 ID와 사유가 미리 채워져 있다. 별도 plan JSON 업로드나 셀 추가는 없다.
-4. Preflight에서 profile·mode·실제 예산·정확한 두 경로·byte0 재읽기를 확인한다. 설정을 바꿨다면 preflight를 다시 확인한다.
-5. 실행 셀의 `EXECUTE_ONCE=True`로 바꾸어 **한 번만** 실행한다. 인증→metadata→targeted 추출 순서다. 같은 작업을 자동 반복하지 않는다.
-6. 결과 셀에서 완료/미확보 targets, 저장 파일 수, 검증 상태, 실제 비용과 중단 이유를 확인한다.
-7. 마지막 셀의 `DOWNLOAD_RESULT_ZIP=True`로 결과 ZIP을 받는다. 실패해도 가능한 보고서를 보관하고 테스트 세션에 전달한다. Drive 프로젝트 `reports/`에도 보관한다. Notebook 저장만으로 임시 결과는 보존되지 않는다.
+실행 안내와 중간 질문은 이 프로젝트의 **테스트 세션**이 담당한다. 검토한 고정 revision의 사용자용 `archive_prepare_pose_ready_<revision>.ipynb`와 직접 소스 `rewind-archive-source-<revision>.zip`을 전달한다. 이전 왼쪽용 notebook을 재실행하지 않는다.
 
-## 결과별 판단
+1. 기존 결과를 보관하고 새 CPU 런타임에서 전달된 pose notebook을 연다. GPU는 필요 없다.
+2. 첫 셀에 직접 소스 ZIP 한 개를 업로드한다. 결과 ZIP이나 바깥 배포 묶음은 소스가 아니다.
+3. 사전70검사 로그를 보관한 뒤 미리 채운 JOB와 preflight의 pose kind·두 경로·고정 예산을 확인한다.
+4. `EXECUTE_ONCE=True`로 실행 셀을 한 번 실행한다. 인증→metadata→pose 추출 순서이며 별도 선택 JSON이나 새 셀이 없다.
+5. 결과 검토 셀과 `DOWNLOAD_RESULT_ZIP=True` 셀을 실행해 `archive_job_archvis_pose_1_10_64m_001.zip`을 보관한다. 실패했어도 가능한 보고서를 보존한다.
+6. 결과 ZIP·사전검사 로그·마지막 출력·실행 notebook을 테스트 세션에 전달한다. Drive 프로젝트 `reports/`의 영구보관 여부는 별도로 기록한다.
 
-| 결과 | 다음 행동 |
-| --- | --- |
-| Pilot의 `targets_complete=true`, `targets_status=complete`, `verification.status=passed` 및 현재 파일 hash 검사 통과 | 왼쪽 파일 확보 후보로 보존하고 기존 오른쪽과 sequence/frame·PNG 내용·영상 정합성을 별도 검토한다. |
-| 목표1개만 완전 저장 | 해당 파일과 미확보 목록을 보존한다. 두 목표 완료나 stereo clip 확보로 표시하지 않는다. |
-| 목표0개·예산 상한 중단 | 도달 경로·비용을 보존하고 종료한다. 같은 설정 반복·자동 상한 확대를 하지 않는다. |
-| 원본 변경·후검사 미완료·parser/CRC 실패 | 저장된 파일이 있어도 unusable 상태를 우회하지 않는다. |
-| 인증·metadata 실패 | 결과 ZIP을 보관하고 중단한다. 이전 실행의 manifest로 진행하지 않는다. |
+## 성공 판정과 후속 로컬 검토
 
-`stop_reason=targets_complete`만으로 최종 성공을 판단하지 않는다. 이는 목표 저장 후 추출을 멈춘 이유이며, 뒤이은 파일 hash 검사 실패는 별도로 보고한다.
+- 추출 성공: pilot의 `verification.status=passed`, `targets_complete=true`, `targets_status=complete`, 정확한 두 완료 경로·미확보0 및 현재 파일 hash 검증 통과. `stop_reason=targets_complete`만으로 성공 판정하지 않는다.
+- 하나만 완전하면 부분 확보,0개면 정한 범위에서 미확보다. 전체 archive에서 pose가 없다는 결론은 내리지 않는다. 원본 변경·후검사 미완료·parser/CRC/hash 오류면 unusable 상태를 우회하지 않는다.
+- 회수 뒤 로컬에서 JSON schema·87관절·필수값·단위/좌표 관계, 기존62관절 변환 규격 적용 가능성, 좌우 RGB와 sequence/frame 대조 및 GT2D overlay를 검사한다. 기존 오른쪽 원본 보존본을 먼저 찾아 hash를 확인하고, 없다면 재다운로드보다 보관본 전달을 우선한다. 보관본이 없을 때 필요한 안내는 테스트 세션에서 취합한다.
+- 로컬에서 찾은 이전 공식 서버 right10 추출본은 hash가 과거 사용자 결과와 같아도 해당 실행이 `http_body_failed`/unusable이므로 검증된 보존본으로 대체하지 않는다. 기존 사용자 오른쪽 ZIP(`rewind_pilot_2c11fc10.zip` 또는 동일 파일을 확보한 보관본)을 테스트 결과와 함께 회수하거나 누락으로 남긴다. 원본을 다시 읽는 작업은 이번 pose 테스트에 추가하지 않는다.
+- 파일명 대조와 overlay만으로 timestamp·calibration·원본 motion·독립 split 검증을 모두 완료했다고 표시하지 않는다. frame1·10은 연속 clip이 아니며 학습을 시작하지 않는다. 해당 pose 확보·변환·영상 대조는 현재 미실행이다.
 
-원본 archive 전체 무결성, 대응 pose·timestamp·split·원본 motion 독립성, 독립 validation과 실제 학습은 별도 미완료 항목이다. 두 RGB 파일을 확보해도 M0/M1/M2/M3 전체 완료나 모델 성능 개선을 뜻하지 않는다. 다음 pose 준비나 학습은 결과 검토 후 별도 작업으로 인계한다.
-
-이전 scan 결과의 근거는 [로드맵](ROADMAP.md#2026-10-17-사용자-colab-scan-결과-검토), 준비 계약과 제한은 [압축 준비 도구](ARCHIVE_PREPARATION.md), 환경·보관 방법은 [Colab 안내](COLAB_SETUP.md)를 따른다.
+이전 왼쪽 확보 결과는 [로드맵](ROADMAP.md#2026-10-17-대응-왼쪽-rgb-실제-확보-결과), 고정 예산과 보고서 계약은 [압축 준비 도구](ARCHIVE_PREPARATION.md), 변환 규격은 [실제 pose 준비](REAL_DATA_PREPARATION.md)를 따른다.
