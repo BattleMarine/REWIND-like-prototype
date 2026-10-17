@@ -30,6 +30,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-17 pose 1회 테스트 결과 — member 상한에서 미확보
+
+- `a8b673b`/API3의 `archvis_pose_1_10_64m_001`은 `members_limit`/bounded_stop으로 종료했고 목표 JSON0개, 완료0·미확보2다. `verification=passed`는 빈 완료 파일 목록 검사 성공이며 pose 확보 성공이 아니다. 원본 후검사 미완료=false, train_ready=false와 전체 archive 무결성=false를 유지한다.
+- 오케스트레이션은 원본 ZIP CRC·보고서 자체hash·배포 소스12개 hash·ready JOB 정확 일치·설정hash·보고서 연결·상한/미확보 상태를 독립 확인했다. ZIP SHA256은 `1c5f4c6306708e70affc8bca325cc5083b8507b84ffb805824cab50bb93d3aac`이고 근거는 Git 제외 `outputs/test_archvis_pose_counterpart_20261017/verification.json`과 `orchestrator_review.json`에 보존한다.
+- 준비는 압축7.5MiB(7,864,320bytes), 응답body7,869,720bytes,90요청,29.904665초,해제42,045,585bytes에서 tar header1000 상한에 도달했다. Header 수는 정규 JSON 수와 다르고 metadata 항목도 포함한다. Tar metadata payload 누적62,591bytes도64KiB 상한에 근접했다. 최초 metadata는 별도1요청·290bytes·0.194460초다.
+- 관측목록128개는 header269까지만 보존됐고 추출은 이후 header1000까지 계속했다. 목록 cap이 중단 원인이 아니다. 보존 목록은 Adanna의 Brutal18+Opening110이며 Serena 목표는 관측/저장되지 않았다. 전체 archive에 목표가 없다는 근거는 아니다. Pose 원본 identity는 과거값과 일치했다.
+- 실제 JSON이 없어 관절·좌표·영상 대조는 미실행이다. 이번70검사 전체로그·실행notebook·별도최종화면·Drive 영구보관·기존 오른쪽 사용자ZIP은 미확인/미수령이다.
+- 동일 설정 반복은 종료한다. 다음 준비는 pose의 header/metadata 밀도와 해제량을 함께 고려한 제한 정책 검토가 필요하다. Member 수만 높여도 곧 metadata/해제량 상한에 닿을 수 있어 성공을 보장하지 않는다. 이번 결과 수령만으로 예산을 바꾸거나 새 실행을 시작하지 않는다.
+
 ### 2026-10-17 다음 테스트 준비 — 동일 frame pose 두 파일
 
 - 사용자 지시에 따라 기존 Serena Getting_Up RGB frame1·10과 같은 pose JSON2개를 확보하는 1회 테스트를 준비한다. 기존 API3/counterpart64MiB_v1의64MiB·300초·768요청·해제128MiB·member1000 상한과 목표 완료 중단을 재사용하며 새 코어·예산 확대는 없다.
