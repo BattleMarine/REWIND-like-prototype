@@ -12,10 +12,10 @@ from .drive_metadata import MetadataLimits, build_drive_manifest, provenance, sa
 from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
-from .profiles import COUNTERPART_PROFILE, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 
 
-NOTEBOOK_API_VERSION = 3
+NOTEBOOK_API_VERSION = 4
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 
@@ -72,8 +72,10 @@ def make_preflight(config, history):
     if any(value>asdict(MetadataLimits())[key] for key,value in asdict(metadata).items()):
         raise PreparationError("workflow_budget_increase_not_supported")
     config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode)
-    if config["profile"]==COUNTERPART_PROFILE and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
+    if config["profile"] in TARGET_PAIR_PROFILES and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
         raise PreparationError("counterpart_profile_requires_targeted_pair")
+    if config["profile"]==POSE_COUNTERPART_PROFILE and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
+        raise PreparationError("pose_profile_requires_pose_kind")
     config["limits"]=asdict(limits)
     config["metadata_limits"]=asdict(metadata)
     if not isinstance(config["previous_result"],str) or len(config["previous_result"].encode("utf-8"))>4096:
@@ -103,6 +105,7 @@ def make_preflight(config, history):
             "selection":config["selection"],"includes":config["includes"],"limits":config["limits"],
             "profile":config["profile"] if config["profile"] is not None else "custom_limits",
             "exact_targets":config["exact_targets"],
+            "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"]==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes,
             "stop_when_targets_stored":bool(config["exact_targets"]),
             "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,
             "total_cooperative_stage_upper_bound_seconds":limits.max_elapsed_seconds+metadata.max_elapsed_seconds if mode!="review" else 0,
@@ -202,6 +205,7 @@ def review_run(path):
         result["extraction"]={k:report[k] for k in ("operation","stop_reason","inspection_candidates_usable",
             "source_validation_pending","stats","member_observations","member_observation_trust",
             "member_observation_cap_reached","full_source_listing_claimed","profile","limits",
+            "last_regular_observation","regular_members_seen","metadata_entry_limit_bytes",
             "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
         try:

@@ -124,7 +124,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 ### Archive 준비 notebook: 한 방향 실행
 
 1. **CPU 런타임**에서 사용자용 `archive_prepare.ipynb`와 같은 revision의 코드 source ZIP을 준비합니다. 배포 묶음 전체 대신 내부 source ZIP만 업로드합니다. 이전 모듈이 import되어 있으면 결과를 먼저 내려받고 커널을 재시작합니다. Source 업로드는 한 번이며 별도 plan/선택 JSON 업로드는 없습니다.
-2. 위에서 아래로 로컬 사전 검사70개(archive24+metadata14+planning8+scan7+workflow7+targets10)를 실행합니다. 실제 데이터·Google 인증 없이 합성/모의/localhost만 검사합니다. Notebook/source API는3이며 기존14셀/7코드 셀 순서는 유지합니다. 이후 **JOB 한 설정 셀(id=job-config)**을 확인합니다. 사용자용 사본은 검토한 selection·profile·exact_targets가 이 셀에 미리 채워질 수 있으며 generic notebook은 직접 입력합니다.
+2. 위에서 아래로 로컬 사전 검사80개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10)를 실행합니다. 실제 데이터·Google 인증 없이 합성/모의/localhost만 검사합니다. Notebook/source API는4이며 기존14셀/7코드 셀 순서는 유지합니다. 이후 **JOB 한 설정 셀(id=job-config)**을 확인합니다. 사용자용 사본은 검토한 selection·profile·exact_targets가 이 셀에 미리 채워질 수 있으며 generic notebook은 직접 입력합니다.
 3. Generic 기본값은 `profile="smoke8MiB_v1"`, `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, `exact_targets=[]`입니다. Job ID·reason·selection·profile·targets·limits·metadata_limits를 같은 셀에 둡니다. Scan은 최대128개 regular header를 관측하고 payload는 저장하지 않지만 실제 Drive의 선행 payload를 읽고 해제하는 비용은 발생합니다. 별도로 검토한 **대응2파일 추출**은 아래 고정 counterpart 프로파일을 사용합니다.
 4. 다음 preflight에서 effective 설정과 동일 설정/선택 이력을 확인합니다. 이 단계는 인증/원본 요청0입니다. Profile·정확한 목표·body/time/requests/decompressed/disk·두 단계 상한 합계를 확인합니다. Source size/version/modifiedTime은 아직 unknown이며 metadata 이후 표시합니다. 이름·glob은 저장 필터이지 gzip 위치 점프가 아닙니다. 새 작업은 선택한 더 큰 상한에서도 byte0부터 다시 읽으며 이전8MiB 뒤에서 이어받지 않습니다.
 5. 다음 실행 셀의 **`EXECUTE_ONCE=True`**를 명시해 한 번 실행합니다. Profile/targets/budget 등 JOB가 preflight 뒤에 바뀌면 인증 전 차단합니다. 먼저 job 기록→사용자 인증→metadata 확인→scan/pilot 순서로 실행하며 자동 재시도하지 않습니다. 최초Metadata128KiB/30초는 선택한 준비 프로파일과 별도입니다. Range256KiB·read1/해제64KiB와 매 Range의 총3요청(media1+전후 metadata2)·metadata 최대32KiB 예약은 유지합니다.
@@ -150,6 +150,16 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 이전9필드 설정은 profile=None/exact_targets=[]로 정규화하여 기존8MiB 이하 예산을 유지하며 `custom_limits`로 보고합니다. 기존 discovery도 이 custom8MiB 계약을 사용합니다. 명명한 프로파일은 실제 limits와 정확히 일치해야 하며 `profile=None`을 통해64MiB를 허용하지 않습니다. 기존 결과 review는 원본/인증 요청0이며 대상/profile 값이 남아 있어도 검토할 수 있습니다.
 
 모든 결과는 train_ready=false입니다. 관측 목록/파일 hash·이름 대응, 실제 좌우 RGB/pose·시간·split/원본 motion 정합성, 학습 준비 완료를 구분합니다. 실행의 목적·기존 결과·다음 선택은 [다음 실제 데이터 준비 실행](REAL_DATA_NEXT_RUN.md)을 따릅니다.
+
+### Pose metadata가 많은 경우의 별도 고정 정책
+
+기존 pose 테스트는 같은64MiB 상한에서도 header1000에서 먼저 멈췄고 tar metadata64KiB 상한에도 근접했습니다. 동일 설정을 반복하지 않습니다. 별도 `poseCounterpart64MiB_v1`은 body64MiB/300초/768요청은 유지하고 **header10000·누적 tar metadata1MiB·해제512MiB**를 명시합니다. [설정 JSON](../configs/archive_limits_poseCounterpart64MiB_v1.json)과 실제 limits의 정확한 일치를 검사합니다. 기존 smoke/RGB-counterpart 정책은 그대로입니다.
+
+JOB 한 셀의 profile과 고정 limits만 새 정책으로 정하고 kind=pose·extract/targeted·정확한2목표를 유지합니다. 사용자용 고정 사본은 테스트 세션에서 인계합니다. 새 정책이 없는 API3 소스와 섞지 않도록 API4에서 확인하며 입력 셀이나 plan 업로드를 추가하지 않습니다. 상한 변경은 이 고정 preset에 한정되며 목표 위치·실제 완료를 보장하지 않습니다.
+
+개별 GNU/PAX payload는64KiB를 유지해 큰 단일 항목을 읽기 전에 거부하고, 누적 metadata만1MiB까지 허용합니다. 내부IO/해제 chunk64KiB와 HTTP Range256KiB를 구분합니다. 최대10000개 seen 경로·metadata parser·Python/set 비용이 있어 disk16MiB를 프로세스 RAM 상한으로 해석하지 않습니다. 전체 해제512MiB를 모아서 저장하지 않습니다.
+
+결과는 최초 관측목록128개와 **last_regular_observation 한 행·regular_members_seen 합계**를 함께 봅니다. Last 행은 마지막 regular header의 선언/완료 상태이며 payload가 불완전할 수 있고 정확한 seek offset은 아닙니다. Source/후검사/CRC/parser 실패면 목록과 last 행 모두 untrusted입니다. 기존 targets_complete의 저장 단계/파일 검증 구분·missing 목록·ZIP 보관·성공/미확보 후 중단 규칙은 같습니다. 실제 pose와 기존 오른쪽 원본 ZIP이 미확보인 상태에서는 좌표/영상 정합성 검토를 완료했다고 표시하지 않습니다.
 
 ## 6. 세션 종료와 재시작
 

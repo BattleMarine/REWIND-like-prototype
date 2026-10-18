@@ -1,0 +1,15 @@
+{
+  "max_transfer_bytes": 67108864,
+  "max_elapsed_seconds": 300.0,
+  "request_timeout_seconds": 5.0,
+  "io_chunk_bytes": 65536,
+  "media_range_bytes": 262144,
+  "max_decompressed_bytes": 536870912,
+  "max_file_bytes": 4194304,
+  "max_disk_bytes": 16777216,
+  "max_files": 2,
+  "max_members": 10000,
+  "max_metadata_bytes": 1048576,
+  "max_path_bytes": 1024,
+  "max_ranges": 768
+}

@@ -45,6 +45,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 후속 pose 테스트는 압축7.5MiB·약29.9초에서 tar header1000 상한에 도달했고 목표 JSON0개로 종료했습니다. 동일 실행 반복을 중단하고 pose의 header·metadata·해제량 제한을 함께 검토해야 합니다. 실제 pose 확보·좌표/영상 대조·학습은 아직 미완료이며 [실행 안내](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
 
+2026-10-19 후속 준비에서는 pose 전용 `poseCounterpart64MiB_v1`을 추가해 전송64MiB·300초는 유지하고 header10,000·누적metadata1MiB·해제512MiB를 적용합니다. 단일metadata64KiB와 저장/disk 상한도 유지합니다. API4 보고서에는 마지막 regular 관측과 총 관측 수를 추가합니다. 전체175개 회귀와 새 소스 ZIP의80개 사전검사·모의 노트북 실행을 통과했습니다. 실제 재실행·목표 pose 확보는 아직 미검증이며 [고정 1회 실행 안내](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |

@@ -11,13 +11,13 @@ from pathlib import Path
 
 from . import __version__
 from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
-from .profiles import COUNTERPART_PROFILE, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .sources import SplitStream
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
     "transfer_bytes_limit", "decompressed_bytes_limit", "elapsed_limit", "files_limit", "members_limit",
-    "metadata_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete"}
+    "metadata_bytes_limit", "metadata_entry_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete"}
 
 
 MAX_OBSERVED_MEMBERS = 128
@@ -28,6 +28,7 @@ def report_reserve_bytes(manifest, includes, limits, exact_targets=None):
     observation_reserve = min(MAX_OBSERVED_MEMBERS,limits.max_members)*(2*limits.max_path_bytes+512)
     return (16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024
         +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve
+        +2*(2*limits.max_path_bytes+512)  # last regular 행을 extraction/pilot에 각각 예약
         +(6*len(canonical(exact_targets))+1024 if exact_targets else 0))
 
 
@@ -149,8 +150,11 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     exact_targets = validate_exact_targets(exact_targets,includes,limits,mode)
     if profile is not None:
         validate_profile_limits(profile,limits)
-        if profile==COUNTERPART_PROFILE and (mode!="extract" or len(exact_targets)!=2):
+        if profile in TARGET_PAIR_PROFILES and (mode!="extract" or len(exact_targets)!=2):
             raise PreparationError("counterpart_profile_requires_two_exact_targets")
+        if profile==POSE_COUNTERPART_PROFILE and manifest["kind"]!="pose":
+            raise PreparationError("pose_profile_requires_pose_kind")
+    metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes
     budget = Budget(limits,**({"clock":clock} if clock else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
     reserve = report_reserve_bytes(manifest,includes,limits,exact_targets)
@@ -162,6 +166,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     partial_dir.mkdir()
     files, active, reason = [], None, "unknown"
     observations, observation_cap_reached = [], False
+    last_regular, regular_count = None, 0
     tar_eof = False
     source = reader = None
     try:
@@ -194,6 +199,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 raise PreparationError("invalid_tar_size")
             safe_path(info.name,limits.max_path_bytes)
             if info.type in (tarfile.GNUTYPE_LONGNAME,tarfile.XHDTYPE,tarfile.XGLTYPE):
+                if profile==POSE_COUNTERPART_PROFILE and info.size>metadata_entry_limit:
+                    raise PreparationError("metadata_entry_bytes_limit")
                 budget.add("metadata_bytes",info.size,limits.max_metadata_bytes)
                 chunks = []
                 read_payload(reader,info.size,chunks.append)
@@ -233,15 +240,16 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
             if info.type not in (tarfile.REGTYPE,tarfile.AREGTYPE):
                 raise PreparationError("links_or_special_file")
             selected = any(fnmatch.fnmatchcase(name,pattern) for pattern in includes)
+            regular_count += 1
+            observed = {"header_ordinal":budget.members,"regular_ordinal":regular_count,
+                "member":name,"size_bytes":size,"selected":selected,"payload_complete":False,
+                "payload_bytes_returned":0,"stored":False}
+            last_regular = observed
             if len(observations)>=min(MAX_OBSERVED_MEMBERS,limits.max_members):
                 observation_cap_reached = True
                 if mode=="scan":
                     raise PreparationError("observed_members_limit")
-                observed = None  # 기존 extract는 관측목록 때문에 조기 중단하지 않는다.
             else:
-                observed = {"header_ordinal":budget.members,"regular_ordinal":len(observations)+1,
-                    "member":name,"size_bytes":size,"selected":selected,"payload_complete":False,
-                    "payload_bytes_returned":0,"stored":False}
                 observations.append(observed)
             def observe(chunk):
                 if observed is not None:
@@ -320,6 +328,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "whole_archive_integrity_verified":reason=="complete" and complete_source and manifest["source_scope"]!="official_prefix_local",
         "inspection_candidates_usable":usable,"source_validation_pending":pending_validation,"train_ready":False,
         "operation":mode,"member_observations":observations,
+        "last_regular_observation":last_regular,"regular_members_seen":regular_count,
+        "metadata_entry_limit_bytes":metadata_entry_limit,
         "member_observation_scope":"reached_regular_headers_only_not_a_seek_index",
         "member_observation_limit":min(MAX_OBSERVED_MEMBERS,limits.max_members),
         "member_observation_cap_reached":observation_cap_reached,

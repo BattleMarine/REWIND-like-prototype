@@ -1,6 +1,6 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-17 후속: 기존8MiB scan의 실제 Colab 결과에서 오른쪽 member만 관측한 것을 확인했고 동일8MiB 반복은 종료했습니다. 이번 구현은 기본값을 유지한 별도 `counterpart64MiB_v1`·정확한2목표 완료 중단입니다. 이 확장 프로파일의 실제 Drive 실행과 left2개 확보는 아직 미검증이며 고정 revision을 테스트 세션에 인계한 뒤 별도로 확인합니다. 실제 scan 결과와 구현 검증은 [로드맵](ROADMAP.md)을 따릅니다.
+2026-10-19 후속: 왼쪽 RGB2개는 확보했지만, 같은 `counterpart64MiB_v1`을 쓴 pose 실행은 header1000 상한에서 목표0으로 중단했습니다. 새 `poseCounterpart64MiB_v1`은 pose metadata 밀도를 고려한 별도 고정 상한이며 기존 두 프로파일은 유지합니다. 새 pose 정책의 실제 Drive 실행·목표 확보는 미검증입니다. 고정 revision을 테스트 세션에 인계해 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다.
 
 2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 최신 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 
@@ -108,7 +108,7 @@ Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict�
 }
 ```
 
-1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사70개(archive24+metadata14+planning8+scan7+workflow7+targets10)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. Notebook/source API는3이며7개 코드 셀의 순서는 유지합니다.
+1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사80개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. Notebook/source API는4이며7개 코드 셀의 순서는 유지합니다.
 2. 단일 `JOB` 설정 셀(id=`job-config`)만 편집합니다. Generic 기본값은 `profile="smoke8MiB_v1"`, `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, `exact_targets=[]`입니다. 별도로 검토한 대응2파일 추출은 아래 `counterpart64MiB_v1` 계약을 사용합니다. 새 job_id와 목적 reason을 함께 기록합니다. 기존9필드 custom8MiB discovery 계약도 유지하며 이 경우 profile=None, limits.max_files2이하와 명시 glob을 사용합니다. Notebook이 목적이나 필터를 바꾸지 않습니다.
 3. Preflight에서 mode/purpose·selection/archive·필터·Range256KiB/IO64KiB·예산·동일 설정/선택 이력을 확인합니다. 이 단계는 원본 요청과 인증0입니다. 실제 source size/version/modifiedTime은 아직 unknown이며 metadata 성공 뒤 따로 표시합니다. `includes`는 gzip 위치 점프가 아닌 저장/선택 필터입니다.
 4. 다음 셀의 `EXECUTE_ONCE=True`를 명시해 한 번 실행합니다. 현재 JOB와 frozen preflight가 다르면 인증 전 거부합니다. 먼저 job을 기록하고 인증→metadata→scan/pilot을 실행합니다. Metadata는 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답16KiB·합128KiB,30초/요청5초입니다. 최초 metadata 단계와 선택한 준비 프로파일의 비용을 구분합니다. 실패도 job을 소비하고 자동 재시도하지 않습니다.
@@ -125,6 +125,7 @@ Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict�
 | --- | --- | --- | --- | --- | --- |
 | smoke8MiB_v1 | 8MiB | 60초 | 128 | 32MiB | 최대32 |
 | counterpart64MiB_v1 | 64MiB | 300초 | 768 | 128MiB | 정확한 목표 최대2 |
+| poseCounterpart64MiB_v1 | 64MiB | 300초 | 768 | 512MiB | 정확한 pose 목표 최대2 |
 
 기본 smoke 설정은 바꾸지 않습니다. [counterpart64MiB_v1 설정](../configs/archive_limits_counterpart64MiB_v1.json)은 별도 선택한 1회 targeted 추출 상한입니다. Range256KiB·IO64KiB·요청 timeout5초·파일4MiB·disk16MiB·경로1024bytes·tar metadata64KiB·header1000·관측목록128 등 나머지 상한은 같습니다. Python의 frozen Limits와 변경 불가 mapping으로 preset을 유지하고 JSON과 일치 검사합니다. 명시한 프로파일명과 실제 limits가 한 필드라도 다르면 거부하며, 수치만 임의로 올릴 수 없습니다.
 
@@ -141,6 +142,20 @@ Reports/job에는 profile·실제 limits·`exact_targets`, `stored_targets`, `co
 Counterpart 준비와 최초 metadata를 합친 명시 상한은 body64MiB+128KiB(64.125MiB), 협력적300+30초,768+8요청입니다. 인증/전체wire/OS hard deadline과 ZIP 비용은 별도입니다. 2026-10-17 실제 준비8,356,024bytes/29.116846초의 단순 비례는 약234초지만 더 넓은 원본의 처리량·성공·실행 시간을 보장하지 않습니다. Metadata32KiB 사전 예약 때문에 body 상한을 전부 채우지 않을 수 있고 동시 상한이면 ranges_limit도 가능합니다. Index/resume가 아니며 새 실행은 byte0부터 다시 읽습니다.
 
 이전9필드 JOB는 profile=None/exact_targets=[]로 정규화하며 기존 smoke 이하 예산 정책과 이전 effective fingerprint를 유지합니다. 이 경로는 명명한 고정 preset으로 오표기하지 않고 `custom_limits`와 실제 limits를 보고합니다. 새11필드 JOB의 profile/targets/budget 변경도 frozen preflight와 다르면 인증 전에 거부합니다.
+
+### Pose 전용 metadata 밀도 정책
+
+`poseCounterpart64MiB_v1`은 [고정 JSON](../configs/archive_limits_poseCounterpart64MiB_v1.json)과 정확히 일치해야 합니다. 신규 실행은 kind=pose, mode=extract, purpose=targeted, 같은 literal exact_targets/includes2개를 강제합니다. Review는 원본/인증 요청 없이 가능합니다. Body64MiB/300초/768요청·Range256KiB·내부IO64KiB·개별파일4MiB·disk16MiB·저장2개는 그대로이며, **header10000·누적 tar metadata1MiB·해제512MiB**만 pose 전용으로 설정합니다. 기존 smoke/RGB-counterpart와 legacy 상한은 변경하지 않습니다.
+
+직전 실제 pose 실행은 압축7.5MiB에서 header1000, tar metadata62,591bytes, 해제42,045,585bytes에 도달했습니다. 이를64MiB까지 단순 비례하면 대략 header8534·metadata534kB·해제342MiB입니다. 새 상한은 이 추정보다 여유가 있지만 분포/압축률/목표 위치를 모르므로 독립 상한 중 먼저 닿는 조건에서 종료하며 성공을 보장하지 않습니다. 이전 prefix도 byte0부터 다시 읽습니다. 최초 Drive metadata128KiB/30초는 별도이고 총 비용 제외 범위는 기존과 같습니다.
+
+누적 tar metadata1MiB와 **단일 GNU/PAX payload64KiB**를 분리합니다. 새 pose profile에서 큰 선언은 body 수집 전에 `metadata_entry_bytes_limit`로 중단하며 report/preflight의 metadata_entry_limit_bytes에65536을 기록합니다. 기존 profile/custom은 종전 누적 상한과 stop_reason을 유지합니다. 개별 payload는 최대64KiB의 chunks/join과 PAX 문자열/필드로 일시 복사되며, IO/해제 출력은64KiB 단위입니다. 누적1MiB 전체를 한 metadata 버퍼로 보관하지 않습니다.
+
+Case-insensitive 중복 검사용 seen set은 max_members 이내인 최대10000경로로 제한됩니다. UTF-8 경로 원문만으로 최대 약10MiB이며 Python 문자열·casefold·set·zlib·전송 buffer·allocator 비용은 추가입니다. 이는 disk16MiB와 다른 메모리 범위이며 **프로세스 RSS 하드 상한을 보장하지 않습니다.** 전체512MiB 해제 결과를 RAM/디스크에 모으지 않고 skip payload도 스트리밍으로 소비합니다.
+
+관측목록128개는 유지하고 별도 `last_regular_observation` 한 행과 `regular_members_seen`만 갱신합니다. Last 행에는 마지막으로 안전하게 파싱한 regular header의 실제 ordinal/name/size·선택·payload 완료/저장 상태를 기록하며, 아직 읽지 않은 이후 경로나 정확한 파일 seek offset을 만들지 않습니다. Scan은128개 목록 cap에서 중단하지만 다음에 닿은 regular header 한 행은 payload 미완료로 표시할 수 있습니다. Source/CRC/parser/후검사 실패 시 **last 행에도 동일한 전체 member_observation_trust=untrusted_failed_source_or_parser**를 적용합니다. 개별 payload_complete=true만으로 사용할 수 없습니다.
+
+Last 한 행의 JSON escape 최악과 extraction/pilot 양쪽 기록 공간을 사전 disk reserve에 더합니다. 목록을10000개로 늘리거나 본문/모든 path를 보고서에 복사하지 않습니다. Targets 완료 후 즉시 중단·partial 제거·원본 전후 검사·파일 hash/ZIP 판정은 기존 계약과 같습니다. 목표 pose가 아직 없고 기존 오른쪽 사용자 ZIP도 미회수여서 현재 관절·좌표·좌우 영상 정합성 검증은 할 수 없습니다. Frame1/10은 연속clip이 아니며 학습은 시작하지 않습니다.
 
 ## 작업 상한과 측정 범위
 
@@ -219,6 +234,14 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 `verify`는 extraction manifest 내용 hash, 원본 manifest 동일성, extractor code hash, 개별 완료 파일의 길이·SHA-256·안전한 경로를 확인합니다. Hash 읽기는 기록된 크기만 bounded로 수행하고 fd 변화도 검사합니다. 실제 원격 원본을 다시 다운로드하거나 source가 이후 변하지 않았음을 증명하지 않습니다. 같은 런타임에서 검사된 추출본은 반복 학습 전에 재사용할 수 있지만 M1 입력 준비 조건은 별도입니다. 코드가 바뀌거나 임시 추출본이 소실되면 새 준비를 검토합니다. 원본 압축 조각은 유지합니다.
 
 ## 실행한 검증과 남은 일
+
+### 2026-10-19 Pose 밀도 정책과 bounded 진단 검증
+
+전체 회귀175개를1회 실행해39.727초에 통과했고, 신규 pose-profile10개와 오케스트레이션 독립10개도 통과했습니다. 실제 PAX+작은 JSON600개 뒤 목표2개 fixture는 기존 정책에서 members_limit, 새 정책에서 targets_complete/파일 hash 검증을 재현했습니다. 별도 누적 metadata fixture는 기존64KiB 중단과 새1MiB 범위의 완료를 대조했습니다. 단일 metadata64KiB는 payload 할당 전에 거부하고, 누적1MiB·header10000은 각각 작은 압축 fixture에서 독립 중단을 확인했습니다. 해제512MiB 경계는 이미 소비한 prefix를 예산 상태로 표현하고 실제 zlib의 마지막64KiB를 처리하는 bounded mock으로 검증했으며 실제512MiB 파일 생성/다운로드·성능 시험은 하지 않았습니다.
+
+추가 회귀는 잘못된 kind/profile/limits/목표 거부, 부분 목표 보존, 원본 변경 시 last 행까지 untrusted, 관측 cap 뒤 extract 지속·scan cap 유지, report reserve·ZIP 상한을 포함합니다. 기존 긴 경로/JSON escape reserve 검사도 전체 회귀에서 통과했습니다. Fresh source ZIP의 API4 notebook7코드 셀을 모의 Colab으로 위에서 아래 실행해80개 사전 검사, 새 pose profile/preflight/한 번 실행/목표 완료/last 행/review/ZIP을 확인했습니다. 기본 인증0·stale/중복 차단·실패 job-only ZIP도 유지했습니다.
+
+오케스트레이션 독립 PAX700개 fixture는 기존 header1000·metadata60,500bytes에서0파일 중단, 새 정책은 header1402·metadata84,700bytes에서2파일 완료와 hash 일치를 확인했습니다. 모든 검증은 로컬 합성/모의/localhost 범위이며 실제 Google·Drive 원본 요청0입니다. 근거는 Git 제외 `outputs/pose_policy_20261019/developer/`와 `root/`에 보존합니다. 새 정책의 실제 pose 확보와 좌표/영상 정합성은 미검증이며 고정 revision 사용자 테스트와 구분합니다.
 
 ### 2026-10-17 고정 counterpart 프로파일·목표 완료 중단
 

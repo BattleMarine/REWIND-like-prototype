@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 17일 운영·검증 상태 보완
+검토 초안 v0.2   |   2026년 10월 19일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -29,6 +29,17 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 1 데이터 준비와 입력 파이프라인
+
+### 2026-10-19 pose 전용 제한 정책과 재검증 준비
+
+- 사용자 승인에 따라 이전 pose `members_limit`를 재현하고 별도 `poseCounterpart64MiB_v1`을 준비한다. 전송64MiB·300초·768요청은 유지하고 header10,000·tar metadata누적1MiB·해제512MiB를 조합한다. 저장2개·파일4MiB·disk16MiB·Range256KiB·IO64KiB 및 원본 전후 검사도 유지한다. 기존 프로파일을 소급 변경하지 않는다. 새pose의 단일metadata는64KiB로 별도 제한하며 API4는 처음128개 목록 외 마지막regular1개와총regular관측수를 기록한다.
+- 이전7.5MiB 관측의64/7.5배는 header약8,534·metadata약534,110bytes·해제358,788,992bytes·약255초다. 이는 설정 근거용 선형 참고이며 목표가 그 범위 안에 있거나 해당 시간에 완료된다는 보장이 아니다. 각 상한은 독립 적용하고 첫7.5MiB 재읽기 비용도 포함한다.
+- Metadata가 많은 로컬 fixture로 기존중단과 새목표완료, 잘린파일·원본변경·독립상한·보고서예약·ZIP을 검사한다. 검토·로컬커밋 뒤 고정 source/pose notebook을 테스트 세션에 인계하며 실제 Drive 실행은 로컬 검증과 구분한다.
+- 결과 회수 후 관절/단위/좌표/변환과 GT2D 영상 대조를 로컬에서 진행한다. 오른쪽 사용자 원본 ZIP이 필요하며 실패한 official probe 파일로 대체하지 않는다. 아직 실제 pose payload·내용 정합성·연속clip·학습은 미검증이다. [실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다.
+
+- 독립 로컬 PAX700개 fixture에서 기존설정은 header1000/metadata60,500bytes/목표0으로 중단했고 새설정은 header1402/metadata84,700bytes에서 두 목표를 저장하고 즉시 중단했다. 파일hash가 일치하며 실제Google요청은0이다. 근거는 Git 제외 `outputs/pose_policy_20261019/root/density/review.json`에 있다. 실제pose나모델성능검증이 아니다.
+
+- 개발 검증은 전체175개 회귀(39.727초), fresh source ZIP/API4 notebook의80개 사전검사와 모의 pose 완료·결과ZIP·실패보관을 통과했다. 오케스트레이션은 별도 PAX700개 재현 및 pose 관련10개(1.564초)를 확인했다. 검증 로그는 `outputs/pose_policy_20261019/`에 보존하며 사용자 실제Colab/Drive와 구분한다.
 
 ### 2026-10-17 pose 1회 테스트 결과 — member 상한에서 미확보
 
