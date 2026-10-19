@@ -30,6 +30,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-19 pose 재검증 결과 — 요청 예외로 미확보
+
+- `4571f30`/API4, `archvis_pose_1_10_density_001`의 실제 Colab 실행은 `authorized_request_failed`로 종료했다. 목표 JSON0개·미확보2개, `targets_status=unusable`, `source_validation_pending=true`다. 작업의 finished 상태는 추출 성공이 아니다.
+- 압축9.5MiB(9,961,472bytes)를 읽고 준비41.529793초·116요청(media39+metadata77)·응답body9,968,402bytes에서 중단했다. Header1293·tar metadata80,643bytes·해제54,640,539bytes로 이전 제한은 넘었지만 새 제한에는 도달하지 않았다. 최초 metadata는 별도1요청·290bytes·0.127415초다.
+- 39번째 media Range [9,961,472, 10,223,615]는 수신0bytes·응답 상태 코드 없이 실패했다. `session_opener`가 요청/응답 래핑 예외를 공통 오류로 바꾸므로 인증·통신·timeout 중 원인을 확정할 수 없다. `invalid_or_changed_source` 분류도 실제 원본 변경의 증거가 아니다.
+- 처음128개 목록과 마지막regular 관측(총626개 중 Adanna Cards frame9, payload 미완료)은 `untrusted_failed_source_or_parser` 진단이다. 검증된 파일이나 seek index로 사용하지 않는다. 실제 pose 내용·좌표·영상 대조, 전체 archive 무결성·학습 준비는 미완료다.
+- 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포 소스12개 hash·ready JOB/설정hash·보고서 연결을 독립 확인했다. 원본 ZIP SHA256은 `6e554d053340f9d074c3f486642bc68cc0455989bcd965432dfd1255e9f2fc99`다. 원본 사본·검토 근거는 Git 제외 `outputs/test_archvis_pose_density_20261019/`의 `verification.json`, `orchestrator_review.json`에 보존한다. 이번 실제 실행의80개 사전검사 전체로그·실행notebook·Drive 영구보관은 미확인이다.
+- 동일 실행 반복은 종료한다. 다음 개발 검토는 비밀정보 없는 예외 종류·발생 단계 진단과 로컬 재현이다. 원시 예외문·token·URL을 기록하지 않으며 예산/timeout 확대나 자동 재시도는 이번 결과만으로 적용하지 않는다.
+
 ### 2026-10-19 pose 전용 제한 정책과 재검증 준비
 
 - 사용자 승인에 따라 이전 pose `members_limit`를 재현하고 별도 `poseCounterpart64MiB_v1`을 준비한다. 전송64MiB·300초·768요청은 유지하고 header10,000·tar metadata누적1MiB·해제512MiB를 조합한다. 저장2개·파일4MiB·disk16MiB·Range256KiB·IO64KiB 및 원본 전후 검사도 유지한다. 기존 프로파일을 소급 변경하지 않는다. 새pose의 단일metadata는64KiB로 별도 제한하며 API4는 처음128개 목록 외 마지막regular1개와총regular관측수를 기록한다.
