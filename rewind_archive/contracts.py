@@ -11,9 +11,10 @@ from urllib.parse import urlsplit
 
 
 class PreparationError(ValueError):
-    def __init__(self, reason, diagnostic=None):
+    def __init__(self, reason, diagnostic=None, request_failure=None):
         self.reason = reason
         self.diagnostic = diagnostic
+        self.request_failure = request_failure
         super().__init__(reason)
 
 

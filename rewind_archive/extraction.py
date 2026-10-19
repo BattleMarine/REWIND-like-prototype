@@ -13,6 +13,7 @@ from . import __version__
 from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
 from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .sources import SplitStream
+from .diagnostics import safe_request_failure
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
@@ -165,6 +166,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     partial_dir = output/".partials"
     partial_dir.mkdir()
     files, active, reason = [], None, "unknown"
+    failure = None
     observations, observation_cap_reached = [], False
     last_regular, regular_count = None, 0
     tar_eof = False
@@ -308,6 +310,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                     temporary.unlink()
     except PreparationError as exc:
         reason = exc.reason
+        failure = safe_request_failure(exc.request_failure)
     except KeyboardInterrupt:
         reason = "interrupted"
     except OSError:
@@ -321,7 +324,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason in {"interrupted","targets_complete"} else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
     report = {"schema_version":"archive_extraction_v1","extractor_version":__version__,"code_sha256":code_hashes(),
         "archive_manifest":manifest,"archive_manifest_sha256":digest(manifest),"selection":includes,"limits":asdict(limits),
-        "stop_reason":reason,"failure_class":failure_class,"active_incomplete_member":active,"files":files,"range_audit":source.audit if source else [],
+        "stop_reason":reason,"request_failure":failure,"failure_class":failure_class,"active_incomplete_member":active,"files":files,"range_audit":source.audit if source else [],
         "stats":budget.stats(),"compressed_bytes_received":source.compressed_bytes_received if source else 0,
         "gzip_eof_crc_valid":reader.gzip_eof_crc_valid if reader else False,"tar_end_blocks_seen":tar_eof,
         "declared_source_complete":complete_source,

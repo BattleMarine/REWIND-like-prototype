@@ -15,7 +15,8 @@ from rewind_data.audit import read_json
 from . import __version__
 from .contracts import Budget, PreparationError, canonical, digest, validate_manifest
 from .extraction import code_hashes
-from .sources import read_metadata_body, metadata_diagnostic, session_opener
+from .sources import read_metadata_body, metadata_diagnostic, session_opener, close_response
+from .diagnostics import attach_failure, request_failure, safe_request_failure
 
 
 FIELDS = "id,name,size,version,modifiedTime,mimeType,trashed,capabilities(canDownload)"
@@ -144,6 +145,7 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
     files=[]
     request_audit=[]
     reason="unknown"
+    failure=None
     selection_hash=None
     try:
         validate_selection(selection)
@@ -152,7 +154,7 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
             raise PreparationError("metadata_files_limit")
         if authorized_session is None:
             raise PreparationError("drive_session_required")
-        opener=session_opener(authorized_session)
+        opener=session_opener(authorized_session,"metadata_initial")
         validated=[]
         for part in selection["parts"]:
             budget.request("metadata", limits.max_requests)
@@ -163,11 +165,16 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
                 record["bytes_received"]+=len(chunk)
                 received.update(chunk)
             response=None
+            stage="request_open"
+            failed=True
             try:
                 url=f"https://www.googleapis.com/drive/v3/files/{part['file_id']}?fields={FIELDS}"
                 response=opener(url,{"Accept-Encoding":"identity"},budget.timeout())
+                stage="response_validation"
                 record["response"]=metadata_diagnostic(response)
-                raw=read_metadata_body(response,budget,limits.max_response_bytes,on_chunk)
+                stage="body_read"
+                raw=read_metadata_body(response,budget,limits.max_response_bytes,on_chunk,operation="metadata_initial")
+                stage="response_validation"
                 try:
                     doc=read_json(raw)
                 except (ValueError,UnicodeError):
@@ -180,13 +187,23 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
                 budget.files+=1
                 budget.check_time()
                 record["status"]="validated"
+                failed=False
             except PreparationError as exc:
+                attach_failure(exc,"metadata_initial",stage)
                 record["status"],record["reason"]="failed",exc.reason
+                record["request_failure"]=safe_request_failure(exc.request_failure)
                 raise
+            except Exception as exc:
+                failure=request_failure(exc,"metadata_initial",stage)
+                record.update(status="failed",reason="metadata_request_or_input_failed",request_failure=failure)
+                raise PreparationError("metadata_request_or_input_failed",request_failure=failure) from None
             finally:
                 record["sha256_received_bytes"]=received.hexdigest()
                 if response is not None:
-                    response.close()
+                    try:close_response(response,"metadata_initial","metadata_request_or_input_failed",preserve_active=failed)
+                    except PreparationError as exc:
+                        record.update(status="failed",reason=exc.reason,request_failure=safe_request_failure(exc.request_failure))
+                        raise
         manifest={"schema_version":"archive_manifest_v1","archive_id":selection["archive_id"],"dataset_version":selection["dataset_version"],
             "kind":selection["kind"],"source_scope":"user_drive","total_parts":selection["total_parts"],"parts":validated}
         validate_manifest(manifest)
@@ -194,13 +211,15 @@ def build_drive_manifest(selection, authorized_session, limits, clock=time.monot
         reason="complete"
     except PreparationError as exc:
         manifest=None;reason=exc.reason
+        failure=safe_request_failure(exc.request_failure)
     except KeyboardInterrupt:
         manifest=None;reason="interrupted"
-    except Exception:
+    except Exception as exc:
         manifest=None;reason="metadata_request_or_input_failed"
+        failure=request_failure(exc,"metadata_initial","unknown")
     elapsed=budget.clock()-budget.started
     report={"schema_version":"drive_metadata_report_v1","phase":"metadata_only","manifest_ready":manifest is not None,
-        "stop_reason":reason,"selection_sha256":selection_hash,"manifest_sha256":digest(manifest) if manifest else None,
+        "stop_reason":reason,"request_failure":failure,"selection_sha256":selection_hash,"manifest_sha256":digest(manifest) if manifest else None,
         "source":provenance(),"environment":environment(),"limits":asdict(limits),
         "stats":{"requests":budget.ranges,"transfer_bytes":budget.transfer_bytes,"validated_files":budget.files,"elapsed_seconds":elapsed},
         "validated_metadata":files,"request_audit":request_audit,"media_requested_by_builder":False,"train_ready":False}

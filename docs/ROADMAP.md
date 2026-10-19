@@ -30,6 +30,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-19 요청 실패 진단 보완과 1회 검증 준비
+
+- 사용자 승인 범위는 요청 예외의 안전한 분류·발생 단계 기록과 로컬 재현, 검토 후 고정 버전의 테스트 세션 인계다. 이전 실행의 원인을 소급 추정하거나 자동 재시도·예산·timeout을 변경하지 않는다.
+- 새 API5는 짧은 허용값만 갖는 `request_failure`를 metadata/extraction/pilot/job/review 및 결과 ZIP에 전달한다. 원시 예외문·임의 클래스명·URL·인증정보를 남기지 않는다. HTTP 응답 상태와 예외 분류를 구분하고 미지원/포괄 예외는 unknown으로 유지한다.
+- 새 JOB `archvis_pose_1_10_diagnostic_001`은 같은 pose 두 목표와 `poseCounterpart64MiB_v1`을 사용한다. CPU에서 1회 실행하고 결과를 보존한 뒤 중단한다. 진단 회수 성공과 pose 추출 성공을 별도로 판단하며 오류 미재발을 과거 원인 해결의 증거로 삼지 않는다.
+- 초기 metadata·media 요청·본문·원본 전후 검사 실패를 로컬 모의 환경에서 확인한다. 실제 Drive 원인 확인·pose 확보·학습은 별도 미검증이며 검토된 소스와 notebook의 정확한 식별값을 테스트 세션에 전달한다.
+
+- 개발 검증은 전체189개 회귀(145.440초), 실제 라이브러리 예외23조건·chunked 전송15조건, fresh source ZIP의94개 사전검사·모의 notebook 실행을 통과했다. 오케스트레이션은 진단14개(21.202초)와 별도 initial/pre/media/post 요청 실패 및 정상5시나리오를 검증했다. 최초 실패/중단 보존, 후검사 pending/unusable, 재시도 없음, ZIP의 비밀 sentinel 비노출을 확인했다. 실제 Google 요청은0이며 근거는 Git 제외 `outputs/request_diagnostics_20261019/`에 보존한다.
+
 ### 2026-10-19 pose 재검증 결과 — 요청 예외로 미확보
 
 - `4571f30`/API4, `archvis_pose_1_10_density_001`의 실제 Colab 실행은 `authorized_request_failed`로 종료했다. 목표 JSON0개·미확보2개, `targets_status=unusable`, `source_validation_pending=true`다. 작업의 finished 상태는 추출 성공이 아니다.

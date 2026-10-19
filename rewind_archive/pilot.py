@@ -7,6 +7,7 @@ from .contracts import Limits, PreparationError, digest, target_summary
 from .drive_metadata import environment, provenance, validate_metadata_result, write_new_json
 from .extraction import prepare
 from .matching import verify_extraction
+from .diagnostics import safe_request_failure
 
 
 PENDING = ["live_drive_colab_validation","joints","units","coordinates","calibration","timestamp",
@@ -31,6 +32,7 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         "manifest_sha256":digest(manifest),"extraction_manifest_content_sha256":digest(extraction),
         "complete_files":len(extraction["files"]),"verification":verification,"stats":extraction["stats"],
         "stop_reason":extraction["stop_reason"],"failure_class":extraction["failure_class"],
+        "request_failure":safe_request_failure(extraction.get("request_failure")),
         "inspection_candidates_usable":extraction["inspection_candidates_usable"] and verification["status"]=="passed",
         "gzip_eof_crc_valid":extraction["gzip_eof_crc_valid"],"tar_end_blocks_seen":extraction["tar_end_blocks_seen"],
         "whole_archive_integrity_verified":extraction["whole_archive_integrity_verified"],

@@ -13,9 +13,10 @@ from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
 from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .diagnostics import request_failure, safe_request_failure
 
 
-NOTEBOOK_API_VERSION = 4
+NOTEBOOK_API_VERSION = 5
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 
@@ -139,6 +140,7 @@ def claim_workflow_job(config, preflight, history):
         "profile":config["profile"] if config["profile"] is not None else "custom_limits","limits":config["limits"],
         **target_summary(config["exact_targets"],[],True),
         "reads_from_byte_zero":True,"train_ready":False}
+    record["request_failure"]=None
     history[config["job_id"]]=record
     return record
 
@@ -167,7 +169,8 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
         metadata=build_drive_manifest(config["selection"],session,MetadataLimits.from_dict(config["metadata_limits"]))
         save_metadata_bundle(metadata,root/"metadata")
         if not metadata["report"]["manifest_ready"]:
-            record.update(status="metadata_failed",stop_reason=metadata["report"]["stop_reason"])
+            record.update(status="metadata_failed",stop_reason=metadata["report"]["stop_reason"],
+                request_failure=safe_request_failure(metadata["report"].get("request_failure")))
         else:
             record["source_identity_after_metadata"]=metadata["manifest"]
             write_job_record(root/"job.json",record)
@@ -177,6 +180,7 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
             pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,
                 mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"])
             record.update(status="finished",stop_reason=pilot["stop_reason"],sample_acquired=pilot["sample_acquired"],
+                request_failure=safe_request_failure(pilot.get("request_failure")),
                 observed_regular_members=pilot["observed_regular_members"],profile=pilot["profile"],limits=pilot["limits"],
                 **{k:pilot[k] for k in ("exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status")})
     except KeyboardInterrupt:
@@ -184,6 +188,8 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
     except Exception as exc:
         # 인증/transport exception 원문에는 token이나 URL이 있을 수 있다.
         record.update(status="failed",stop_reason=exc.reason if isinstance(exc,PreparationError) else "workflow_execution_failed")
+        record["request_failure"]=request_failure(exc,"authentication" if record["stage"]=="authentication" else "workflow",
+            "authentication_setup" if record["stage"]=="authentication" else "unknown")
     finally:
         if session is not None:
             try:session.close()
@@ -199,6 +205,9 @@ def review_run(path):
     if (root/"job.json").is_file():
         record=read_report(root/"job.json",256*1024)
         result["job"]={k:record[k] for k in ("job_id","config","status","stage","stop_reason") if k in record}
+        result["job"]["request_failure"]=safe_request_failure(record.get("request_failure"))
+        result["request_failure"]=safe_request_failure(record.get("request_failure"))
+        result["request_failure_recorded"]="request_failure" in record
     extraction_root=root/"pilot" if (root/"pilot").is_dir() else root
     if (extraction_root/"extraction_manifest.json").is_file():
         report=read_report(extraction_root/"extraction_manifest.json")
@@ -208,6 +217,9 @@ def review_run(path):
             "last_regular_observation","regular_members_seen","metadata_entry_limit_bytes",
             "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
+        result["extraction"]["request_failure"]=safe_request_failure(report.get("request_failure"))
+        result["request_failure"]=safe_request_failure(report.get("request_failure"))
+        result["request_failure_recorded"]="request_failure" in report
         try:
             verify_extraction(extraction_root)
             result["file_verification"]="passed_current_code"
@@ -217,6 +229,8 @@ def review_run(path):
         pilot=read_report(extraction_root/"pilot_report.json")
         result["sample_acquired"]=pilot.get("sample_acquired",False)
         result["sample_status"]=pilot.get("sample_status","legacy_report")
+        result["request_failure"]=safe_request_failure(pilot.get("request_failure"))
+        result["request_failure_recorded"]="request_failure" in pilot
         result["target_verification"]={k:pilot[k] for k in ("completed_targets","missing_targets","targets_complete","targets_status") if k in pilot}
     if len(result)==3:
         raise PreparationError("workflow_no_result_reports")

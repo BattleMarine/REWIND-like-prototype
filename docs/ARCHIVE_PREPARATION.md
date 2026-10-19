@@ -1,6 +1,6 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-19 후속: 왼쪽 RGB2개는 확보했지만, 같은 `counterpart64MiB_v1`을 쓴 pose 실행은 header1000 상한에서 목표0으로 중단했습니다. 새 `poseCounterpart64MiB_v1`은 pose metadata 밀도를 고려한 별도 고정 상한이며 기존 두 프로파일은 유지합니다. 새 pose 정책의 실제 Drive 실행·목표 확보는 미검증입니다. 고정 revision을 테스트 세션에 인계해 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다.
+2026-10-19 후속: Pose 전용 API4의 실제 실행은39번째 media에서 `authorized_request_failed`로 중단했습니다. 해당 보고서에는 예외 타입/정확한 발생 단계가 없어 원인을 확정하지 않습니다. 이번 API5는 예산/목표/재시도를 바꾸지 않고 안전한 요청 실패 진단을 추가합니다. 고정 revision을 테스트 세션에 인계해 별도 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다. 목표 pose·좌표/영상 검증은 여전히 미완료입니다.
 
 2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 최신 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 
@@ -108,7 +108,7 @@ Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict�
 }
 ```
 
-1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사80개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. Notebook/source API는4이며7개 코드 셀의 순서는 유지합니다.
+1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사94개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+diagnostics14)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. Notebook/source API는5이며7개 코드 셀의 순서는 유지합니다.
 2. 단일 `JOB` 설정 셀(id=`job-config`)만 편집합니다. Generic 기본값은 `profile="smoke8MiB_v1"`, `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, `exact_targets=[]`입니다. 별도로 검토한 대응2파일 추출은 아래 `counterpart64MiB_v1` 계약을 사용합니다. 새 job_id와 목적 reason을 함께 기록합니다. 기존9필드 custom8MiB discovery 계약도 유지하며 이 경우 profile=None, limits.max_files2이하와 명시 glob을 사용합니다. Notebook이 목적이나 필터를 바꾸지 않습니다.
 3. Preflight에서 mode/purpose·selection/archive·필터·Range256KiB/IO64KiB·예산·동일 설정/선택 이력을 확인합니다. 이 단계는 원본 요청과 인증0입니다. 실제 source size/version/modifiedTime은 아직 unknown이며 metadata 성공 뒤 따로 표시합니다. `includes`는 gzip 위치 점프가 아닌 저장/선택 필터입니다.
 4. 다음 셀의 `EXECUTE_ONCE=True`를 명시해 한 번 실행합니다. 현재 JOB와 frozen preflight가 다르면 인증 전 거부합니다. 먼저 job을 기록하고 인증→metadata→scan/pilot을 실행합니다. Metadata는 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답16KiB·합128KiB,30초/요청5초입니다. 최초 metadata 단계와 선택한 준비 프로파일의 비용을 구분합니다. 실패도 job을 소비하고 자동 재시도하지 않습니다.
@@ -118,6 +118,33 @@ Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict�
 `build_drive_manifest(selection, session, MetadataLimits)`는 manifest 또는 None과 sanitized report를 반환합니다. `save_metadata_bundle`은 새 디렉터리만 사용하고 기존 파일을 덮어쓰지 않습니다. 성공이면 `metadata/archive_manifest.json`·`metadata_report.json`, 실패이면 report만 보존합니다. Code/revision/hash·실행 환경·metadata snapshot·요청 body 범위와 stats를 기록합니다. 실패한 부분 snapshot에서 유효 manifest를 만들지 않습니다.
 
 `run_metadata_pilot`은 결과 hash/code 대조 → 기존 prepare → verify → compact `pilot_report.json`을 연결합니다. 저장 파일과 반환 report는 같고 metadata report hash와 **metadata_stage_stats/limits**를 포함합니다. Metadata128KiB/30초와 선택한 준비 프로파일은 별도이며 전후 metadata 비용은 후자의 stats에 포함됩니다. 준비 결과 파일·CRC·stop/failure·verify·미검증 항목과 train_ready=false를 확인합니다. Source/body/시간의 측정 한계는 아래와 같으며 인증·wire 전체나 실제 성능을 주장하지 않습니다. 로컬 manifest는 `python -m rewind_archive pilot --manifest ... --limits ... --include ... --output ...`로 동일 보고서를 생성할 수 있습니다. 작은 local bundle 외 Drive 쓰기·업로드는 추가하지 않았습니다.
+
+## 안전한 요청 실패 진단
+
+`request_failure`는 HTTP `response`/기존 `.diagnostic`과 분리된 optional 구조입니다. Metadata report와 request audit, extraction report/range audit/전후metadata audit, pilot, job, review와 결과 ZIP까지 전달합니다. 실패로 응답을 얻지 못하면 HTTP 상태를 만들어내지 않습니다. Pre/post metadata 요청 실패도 해당 audit에 수신 bytes와 단계만 기록합니다. 원시 예외 str/repr, URL/token/header/body, 임의 클래스명, traceback/exception chain·args는 직렬화하지 않습니다.
+
+```json
+{"schema_version":"request_failure_v1","category":"read_timeout","library":"requests","operation":"media","stage":"request_open"}
+```
+
+위는 예시이며 직전 실패를 이 유형으로 분류한 것이 아닙니다. Category/library는 이미 로드된 실제 `requests.exceptions`, `urllib3.exceptions`, `google.auth.exceptions`와 표준 라이브러리의 allowlist 타입에 `isinstance`로 대응합니다. 진단을 위해 추가 import·인증·네트워크·재시도를 시작하지 않습니다. 이름만 같은 사용자 클래스나 알 수 없는 wrapper는 unknown이며 내부 cause를 추측하지 않습니다.
+
+| 필드 | 허용 값과 의미 |
+| --- | --- |
+| category | authentication, connect_timeout, read_timeout, timeout, tls, connection, transport, http, incomplete_body, request_other, os_error, unknown |
+| library | requests, urllib3, google_auth, stdlib, unknown |
+| operation | metadata_initial, metadata_pre, metadata_post, media, authentication, workflow, unknown |
+| stage | request_open, response_wrap, body_read, response_validation, response_close, authentication_setup, unknown |
+
+ConnectTimeout/ReadTimeout처럼 구체적인 타입만 구분합니다. 일반 TimeoutError는 timeout이며 connect/read를 추측하지 않습니다. Google TransportError는 authentication으로 통합하지 않고 transport로 구분합니다. `authentication`은 해당 라이브러리 타입군이라는 뜻이며 자격 증명 무효·권한 거부·quota의 확정 진단이 아닙니다. HTTPError 타입의 http 분류도 숫자 status를 대신하지 않습니다. Classifier는 원문이나 nested exception의 속성을 따라가지 않습니다. Body 예외의 기존 partial bytes는 누적량/hash 계산에만 사용하며 내용을 출력하지 않습니다.
+
+Session.get 요청 호출과 SessionResponse wrapping을 분리하지만 두 실패의 기존 stop_reason은 `authorized_request_failed`로 유지합니다. 본문은 `http_body_failed`, 응답 protocol/원본 비교는 기존 중단 이유를 유지합니다. 먼저 발생한 body/validation 실패나 KeyboardInterrupt를 후속 close 오류가 덮지 않습니다. Cleanup만 실패했을 때 response_close를 기록하고 unusable 상태를 유지합니다. 새로운 진단은 source_validation_pending·partial 삭제·원본 전후 검증·usable/목표 완료 판정·budget/timeout/retry0를 우회하지 않습니다.
+
+새 구조는 닫힌 enum과 고정 key만 허용해256bytes 이내로 제한됩니다. 임의 key/값은 버리거나 unknown으로 정규화합니다. Fail-stop이므로 실패 진단을 무한 축적하지 않으며 정상 단계별 metadata audit도 기존 max_ranges에 묶입니다. Media1+전후metadata2의 report 비용(두 report의 metadata audit 복사 포함)은 기존 요청당1024bytes 예약 안인지 검사하고, 상위 진단의 작은 고정 복사도 기존 base reserve를 사용합니다. Disk/ZIP 상한은 늘리지 않습니다.
+
+정상/자체 중단 등 진단이 없으면 request_failure는 null입니다. 이전 보고서의 누락 필드는 review에서 null, request_failure_recorded=false로 표시하며 과거 원인을 새 코드로 소급 추정하지 않습니다. 새 optional 필드는 report 자체hash에 포함되고 report v1의 기존 입력은 읽을 수 있습니다. 코드 hash 검증을 임의로 해제하는 호환 기능은 아닙니다. API5 source와 notebook을 함께 사용하며 JOB11필드·14셀/7코드 셀·예산·정확한 목표는 그대로입니다.
+
+직전 media39의 status 미기록/adapter 수신0bytes는 인증·연결·timeout·TLS나 wrapping 중 어느 것인지 구분할 근거가 아닙니다. Adapter의0bytes는 전체 network wire 전송0의 증거도 아닙니다. 동일 구버전 실행을 반복하지 않고 테스트 세션에 전달한 고정 진단 버전에서 수집한 결과만 검토합니다.
 
 ## 고정 예산 프로파일과 정확한 목표 완료 중단
 
@@ -234,6 +261,16 @@ UnrealEgo 이름 규칙은 관측한 공식 prefix에서 다음과 같습니다.
 `verify`는 extraction manifest 내용 hash, 원본 manifest 동일성, extractor code hash, 개별 완료 파일의 길이·SHA-256·안전한 경로를 확인합니다. Hash 읽기는 기록된 크기만 bounded로 수행하고 fd 변화도 검사합니다. 실제 원격 원본을 다시 다운로드하거나 source가 이후 변하지 않았음을 증명하지 않습니다. 같은 런타임에서 검사된 추출본은 반복 학습 전에 재사용할 수 있지만 M1 입력 준비 조건은 별도입니다. 코드가 바뀌거나 임시 추출본이 소실되면 새 준비를 검토합니다. 원본 압축 조각은 유지합니다.
 
 ## 실행한 검증과 남은 일
+
+### 2026-10-19 요청 실패 진단 검증
+
+전체189개 회귀(기존175+진단14)를145.440초에 통과했습니다. 집중14개는 초기/pre/media/post 요청·wrapping/body/validation/close 단계, partial bytes/hash, 본문+close 이중 실패의 첫 실패 보존, KeyboardInterrupt 보존, 정상/누락 필드 legacy review와 ZIP을 포함합니다. 비밀 sentinel·str/repr 호출 금지·임의 enum/key 제거와 최대 길이 진단/기존 report reserve도 검사했습니다. 준비 예산·timeout·자동 retry0·목표 경로·pending/unusable 판정은 유지했습니다.
+
+별도 검사에서 설치된 requests2.34.2·urllib3 2.8.0·google-auth2.62.0의 실제 예외 타입23조건을 skip 없이 통과했습니다. Connect/read timeout·TLS·인증/transport와 generic wrapper/위조된 동명 클래스/unknown을 구분했으며 호출은 mock1회뿐입니다. 기존 실제 전송 라이브러리의 chunked/후검사15조건도 익명 localhost에서 통과했습니다. 이 두 검사는 전체189개와 합산하지 않습니다.
+
+Fresh source ZIP의 API5 notebook14셀/7코드 셀을 위에서 아래로 모의 실행했습니다. 사전94개, 기본 인증0·stale/중복 차단·일반 pose 목표 완료·인증 setup timeout·초기 metadata RefreshError·media ReadTimeout과 report→review→ZIP 전달을 확인했습니다. 원시 예외 원문을 결과에 남기지 않았고 과거 진단 없는 report도 원인을 만들어내지 않았습니다. 사용자/Google 실제 인증·Drive 원본 요청은0이며 새 버전의 실제 실패 유형은 아직 관측하지 않았습니다.
+
+근거는 Git 제외 `outputs/request_diagnostics_20261019/developer/`의 unittest.log, diagnostics_final.log, actual_types.json, chunked/transport_report.json, notebook_review.json·notebook.log에 보존합니다. 고정 사용자 배포 ZIP은 커밋 후 오케스트레이션에서 별도 제작·검토합니다. 이번 수정은 pose 확보나 좌표/영상 검증·학습 완료가 아닙니다.
 
 ### 2026-10-19 Pose 밀도 정책과 bounded 진단 검증
 

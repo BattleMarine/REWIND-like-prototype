@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from .contracts import PreparationError
+from .diagnostics import attach_failure, request_failure, safe_request_failure
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -22,18 +23,22 @@ def http_open(url, headers, timeout):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     try:
         return opener.open(request, timeout=timeout)
+    except PreparationError as exc:
+        raise attach_failure(exc,"media","request_open")
     except urllib.error.HTTPError as exc:
         diagnostic = metadata_diagnostic(exc)
-        exc.close()
-        raise PreparationError("http_status_rejected", diagnostic) from None
-    except (OSError, urllib.error.URLError):
-        raise PreparationError("http_open_failed") from None
+        close_response(exc,"media","http_status_rejected",preserve_active=True)
+        raise PreparationError("http_status_rejected", diagnostic,request_failure(exc,"media","request_open")) from None
+    except (OSError, urllib.error.URLError) as exc:
+        raise PreparationError("http_open_failed",request_failure=request_failure(exc,"media","request_open")) from None
 
 
 class SessionResponse:
     def __init__(self, response):
         self.response = response
         self.status, self.headers = response.status_code, response.headers
+        if not callable(getattr(self.headers,"get",None)):
+            raise TypeError("response_headers_mapping_required")
 
     def read1(self, size):
         read1 = getattr(self.response.raw,"read1",None)
@@ -51,19 +56,33 @@ class SessionResponse:
         self.response.close()
 
 
-def session_opener(session):
+def session_opener(session, operation="unknown"):
     if getattr(session,"_max_refresh_attempts",0) != 0:
         raise PreparationError("session_retry_policy")
     def open_response(url, headers, timeout):
         try:
-            return SessionResponse(session.get(url, headers=headers, stream=True, allow_redirects=False, timeout=timeout))
-        except Exception:
+            response=session.get(url, headers=headers, stream=True, allow_redirects=False, timeout=timeout)
+        except Exception as exc:
             # Session 예외에 token/URL이 들어 있더라도 로그에 전달하지 않는다.
-            raise PreparationError("authorized_request_failed") from None
+            raise PreparationError("authorized_request_failed",request_failure=request_failure(exc,operation,"request_open")) from None
+        try:
+            return SessionResponse(response)
+        except Exception as exc:
+            try:response.close()
+            except Exception:pass
+            raise PreparationError("authorized_request_failed",request_failure=request_failure(exc,operation,"response_wrap")) from None
     return open_response
 
 
-def read_one(response, size, budget, on_chunk):
+def close_response(response, operation, reason, preserve_active=False):
+    try:response.close()
+    except Exception as exc:
+        if preserve_active:return
+        if reason=="output_or_read_error" and not isinstance(exc,OSError):reason="workflow_execution_failed"
+        raise PreparationError(reason,request_failure=request_failure(exc,operation,"response_close")) from None
+
+
+def read_one(response, size, budget, on_chunk, operation="unknown"):
     timeout = budget.timeout()
     try:
         if hasattr(response,"set_timeout"):
@@ -72,14 +91,15 @@ def read_one(response, size, budget, on_chunk):
         if sock is not None:
             sock.settimeout(timeout)
         chunk = response.read1(size)
-    except PreparationError:
-        raise
+    except PreparationError as exc:
+        raise attach_failure(exc,operation,"body_read")
     except Exception as exc:
-        partial = getattr(exc,"partial",b"")
+        try:partial = getattr(exc,"partial",b"")
+        except Exception:partial=b""
         if isinstance(partial,bytes):
             budget.transfer_bytes += len(partial)
             on_chunk(partial)
-        raise PreparationError("http_body_failed") from None
+        raise PreparationError("http_body_failed",request_failure=request_failure(exc,operation,"body_read")) from None
     budget.transfer_bytes += len(chunk)
     on_chunk(chunk)
     if budget.transfer_bytes > budget.limits.max_transfer_bytes:
@@ -88,10 +108,10 @@ def read_one(response, size, budget, on_chunk):
     return chunk
 
 
-def read_body(response, expected, budget, on_chunk):
+def read_body(response, expected, budget, on_chunk, operation="unknown"):
     data = bytearray()
     while len(data) < expected:
-        chunk = read_one(response,min(expected-len(data),budget.limits.io_chunk_bytes),budget,on_chunk)
+        chunk = read_one(response,min(expected-len(data),budget.limits.io_chunk_bytes),budget,on_chunk,operation)
         if not chunk:
             raise PreparationError("short_http_body")
         data.extend(chunk)
@@ -111,21 +131,25 @@ def metadata_diagnostic(response):
         "content_type":"absent" if content_type is None else "json" if isinstance(content_type,str) and content_type.split(";",1)[0].strip().lower()=="application/json" else "other"}
 
 
-def read_metadata_body(response, budget, maximum, on_chunk, protocol_reason="metadata_protocol", limit_reason="metadata_response_bytes_limit"):
-    diagnostic=metadata_diagnostic(response)
-    length=diagnostic["content_length"]
-    if diagnostic["status"]!=200 or diagnostic["transfer_encoding"]=="unsupported" or (length is not None and diagnostic["transfer_encoding"]!="absent"):
-        raise PreparationError(protocol_reason)
-    if diagnostic["content_encoding"]=="unsupported":
-        raise PreparationError("metadata_content_encoding")
-    if length is not None:
-        if length=="invalid":
+def read_metadata_body(response, budget, maximum, on_chunk, protocol_reason="metadata_protocol", limit_reason="metadata_response_bytes_limit", operation="unknown"):
+    try:
+        diagnostic=metadata_diagnostic(response)
+        length=diagnostic["content_length"]
+        if diagnostic["status"]!=200 or diagnostic["transfer_encoding"]=="unsupported" or (length is not None and diagnostic["transfer_encoding"]!="absent"):
             raise PreparationError(protocol_reason)
-        if not 0<length<=maximum:
-            raise PreparationError(limit_reason)
-        if length>budget.limits.max_transfer_bytes-budget.transfer_bytes:
-            raise PreparationError("transfer_bytes_limit")
-        return read_body(response,length,budget,on_chunk)
+        if diagnostic["content_encoding"]=="unsupported":
+            raise PreparationError("metadata_content_encoding")
+        if length is not None:
+            if length=="invalid":
+                raise PreparationError(protocol_reason)
+            if not 0<length<=maximum:
+                raise PreparationError(limit_reason)
+            if length>budget.limits.max_transfer_bytes-budget.transfer_bytes:
+                raise PreparationError("transfer_bytes_limit")
+    except PreparationError as exc:
+        raise attach_failure(exc,operation,"response_validation")
+    if length is not None:
+        return read_body(response,length,budget,on_chunk,operation)
     data=bytearray()
     while True:
         # EOF 확인용 1byte도 budget을 초과해 읽지 않는다. Exact cap은 미확정으로 거부한다.
@@ -135,7 +159,7 @@ def read_metadata_body(response, budget, maximum, on_chunk, protocol_reason="met
             raise PreparationError("transfer_bytes_limit")
         if remaining<=0:
             raise PreparationError(limit_reason)
-        chunk=read_one(response,min(budget.limits.io_chunk_bytes,remaining,global_remaining),budget,on_chunk)
+        chunk=read_one(response,min(budget.limits.io_chunk_bytes,remaining,global_remaining),budget,on_chunk,operation)
         if not chunk:
             return bytes(data)
         data.extend(chunk)
@@ -185,6 +209,8 @@ class HttpSource:
             headers["If-Unmodified-Since"] = identity["last_modified"]
         budget.request("media")
         response = self.opener(self.url, headers, budget.timeout())
+        stage="response_validation"
+        failed=True
         try:
             self.last_diagnostic = metadata_diagnostic(response)
             if response.status != 206:
@@ -201,9 +227,17 @@ class HttpSource:
             for field, header in (("etag","ETag"),("last_modified","Last-Modified")):
                 if field in identity and response.headers.get(header) != identity[field]:
                     raise PreparationError("source_changed")
-            return read_body(response, expected, budget, on_chunk)
+            stage="body_read"
+            chunk=read_body(response, expected, budget, on_chunk,"media")
+            failed=False
+            return chunk
+        except PreparationError as exc:
+            raise attach_failure(exc,"media",stage)
+        except Exception as exc:
+            reason="output_or_read_error" if isinstance(exc,OSError) else "workflow_execution_failed"
+            raise PreparationError(reason,request_failure=request_failure(exc,"media",stage)) from None
         finally:
-            response.close()
+            close_response(response,"media","output_or_read_error",preserve_active=failed)
 
 
 class DriveSource(HttpSource):
@@ -211,7 +245,8 @@ class DriveSource(HttpSource):
     def __init__(self, part, authorized_session):
         if authorized_session is None:
             raise PreparationError("drive_session_required")
-        self.part, self.opener = part, session_opener(authorized_session)
+        self.part, self.opener = part, session_opener(authorized_session,"media")
+        self.authorized_session = authorized_session
         file_id = part["source"]["file_id"]
         self.url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
         self.metadata_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=size,version,modifiedTime"
@@ -220,17 +255,22 @@ class DriveSource(HttpSource):
 
     METADATA_RESPONSE_BYTES = 16384
 
-    def check_metadata(self, budget):
+    def check_metadata(self, budget, operation="metadata_pre"):
         budget.request("metadata")
-        response = self.opener(self.metadata_url, {"Accept-Encoding":"identity"}, budget.timeout())
+        if not hasattr(budget,"metadata_response_audit"):
+            budget.metadata_response_audit=[]
+        audit={"operation":operation,"response":None,"bytes_received":0,"status":"pending"}
+        budget.metadata_response_audit.append(audit)
+        response=None;stage="request_open";failed=True
         try:
-            if not hasattr(budget,"metadata_response_audit"):
-                budget.metadata_response_audit=[]
-            audit={"response":metadata_diagnostic(response),"bytes_received":0}
-            budget.metadata_response_audit.append(audit)
+            response=session_opener(self.authorized_session,operation)(self.metadata_url,{"Accept-Encoding":"identity"},budget.timeout())
+            stage="response_validation"
+            audit["response"]=metadata_diagnostic(response)
             def received(chunk):
                 audit["bytes_received"]+=len(chunk)
-            raw = read_metadata_body(response,budget,self.METADATA_RESPONSE_BYTES,received,protocol_reason="drive_metadata_response")
+            stage="body_read"
+            raw = read_metadata_body(response,budget,self.METADATA_RESPONSE_BYTES,received,protocol_reason="drive_metadata_response",operation=operation)
+            stage="response_validation"
             try:
                 doc = json.loads(raw)
             except (ValueError,UnicodeError):
@@ -239,8 +279,23 @@ class DriveSource(HttpSource):
                 raise PreparationError("drive_metadata_response")
             if doc.get("size") != str(self.part["size_bytes"]) or doc.get("version") != self.part["identity"]["version"] or doc.get("modifiedTime") != self.part["identity"]["modified_time"]:
                 raise PreparationError("source_changed")
+            audit["status"]="complete"
+            failed=False
+        except PreparationError as exc:
+            attach_failure(exc,operation,stage)
+            audit.update(status="failed",reason=exc.reason,request_failure=safe_request_failure(exc.request_failure))
+            raise
+        except Exception as exc:
+            reason="output_or_read_error" if isinstance(exc,OSError) else "workflow_execution_failed"
+            failure=request_failure(exc,operation,stage)
+            audit.update(status="failed",reason=reason,request_failure=failure)
+            raise PreparationError(reason,request_failure=failure) from None
         finally:
-            response.close()
+            if response is not None:
+                try:close_response(response,operation,"output_or_read_error",preserve_active=failed)
+                except PreparationError as exc:
+                    audit.update(status="failed",reason=exc.reason,request_failure=safe_request_failure(exc.request_failure))
+                    raise
 
     def read_range(self, start, end, budget, on_chunk):
         self.last_diagnostic = None
@@ -248,10 +303,10 @@ class DriveSource(HttpSource):
         budget.reserve_requests(3)
         if end-start+1+2*self.METADATA_RESPONSE_BYTES > budget.limits.max_transfer_bytes-budget.transfer_bytes:
             raise PreparationError("transfer_bytes_limit")
-        self.check_metadata(budget)
+        self.check_metadata(budget,"metadata_pre")
         self.pending_validation = True
         chunk = super().read_range(start,end,budget,on_chunk)
-        self.check_metadata(budget)
+        self.check_metadata(budget,"metadata_post")
         self.pending_validation = False
         return chunk
 
@@ -304,6 +359,8 @@ class SplitStream:
             record["status"], record["reason"] = "failed", exc.reason
             if exc.diagnostic is not None:
                 record["response"] = exc.diagnostic
+            if exc.request_failure is not None:
+                record["request_failure"]=safe_request_failure(exc.request_failure)
             raise
         finally:
             if getattr(source,"last_diagnostic",None) is not None and "response" not in record:
