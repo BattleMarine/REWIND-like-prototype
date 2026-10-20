@@ -1,5 +1,14 @@
 # 다음 실제 데이터 준비 실행
 
+### 2026-10-21 API5 실제 진단 결과 — 사전 metadata 읽기 시간 초과
+
+- `1ea5ff5`/API5, `archvis_pose_1_10_diagnostic_001`에서 `request_failure`는 `read_timeout / requests / metadata_pre / request_open`이다. 안전한 진단 회수는 확인했지만 pose 목표0개·미확보2개, `targets_status=unusable`, 검증 `not_usable`로 추출은 실패했다.
+- Media58개 Range는206으로 완료했고 압축14.5MiB(15,204,352bytes)를 읽었다. 다음59번째 범위의 사전 metadata 요청에서 응답 없이 시간 초과가 발생했다. HTTP408/403/429나 서버·네트워크의 근본 원인, 이전 API4 실패 원인을 소급 확정하지 않는다. 새 media 전 실패라 `source_validation_pending=false`지만 전체 실행/관측은 사용 불가다.
+- 준비58.151502초·body15,214,792bytes·175요청(media58+metadata117), 해제83,362,297bytes·header1961·tar metadata121,110bytes·저장0이며 예산 상한에 도달하지 않았다. 초기 metadata는 별도0.197897초·290bytes·1요청이다. 실행 셀236.460초는 인증 등을 포함한 더 넓은 기록으로 준비시간과 구분한다.
+- ZIP CRC·보고서4개 자체hash·배포13모듈hash·ready JOB/설정hash·진단 및 보고서 연결을 오케스트레이션에서 독립 대조했다. 실행 notebook 코드7셀은 승인된 EXECUTE_ONCE 토글 외 동일하다. 사전검사 셀의 성공 종료 기록은 있지만94개 개별 로그는 보존되지 않았다. 테스트 세션은 실행PDF도 검토했으며 일부 출력이 잘려 상세 진단은 notebook/ZIP을 근거로 삼았다.
+- ZIP SHA256은 `395cba63903060684fd6844f72aa0f83eaac7c771fa3e629c4720bd377fc09f0`이다. 원본 사본·검토 자료는 Git 제외 `outputs/test_archvis_pose_diagnostic_20261019/`에 보존하며 폴더명과 달리 검토일은10월21일이다. regular955개 중 첫128개와 마지막 Adanna Walk_Left frame6 관측도 untrusted 진단이며 seek index가 아니다.
+- 이번 테스트는 종료한다. 다음 검토 후보는 전체 준비 예산 안에서 요청별 timeout과 제한된 재시도 정책을 설계·로컬 재현하는 것이다. 아직 적용하거나 새 실행을 요청하지 않았다. Drive 영구보관·기존 오른쪽 원본ZIP은 미확인/미수령이고, pose 내용·좌표/영상·실제 학습은 미완료다.
+
 ### 2026-10-19 pose 재검증 결과 — 요청 예외로 미확보
 
 - `4571f30`/API4, `archvis_pose_1_10_density_001`의 실제 Colab 실행은 `authorized_request_failed`로 종료했다. 목표 JSON0개·미확보2개, `targets_status=unusable`, `source_validation_pending=true`다. 작업의 finished 상태는 추출 성공이 아니다.
@@ -9,7 +18,7 @@
 - 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포 소스12개 hash·ready JOB/설정hash·보고서 연결을 독립 확인했다. 원본 ZIP SHA256은 `6e554d053340f9d074c3f486642bc68cc0455989bcd965432dfd1255e9f2fc99`다. 원본 사본·검토 근거는 Git 제외 `outputs/test_archvis_pose_density_20261019/`의 `verification.json`, `orchestrator_review.json`에 보존한다. 이번 실제 실행의80개 사전검사 전체로그·실행notebook·Drive 영구보관은 미확인이다.
 - 동일 실행 반복은 종료한다. 다음 개발 검토는 비밀정보 없는 예외 종류·발생 단계 진단과 로컬 재현이다. 원시 예외문·token·URL을 기록하지 않으며 예산/timeout 확대나 자동 재시도는 이번 결과만으로 적용하지 않는다.
 
-## 이번 테스트: 동일 목표 요청 실패 진단
+## 종료된 테스트의 절차: 동일 목표 요청 실패 진단
 
 2026-10-19 사용자 승인에 따라 요청 예외 종류와 발생 단계를 안전하게 기록하는 수정본을 준비한다. 이전 `4571f30` 실행의 실패 원인은 소급 확정할 수 없다. 새 실행은 같은 두 목표와 예산을 유지하며, 오류가 재발하면 진단을 회수하고 재발하지 않으면 그 실행 결과만 평가한다. 이번 요청은 위 종료된 실행의 반복 안내가 아니라 검토·커밋된 새 진단 버전의 1회 테스트다.
 

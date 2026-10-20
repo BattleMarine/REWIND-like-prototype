@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 19일 운영·검증 상태 보완
+검토 초안 v0.2   |   2026년 10월 21일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -29,6 +29,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 1 데이터 준비와 입력 파이프라인
+
+### 2026-10-21 API5 실제 진단 결과 — 사전 metadata 읽기 시간 초과
+
+- `1ea5ff5`/API5, `archvis_pose_1_10_diagnostic_001`에서 `request_failure`는 `read_timeout / requests / metadata_pre / request_open`이다. 안전한 진단 회수는 확인했지만 pose 목표0개·미확보2개, `targets_status=unusable`, 검증 `not_usable`로 추출은 실패했다.
+- Media58개 Range는206으로 완료했고 압축14.5MiB(15,204,352bytes)를 읽었다. 다음59번째 범위의 사전 metadata 요청에서 응답 없이 시간 초과가 발생했다. HTTP408/403/429나 서버·네트워크의 근본 원인, 이전 API4 실패 원인을 소급 확정하지 않는다. 새 media 전 실패라 `source_validation_pending=false`지만 전체 실행/관측은 사용 불가다.
+- 준비58.151502초·body15,214,792bytes·175요청(media58+metadata117), 해제83,362,297bytes·header1961·tar metadata121,110bytes·저장0이며 예산 상한에 도달하지 않았다. 초기 metadata는 별도0.197897초·290bytes·1요청이다. 실행 셀236.460초는 인증 등을 포함한 더 넓은 기록으로 준비시간과 구분한다.
+- ZIP CRC·보고서4개 자체hash·배포13모듈hash·ready JOB/설정hash·진단 및 보고서 연결을 오케스트레이션에서 독립 대조했다. 실행 notebook 코드7셀은 승인된 EXECUTE_ONCE 토글 외 동일하다. 사전검사 셀의 성공 종료 기록은 있지만94개 개별 로그는 보존되지 않았다. 테스트 세션은 실행PDF도 검토했으며 일부 출력이 잘려 상세 진단은 notebook/ZIP을 근거로 삼았다.
+- ZIP SHA256은 `395cba63903060684fd6844f72aa0f83eaac7c771fa3e629c4720bd377fc09f0`이다. 원본 사본·검토 자료는 Git 제외 `outputs/test_archvis_pose_diagnostic_20261019/`에 보존하며 폴더명과 달리 검토일은10월21일이다. regular955개 중 첫128개와 마지막 Adanna Walk_Left frame6 관측도 untrusted 진단이며 seek index가 아니다.
+- 이번 테스트는 종료한다. 다음 검토 후보는 전체 준비 예산 안에서 요청별 timeout과 제한된 재시도 정책을 설계·로컬 재현하는 것이다. 아직 적용하거나 새 실행을 요청하지 않았다. Drive 영구보관·기존 오른쪽 원본ZIP은 미확인/미수령이고, pose 내용·좌표/영상·실제 학습은 미완료다.
 
 ### 2026-10-19 요청 실패 진단 보완과 1회 검증 준비
 
