@@ -30,6 +30,16 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 API6 실제 결과 — 오류 없이 요청 상한 도달, pose 미확보
+
+- `cb76a3c`/API6의 `archvis_pose_1_10_retry_001`은 `ranges_limit`/bounded_stop으로 종료했다. 준비768요청(media256+metadata512), body67,076,276bytes,232.180825초로 상한을 준수했다. 최초 metadata는 별도1요청·290bytes·0.158772초다. 전체 응답body64MiB에도 근접했으므로 요청 횟수만 늘려 해결될 것으로 보지 않는다.
+- byte0부터 압축67,030,196bytes를 연속256범위로 읽었고 모두206 완료, 사전/후 metadata512개도 정상 완료했다. 목표 pose0개·missing2·targets_status=incomplete·sample_acquired=false다. verification passed/완료0개는 빈 저장목록 검증이며 추출 성공이 아니다. source_validation_pending=false, 관측은 bounded_observation_only로 유지한다.
+- request_failure=null, retries_started0·events빈목록·wait0으로 실제 timeout/자동회복은 발생하지 않았다. 이전보다 길게 진행한 결과만으로 timeout 변경의 효과나 근본 원인 해결을 입증하지 않는다.
+- 해제368,062,368bytes·header8652·regular4214·tar metadata541,603bytes를 관측했다. 첫128개 목록과 마지막 Kyle Dismissing_Gesture frame24(미완료)만 보존하며 전체 목록이나 목표 부재/위치를 증명하지 않는다. 전체gzip/CRC 무결성과 train_ready는false다.
+- 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포14모듈hash·고정JOB/config·보고서/정책 연결·256완료Range를 독립 확인했다. 실행notebook7셀은 승인된 EXECUTE_ONCE 토글 외 동일하다. 사전검사 셀 성공 기록은 있지만 사용자 런타임115개 개별 로그는 미보존이다. 테스트 세션은 PDF5페이지도 확인했으며 일부 출력 누락 때문에 상세 수치는 ZIP/notebook을 근거로 삼았다.
+- ZIP SHA256은 `4f72de49c111e2c17fe84df9f4e4e533e1350ad7c27a5f477672d38f4065bd33`이다. 원본3개와 검토 근거는 Git 제외 `outputs/test_archvis_pose_retry_20261021/`에 보존한다. Drive 영구보관·기존 오른쪽 원본ZIP은 미확인/미수령이다. Pose payload가 없어 좌표·영상 대조는 미실행이다.
+- 이번 테스트는 종료한다. 다음은 단순 동일 실행 반복 대신 데이터 확보 전략을 검토한다. 더 넓은 순차 탐색의 전송/시간/요청/해제 비용과, 접근 가능한 시퀀스의 좌우 RGB·pose 교집합을 찾는 대안을 비교한다. 목표 변경이나 예산 확대·새 원본 요청은 아직 적용하지 않았다.
+
 ### 2026-10-21 metadata 사전 요청 timeout·제한 재시도 준비
 
 - 사용자 승인에 따라 별도 opt-in `metadataPreTimeout10sRetry1Global3_v1` 정책을 준비한다. 기존 profile/예산/기본5초·재시도0 동작은 유지한다. 새 API6는 pose targeted 준비에서 정책을 명시하며 설정hash와 실행 보고서에 기록한다.

@@ -1,5 +1,15 @@
 # 다음 실제 데이터 준비 실행
 
+### 2026-10-21 API6 실제 결과 — 오류 없이 요청 상한 도달, pose 미확보
+
+- `cb76a3c`/API6의 `archvis_pose_1_10_retry_001`은 `ranges_limit`/bounded_stop으로 종료했다. 준비768요청(media256+metadata512), body67,076,276bytes,232.180825초로 상한을 준수했다. 최초 metadata는 별도1요청·290bytes·0.158772초다. 전체 응답body64MiB에도 근접했으므로 요청 횟수만 늘려 해결될 것으로 보지 않는다.
+- byte0부터 압축67,030,196bytes를 연속256범위로 읽었고 모두206 완료, 사전/후 metadata512개도 정상 완료했다. 목표 pose0개·missing2·targets_status=incomplete·sample_acquired=false다. verification passed/완료0개는 빈 저장목록 검증이며 추출 성공이 아니다. source_validation_pending=false, 관측은 bounded_observation_only로 유지한다.
+- request_failure=null, retries_started0·events빈목록·wait0으로 실제 timeout/자동회복은 발생하지 않았다. 이전보다 길게 진행한 결과만으로 timeout 변경의 효과나 근본 원인 해결을 입증하지 않는다.
+- 해제368,062,368bytes·header8652·regular4214·tar metadata541,603bytes를 관측했다. 첫128개 목록과 마지막 Kyle Dismissing_Gesture frame24(미완료)만 보존하며 전체 목록이나 목표 부재/위치를 증명하지 않는다. 전체gzip/CRC 무결성과 train_ready는false다.
+- 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포14모듈hash·고정JOB/config·보고서/정책 연결·256완료Range를 독립 확인했다. 실행notebook7셀은 승인된 EXECUTE_ONCE 토글 외 동일하다. 사전검사 셀 성공 기록은 있지만 사용자 런타임115개 개별 로그는 미보존이다. 테스트 세션은 PDF5페이지도 확인했으며 일부 출력 누락 때문에 상세 수치는 ZIP/notebook을 근거로 삼았다.
+- ZIP SHA256은 `4f72de49c111e2c17fe84df9f4e4e533e1350ad7c27a5f477672d38f4065bd33`이다. 원본3개와 검토 근거는 Git 제외 `outputs/test_archvis_pose_retry_20261021/`에 보존한다. Drive 영구보관·기존 오른쪽 원본ZIP은 미확인/미수령이다. Pose payload가 없어 좌표·영상 대조는 미실행이다.
+- 이번 테스트는 종료한다. 다음은 단순 동일 실행 반복 대신 데이터 확보 전략을 검토한다. 더 넓은 순차 탐색의 전송/시간/요청/해제 비용과, 접근 가능한 시퀀스의 좌우 RGB·pose 교집합을 찾는 대안을 비교한다. 목표 변경이나 예산 확대·새 원본 요청은 아직 적용하지 않았다.
+
 ### 2026-10-21 API5 실제 진단 결과 — 사전 metadata 읽기 시간 초과
 
 - `1ea5ff5`/API5, `archvis_pose_1_10_diagnostic_001`에서 `request_failure`는 `read_timeout / requests / metadata_pre / request_open`이다. 안전한 진단 회수는 확인했지만 pose 목표0개·미확보2개, `targets_status=unusable`, 검증 `not_usable`로 추출은 실패했다.
@@ -18,7 +28,7 @@
 - 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포 소스12개 hash·ready JOB/설정hash·보고서 연결을 독립 확인했다. 원본 ZIP SHA256은 `6e554d053340f9d074c3f486642bc68cc0455989bcd965432dfd1255e9f2fc99`다. 원본 사본·검토 근거는 Git 제외 `outputs/test_archvis_pose_density_20261019/`의 `verification.json`, `orchestrator_review.json`에 보존한다. 이번 실제 실행의80개 사전검사 전체로그·실행notebook·Drive 영구보관은 미확인이다.
 - 동일 실행 반복은 종료한다. 다음 개발 검토는 비밀정보 없는 예외 종류·발생 단계 진단과 로컬 재현이다. 원시 예외문·token·URL을 기록하지 않으며 예산/timeout 확대나 자동 재시도는 이번 결과만으로 적용하지 않는다.
 
-## 이번 테스트: metadata 사전 요청 제한 재시도
+## 종료된 테스트의 절차: metadata 사전 요청 제한 재시도
 
 2026-10-21 사용자 승인으로 새 API6의 opt-in `metadataPreTimeout10sRetry1Global3_v1`을 검증한다. 기존 API5 실행은 위 결과로 종료됐다. 새 정책은 metadata_pre의 요청 개시 timeout만 최대10초로 늘리고, 직접 확인된 connect/read timeout 무응답에 한해 pre당 추가1회·전체 추가3회와0.5초 대기를 허용한다. 남은 전체 준비시간으로 timeout/대기를 제한하며 초기 metadata·media·post·본문에는 적용하지 않는다.
 
