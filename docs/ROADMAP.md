@@ -30,6 +30,17 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 API7 cold 실제 결과 — 캐시·관측 보존 성공, pose 미확보
+
+- 고정 `696c234`/API7, `archvis_pose_1_10_cache_cold_001`은 `transfer_bytes_limit`/bounded_stop으로 종료했다. 준비311.326445초·응답body100,630,708bytes·1,152요청(media384+metadata768)이며 초기 metadata는 별도1요청·290bytes·0.145105초다. 시간/요청 상한이 아닌 body 예산에서 멈췄다. 목표 pose0개·missing2·targets_status=incomplete·sample_acquired=false이고 빈 파일목록의 verification passed는 추출 성공이 아니다.
+- Cache는 `usable_prefix`, `ready_for_reuse=true`, cold/input_prefix0이다. byte0부터100,561,588bytes·384개 연속 범위가 모두206 완료했고 전후 metadata768개도200 완료했다. 개별 chunk·전체prefix hash, 원본 identity와 고정16모듈 producer hash를 독립 대조했다. 실제 warm import/재생/전송 절감은 이번에 실행하지 않았다.
+- 관측 카탈로그는92sequence·6,318entry·1,437,945bytes, truncated=false/unclassified0이다. Payload 완료 관측6,317개와 마지막 Carla `024/Dodging` frame47 미완료1개를 포함하며 저장payload는0이다. 관측은 bounded_observation_only이고 전체목록·내용검증·seek index가 아니다. 기록된 sequence에 Serena는 없지만 전체 archive의 부재를 뜻하지 않는다.
+- 해제551,914,001bytes·header13,061·tar metadata811,994bytes로 고정 상한을 준수했다. Local read/IO0, retry0, request_failure=null, source_validation_pending=false다. 실제 timeout 회복과 전체gzip/CRC 무결성·train_ready는 확인되지 않았다.
+- 별도 cache export는1.125434초·local read301,818,194bytes로60초/384MiB 상한 이내다. 제출 결과ZIP137,598bytes와 cacheZIP100,606,124bytes의 CRC/hash·보고서 자체hash·참조, 고정JOB/config와16모듈hash를 오케스트레이션에서 대조했다. 결과ZIP SHA256은 `c4036a35fdd0e84782ba4f64b20b28cb64d02fa4570e324defa27c83fa2f926b`, cacheZIP은 `4d63187ff49de40b5af1843aa4ded51caed255fda9996d78c028c47bf58c3319`다.
+- 원본2개와 검토 근거는 Git 제외 `outputs/test_archvis_pose_cache_cold_20261021/`에 보존한다. 사용자 사전검사 출력은 비어 있었다고 보고됐고 실행 notebook/PDF도 미제출이다. 따라서 사용자 런타임137개 개별검사 통과·전체7셀 상태·토글만 변경됐는지는 확인하지 못했다. Drive reports 영구보관·기존 오른쪽 성공ZIP은 미확인/미수령이며 좌표·영상·시간·split·학습 검증도 남아 있다.
+- 이번 cold 시험은 종료한다. 같은96MiB 논리입력 상한에서 cache 뒤 여유는101,708bytes(약99.3KiB)뿐이므로 동일 설정 warm을 더 넓은 탐색으로 안내하지 않는다. 다음 판단은 보관 카탈로그와 cache를 근거로 재사용 검증·후속 범위의 비용을 검토하는 것이다. 원본 추가 읽기·warm 실행·예산 확대는 이번 결과 검토에서 시작하지 않았다.
+
+
 ### 2026-10-21 압축 prefix 캐시와 관측 카탈로그 구현
 
 - 사용자 승인으로 `posePrefixCache96MiB_v1`/API7을 추가한다. 기존 preset·입력 계약을 유지하고 현재 단일 Drive pose part·정확한 두 목표에 한정한다. 이 구현 범위는 M0 전체 완료나 실제 데이터 학습 완료가 아니다.
