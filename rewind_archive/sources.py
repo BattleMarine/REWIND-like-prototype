@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -372,19 +373,25 @@ class CachedDriveSource(DriveSource):
         budget.reserve_requests(1)
         if self.METADATA_RESPONSE_BYTES>budget.limits.max_transfer_bytes-budget.transfer_bytes:
             raise PreparationError("transfer_bytes_limit")
-        self._check_metadata_once(budget,"metadata_post")
+        before=time.monotonic()
+        try:self._check_metadata_once(budget,"metadata_post")
+        finally:budget.cache_live_check_seconds+=max(0.0,time.monotonic()-before)
         self.pending_validation=False;self.cache_window_pending=False
 
     def read_range(self,start,end,budget,on_chunk):
         if start>=self.cache.input_bytes:
-            chunk=super().read_range(start,end,budget,on_chunk)
+            before=time.monotonic()
+            try:chunk=super().read_range(start,end,budget,on_chunk)
+            finally:budget.remote_range_seconds+=max(0.0,time.monotonic()-before)
             self.cache.append(start,chunk)  # 원본 post 검사가 끝난 범위만 저장한다.
             return chunk
         if not self.cache_checked:
             budget.reserve_requests(2)
             if 2*self.METADATA_RESPONSE_BYTES>budget.limits.max_transfer_bytes-budget.transfer_bytes:
                 raise PreparationError("transfer_bytes_limit")
-            self._check_metadata_once(budget,"metadata_pre")
+            before=time.monotonic()
+            try:self._check_metadata_once(budget,"metadata_pre")
+            finally:budget.cache_live_check_seconds+=max(0.0,time.monotonic()-before)
             self.cache_checked=True;self.pending_validation=True;self.cache_window_pending=True
         chunk=self.cache.read(start,end)
         if end+1==self.cache.input_bytes:self.finish_cached_validation(budget)
@@ -432,9 +439,10 @@ class SplitStream:
         size = min(budget.limits.io_chunk_bytes if isinstance(source,LocalSource) else budget.limits.media_range_bytes,
             part["size_bytes"]-self.offset, remaining)
         if self.cache:
-            from .prefix_cache import LOGICAL_BYTES
-            if budget.logical_compressed_bytes>=LOGICAL_BYTES:raise PreparationError("logical_input_limit")
-            size=source.cache.cap(self.offset,min(size,LOGICAL_BYTES-budget.logical_compressed_bytes))
+            logical=self.cache.policy.logical_bytes
+            if budget.logical_compressed_bytes>=logical:raise PreparationError("logical_input_limit")
+            size=source.cache.cap(self.offset,min(size,logical-budget.logical_compressed_bytes))
+            if len(self.audit)>=self.cache.policy.audit_rows:raise PreparationError("range_audit_limit")
         record = {"part_index":self.part_index,"start":self.offset,"end":self.offset+size-1,"bytes_received":0,"status":"pending"}
         self.audit.append(record)
         if self.cache:record["input_source"]="cache" if cached else "drive"

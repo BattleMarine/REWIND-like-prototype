@@ -1,5 +1,34 @@
 # 제한된 압축 prefix cache와 관측 카탈로그
 
+## API8:128MiB bounded warm 확장
+
+`posePrefixWarm128MiB_v2`는 기존 cache를 필수 입력으로 받습니다. 새 network body40MiB, 논리입력128MiB, 준비420초·HTTP392회, 해제800MiB·header20,000·tar metadata2MiB/단일64KiB입니다. 초기 metadata는 기존 별도128KiB·30초·8회이며 전체는 최대40.125MiB·450초·400회입니다. 기존 네 가지 profile과 v1 계약은 변경하지 않습니다. 실제 원본 warm과 목표 확보는 별도 테스트 전 미검증입니다.
+
+노트북 사전 검사145개에는 큰 합성 gzip과128MiB 경계 cache를 생성하는 검사가 있습니다. 이 단계의 CPU·RAM·임시 disk·시간은 원본 준비420초 및 단계별 disk 합513MiB에 포함되지 않으며,여러 fixture/cache를 동시에 만들기 때문에 추가 임시 공간이 필요합니다.
+
+| 새 고정 cache 정책 | 값 |
+| --- | --- |
+| Format / policy_id | `bounded_prefix_cache_v2` / `pose_prefix_warm128_v2` |
+| Cache 디렉터리 / input·export ZIP | 각각160MiB |
+| 최대chunk / local import·read IO |640개 /260MiB |
+| Export local read / 별도 시간 |512MiB /60초 |
+| Catalog / range audit | Sequence256·entry16,000·6MiB /1,024행 |
+| 일반 추출·보고서 |16MiB,카탈로그와 local audit를 별도 예약 |
+
+JOB은 `cache_expectation`을 추가한14필드입니다. 이 객체의 `manifest_sha256`, `prefix_sha256`, `prefix_bytes`를 검토된 입력으로 고정합니다. `cache_input="upload"`는 그 cache 한 개를 명시적으로 올린다는 뜻입니다. Upload 뒤 manifest가 다르면 실행을 진행하지 않고, 실제 import에서 길이·prefix hash와 bytes를 다시 대조합니다. 입력 누락/손상/변경 시 cold 재다운로드로 전환하지 않습니다. 원본파일 ID는 generic source에 넣지 않습니다.
+
+392회는 cache pre/post2+새 Range129×3+추가retry3에서 정했습니다. 최소 입력은 `128MiB−129×256KiB=100,401,152bytes`(95.75MiB)이며 이를 preflight부터 강제합니다. 실제 고정 시험은100,561,588bytes·384chunk와 그 manifest/prefix hash를 사용합니다. 이 입력에서 새 media는33,656,140bytes·129범위,결과는513chunk입니다. 더 작은 cache를 같은 예산으로128MiB까지 읽는 계약으로 일반화하지 않습니다.
+
+새 reader는 구형 `bounded_prefix_cache_v1`도 구형96MiB/512chunk 규칙으로 읽고,확장 출력은 v2로 표시합니다. v2 재import에는 `input_spec(path,policy=WARM128_POLICY)`,새 `prepare(...,profile=WARM128_PROFILE,cache_input=spec,cache_expectation=expected)`를 사용합니다. `export_cache(directory)`는 출력판에 맞는 고정 정책을 고릅니다. 구형 reader는 v2를 거부하며 v1 생성·기존 API 입력의 동작은 유지합니다. 입력 manifest에서 임의의 큰 상한을 선언할 수 없습니다.
+
+Cache160+input ZIP160+export ZIP160+일반출력16+결과ZIP17=최대513MiB와 작은 보고서 여유를 계산합니다.481MiB는 입력ZIP을 별도128MiB로 강제하는 경우의 계산이며 현재 API8 upload cap은160MiB이므로 일반 상한으로 쓰지 않습니다. Upload 후 local 단계는 별도60초,인증·업로드UI·전체wire·영구보관은 준비 예산과 구분합니다. 보관cache를 다시 업로드하는 비용도 있으므로 원본API 전송 절감을 전체wire 절감으로 해석하지 않습니다.
+
+추가 시간 계수는 `cache_import_seconds`(ZIP 검증·hash·local 복사),`cache_read_seconds`(cached seek/read/hash),`cache_live_check_seconds`(cache window live pre/post),`remote_range_seconds`(새 media와 전후metadata·retry/wait)입니다. 원본 Range 시간에서 cache append는 제외합니다. Cache read 시간은 전체 gzip/parser 재생 시간이 아닙니다. Gzip decode·tar parsing·append·catalog/보고서 처리는 별도 분해하지 않았습니다. 이 값들은 전체 준비 `elapsed_seconds` 안의 부분 계측이므로 전체와 더하지 않으며 `timing_scope`가 범위를 설명합니다. 짧은 모의 요청은 clock 해상도 때문에0일 수 있습니다.
+
+첫 새 Range는 고정 prefix 끝100,561,588부터 시작해야 합니다. 목표가 있어도 준비420초 안의 도달을 보장하지 않습니다.192MiB·전체 인덱싱·다음JOB 자동 실행은 하지 않습니다. [준비안](PREFIX_CACHE_NEXT_STEP.md)의 비용 가정과 [실행 기록](REAL_DATA_NEXT_RUN.md)을 함께 확인합니다.
+
+## 기존 API7 / v1 계약
+
 2026-10-21 · API7 개발 안내. 후속 실제 cold 시험에서 캐시와 관측 카탈로그 보존·hash 정합성을 확인했으나 목표 pose는 미확보다. 실제 warm 재사용과 전송 절감 효과는 미검증이며 [검토 결과](REAL_DATA_NEXT_RUN.md)를 따른다.
 
 ## 실행 계약

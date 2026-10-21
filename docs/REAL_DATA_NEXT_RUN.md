@@ -1,5 +1,13 @@
 # 다음 실제 데이터 준비 실행
 
+## API8 bounded warm128 인계 준비
+
+`posePrefixWarm128MiB_v2`는 실제 cold가 남긴100,561,588bytes/384chunk의 cache를 재사용하는 별도 고정 JOB입니다. 실제 원본 warm은 아직 실행하지 않았습니다. 새 network40MiB·논리128MiB·준비420초·392요청,해제800MiB·header20,000·tar metadata2MiB/단일64KiB,cache/ZIP160MiB·640chunk·local IO260MiB·export512MiB/60초를 적용합니다. 초기 metadata는 기존 별도 예산입니다. [최신 계약](PREFIX_CACHE.md)을 따릅니다.
+
+고정 입력 manifest SHA는 `9b253b0f4f6c8153fa17daffa7f11f8cedd6e70b66252991fffdb2b37708db3c`,prefix SHA는 `6354437b0a27b8050e8111c81a71eec0cc35d915da0852d7978d4298016e857e`입니다. 실제 ready notebook에 이 두 값과 길이를 `cache_expectation`으로 고정합니다. ZIP SHA `4d63187ff49de40b5af1843aa4ded51caed255fda9996d78c028c47bf58c3319`는 upload 보고서·테스트 인계에서 별도로 대조합니다. 원본파일 ID는 검토된 개인 ready 입력에만 둡니다.
+
+새 Range는100,561,588부터 시작하며128MiB까지 최대33,656,140bytes/129개를 추가하는 계산입니다. Cache 입력·출력과live 원본 검사·재시도·중단·카탈로그를 함께 판정하고 목표0개도 보관 후 종료합니다. 구형cache를 수정하지 않고 새v2 cache ZIP과 결과ZIP을 분리합니다. 실제 고정 source/ready 경로·hash와 회수 위치는 검토·커밋 뒤 테스트 세션에 인계하며 아래의 종료된 JOB를 재실행하지 않습니다.
+
 다음 개발·검토 범위는 [캐시 재사용과 후속 탐색 준비안](PREFIX_CACHE_NEXT_STEP.md)을 따른다. 현재 문서의 cold 절차는 종료된 실행 기록이며 새 warm 실행용 고정 notebook은 아직 배포하지 않았다. 사용자 실행 안내는 구현·검토 후 테스트 세션에서 진행한다.
 
 ### 2026-10-21 API7 cold 실제 결과 — 캐시·관측 보존 성공, pose 미확보

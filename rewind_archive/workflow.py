@@ -12,17 +12,19 @@ from .drive_metadata import MetadataLimits, build_drive_manifest, provenance, sa
 from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
-from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .diagnostics import request_failure, safe_request_failure
 from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
 from .prefix_cache import validate_input_spec, export_cache
+from .cache_policy import WARM128_POLICY,validate_expectation,summary as policy_summary
 
 
-NOTEBOOK_API_VERSION = 7
+NOTEBOOK_API_VERSION = 8
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 PREVIOUS_CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 POLICY_CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
-CONFIG_FIELDS = POLICY_CONFIG_FIELDS | {"cache_input"}
+CACHE_CONFIG_FIELDS = POLICY_CONFIG_FIELDS | {"cache_input"}
+CONFIG_FIELDS = CACHE_CONFIG_FIELDS | {"cache_expectation"}
 
 
 def read_report(path, maximum=8*1024**2):
@@ -53,7 +55,7 @@ def load_history(outputs):
 
 
 def make_preflight(config, history):
-    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,POLICY_CONFIG_FIELDS,PREVIOUS_CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
+    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,CACHE_CONFIG_FIELDS,POLICY_CONFIG_FIELDS,PREVIOUS_CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
         raise PreparationError("workflow_config_fields")
     config=copy.deepcopy(config)
     config.setdefault("profile",None)
@@ -61,6 +63,7 @@ def make_preflight(config, history):
     # 누락된 legacy 필드는 config hash/유효 fingerprint까지 그대로 보존한다.
     request_policy=validate_request_policy(config.get("request_policy"))
     cache_input=validate_input_spec(config.get("cache_input"))
+    expectation=validate_expectation(config.get("cache_expectation"),required=config.get("profile")==WARM128_PROFILE)
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -87,8 +90,12 @@ def make_preflight(config, history):
     if request_policy and (config["profile"] not in POSE_PROFILES or
             (mode!="review" and (mode,purpose)!=("extract","targeted")) or len(config["exact_targets"])!=2):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
-    if cache_input is not None and config["profile"]!=CACHE_PROFILE:raise PreparationError("cache_profile_required")
-    if config["profile"]==CACHE_PROFILE and (config["selection"].get("total_parts")!=1 or len(config["selection"].get("parts",[]))!=1):
+    if cache_input is not None and config["profile"] not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
+    if expectation is not None and config["profile"]!=WARM128_PROFILE:raise PreparationError("warm_profile_required")
+    if config["profile"]==WARM128_PROFILE:
+        if cache_input is None:raise PreparationError("warm_cache_required")
+        if cache_input["manifest_sha256"]!=expectation["manifest_sha256"]:raise PreparationError("cache_expected_manifest_mismatch")
+    if config["profile"] in CACHE_PROFILES and (config["selection"].get("total_parts")!=1 or len(config["selection"].get("parts",[]))!=1):
         raise PreparationError("cache_single_drive_part")
     config["limits"]=asdict(limits)
     config["metadata_limits"]=asdict(metadata)
@@ -111,7 +118,8 @@ def make_preflight(config, history):
     if config["profile"] is not None or config["exact_targets"]:
         effective.update(profile=config["profile"],exact_targets=config["exact_targets"])
     if request_policy:effective["request_policy"]=request_policy
-    if config["profile"]==CACHE_PROFILE:effective["cache_input_manifest_sha256"]=cache_input["manifest_sha256"] if cache_input else None
+    if config["profile"] in CACHE_PROFILES:effective["cache_input_manifest_sha256"]=cache_input["manifest_sha256"] if cache_input else None
+    if expectation:effective["cache_expectation"]=expectation
     fingerprint=digest(effective)
     repeats=[r["job_id"] for r in history.values() if r.get("effective_sha256")==fingerprint]
     selection_hash=digest(config["selection"])
@@ -122,11 +130,16 @@ def make_preflight(config, history):
             "profile":config["profile"] if config["profile"] is not None else "custom_limits",
             "exact_targets":config["exact_targets"],
             "request_policy":policy_description(request_policy),
-            "cache_input":cache_input,"prefix_cache_enabled":config["profile"]==CACHE_PROFILE,
+            "cache_input":cache_input,"cache_expectation":expectation,"prefix_cache_enabled":config["profile"] in CACHE_PROFILES,
+            "cache_policy":policy_summary(WARM128_POLICY) if config["profile"]==WARM128_PROFILE else None,
             "cache_limits":({"max_logical_compressed_bytes":96*1024**2,"max_local_io_bytes":196*1024**2,
                 "max_cache_disk_bytes":128*1024**2,"max_catalog_bytes":6*1024**2,
                 "max_catalog_sequences":128,"max_catalog_entries":16000,"export_max_seconds":60,
-                "export_max_local_read_bytes":384*1024**2} if config["profile"]==CACHE_PROFILE else None),
+                "export_max_local_read_bytes":384*1024**2} if config["profile"]==CACHE_PROFILE else
+                {"max_logical_compressed_bytes":128*1024**2,"max_local_io_bytes":260*1024**2,
+                "max_cache_disk_bytes":160*1024**2,"max_catalog_bytes":6*1024**2,"max_catalog_sequences":256,
+                "max_catalog_entries":16000,"max_range_audit_rows":1024,"export_max_seconds":60,
+                "export_max_local_read_bytes":512*1024**2} if config["profile"]==WARM128_PROFILE else None),
             "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"] in POSE_PROFILES else limits.max_metadata_bytes,
             "stop_when_targets_stored":bool(config["exact_targets"]),
             "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,
@@ -185,14 +198,14 @@ def run_workflow_job(config, preflight, history, outputs, session_factory, cache
     write_job_record(root/"job.json",record)
     session=None
     try:
-        if config["profile"]==CACHE_PROFILE and cache_upload_report is not None:
+        if config["profile"] in CACHE_PROFILES and cache_upload_report is not None:
             record["stage"]="cache_upload_record"
             if len(canonical(cache_upload_report))>4096 or cache_upload_report.get("manifest_sha256")!=(config.get("cache_input") or {}).get("manifest_sha256"):
                 raise PreparationError("cache_upload_report_mismatch")
             record["cache_upload_report"]=copy.deepcopy(cache_upload_report)
         record["stage"]="authentication"
         session=session_factory()
-        if config.get("request_policy") or config["profile"]==CACHE_PROFILE:validate_no_hidden_retries(session)
+        if config.get("request_policy") or config["profile"] in CACHE_PROFILES:validate_no_hidden_retries(session)
         record["stage"]="metadata"
         metadata=build_drive_manifest(config["selection"],session,MetadataLimits.from_dict(config["metadata_limits"]))
         save_metadata_bundle(metadata,root/"metadata")
@@ -206,13 +219,13 @@ def run_workflow_job(config, preflight, history, outputs, session_factory, cache
             print({"source_identity_after_metadata":metadata["manifest"],"reads_from_byte_zero":True})
             record["stage"]="pilot"
             pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,
-                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"],request_policy=config.get("request_policy"),cache_input=config.get("cache_input"))
+                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"],request_policy=config.get("request_policy"),cache_input=config.get("cache_input"),cache_expectation=config.get("cache_expectation"))
             record.update(status="finished",stop_reason=pilot["stop_reason"],sample_acquired=pilot["sample_acquired"],
                 request_failure=safe_request_failure(pilot.get("request_failure")),
                 request_retry=pilot["request_retry"],
                 observed_regular_members=pilot["observed_regular_members"],profile=pilot["profile"],limits=pilot["limits"],
                 **{k:pilot[k] for k in ("exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status")})
-            for key in ("prefix_cache","observation_catalog","cache_limits"):
+            for key in ("prefix_cache","observation_catalog","cache_limits","cache_policy","timing_scope"):
                 if key in pilot:record[key]=pilot[key]
     except KeyboardInterrupt:
         record.update(status="interrupted",stop_reason="interrupted")
@@ -251,7 +264,7 @@ def review_run(path):
             "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
         result["extraction"]["request_failure"]=safe_request_failure(report.get("request_failure"))
-        for key in ("prefix_cache","observation_catalog","cache_limits"):
+        for key in ("prefix_cache","observation_catalog","cache_limits","cache_policy","timing_scope"):
             if key in report:result["extraction"][key]=report[key]
         if "observation_catalog" in report:
             summary=report["observation_catalog"]

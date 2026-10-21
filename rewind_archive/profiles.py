@@ -9,7 +9,9 @@ SMOKE_PROFILE = "smoke8MiB_v1"
 COUNTERPART_PROFILE = "counterpart64MiB_v1"
 POSE_COUNTERPART_PROFILE = "poseCounterpart64MiB_v1"
 CACHE_PROFILE = "posePrefixCache96MiB_v1"
-POSE_PROFILES = (POSE_COUNTERPART_PROFILE,CACHE_PROFILE)
+WARM128_PROFILE = "posePrefixWarm128MiB_v2"
+CACHE_PROFILES = (CACHE_PROFILE,WARM128_PROFILE)
+POSE_PROFILES = (POSE_COUNTERPART_PROFILE,*CACHE_PROFILES)
 TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, *POSE_PROFILES)
 PROFILES = MappingProxyType({
     SMOKE_PROFILE:Limits(),
@@ -21,6 +23,9 @@ PROFILES = MappingProxyType({
     CACHE_PROFILE:Limits(max_transfer_bytes=96*1024**2,max_elapsed_seconds=420.0,
         max_ranges=1157,max_decompressed_bytes=640*1024**2,max_files=2,
         max_members=16000,max_metadata_bytes=2*1024**2),
+    WARM128_PROFILE:Limits(max_transfer_bytes=40*1024**2,max_elapsed_seconds=420.0,
+        max_ranges=392,max_decompressed_bytes=800*1024**2,max_files=2,
+        max_members=20000,max_metadata_bytes=2*1024**2),
 })
 
 

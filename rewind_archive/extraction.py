@@ -11,30 +11,32 @@ from pathlib import Path
 
 from . import __version__
 from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
-from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .sources import SplitStream, CachedDriveSource
 from .diagnostics import safe_request_failure
 from .request_policy import validate_request_policy, retry_summary, validate_no_hidden_retries
 from .prefix_cache import PrefixCache, validate_input_spec
 from .catalog import Catalog, CATALOG_BYTES
+from .cache_policy import WARM128_POLICY,validate_expectation,summary as policy_summary
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
     "transfer_bytes_limit", "decompressed_bytes_limit", "elapsed_limit", "files_limit", "members_limit",
-    "metadata_bytes_limit", "metadata_entry_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete", "logical_input_limit"}
+    "metadata_bytes_limit", "metadata_entry_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete", "logical_input_limit", "range_audit_limit"}
 
 
 MAX_OBSERVED_MEMBERS = 128
 
 
-def report_reserve_bytes(manifest, includes, limits, exact_targets=None, request_policy=None):
+def report_reserve_bytes(manifest, includes, limits, exact_targets=None, request_policy=None, cache_policy=None):
     # name JSON escape 최악은 UTF-8 경로 bytes의 2배. 관측목록은 pilot에 복사하지 않는다.
     observation_reserve = min(MAX_OBSERVED_MEMBERS,limits.max_members)*(2*limits.max_path_bytes+512)
     return (16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024
         +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve
         +2*(2*limits.max_path_bytes+512)  # last regular 행을 extraction/pilot에 각각 예약
         +(6*len(canonical(exact_targets))+1024 if exact_targets else 0)
-        +(8192 if request_policy else 0))  # 상한 있는 retry 요약/실패행을 extraction/pilot 양쪽에 예약
+        +(8192 if request_policy else 0)
+        +(cache_policy.audit_rows*1024 if cache_policy else 0))  # local audit를 HTTP 예약과 분리
 
 
 def code_hashes():
@@ -144,7 +146,7 @@ def read_payload(reader, size, sink=None, on_chunk=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None, cache_input=None):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None, cache_input=None, cache_expectation=None):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
@@ -163,15 +165,20 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         if profile in POSE_PROFILES and manifest["kind"]!="pose":
             raise PreparationError("pose_profile_requires_pose_kind")
     cache_input=validate_input_spec(cache_input)
-    if cache_input is not None and profile!=CACHE_PROFILE:raise PreparationError("cache_profile_required")
-    if profile==CACHE_PROFILE and (len(manifest["parts"])!=1 or manifest["total_parts"]!=1 or manifest["parts"][0]["source"]["type"]!="drive"):
+    if cache_input is not None and profile not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
+    expectation=validate_expectation(cache_expectation,required=profile==WARM128_PROFILE)
+    if profile==WARM128_PROFILE and cache_input is None:raise PreparationError("warm_cache_required")
+    if expectation and profile!=WARM128_PROFILE:raise PreparationError("warm_profile_required")
+    if expectation and cache_input["manifest_sha256"]!=expectation["manifest_sha256"]:raise PreparationError("cache_expected_manifest_mismatch")
+    cache_policy=WARM128_POLICY if profile==WARM128_PROFILE else None
+    if profile in CACHE_PROFILES and (len(manifest["parts"])!=1 or manifest["total_parts"]!=1 or manifest["parts"][0]["source"]["type"]!="drive"):
         raise PreparationError("cache_single_drive_part")
     metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile in POSE_PROFILES else limits.max_metadata_bytes
     budget = Budget(limits,request_policy=request_policy,**({"clock":clock} if clock else {}),
         **({"sleeper":sleeper} if sleeper else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
-    reserve = report_reserve_bytes(manifest,includes,limits,exact_targets,request_policy)
-    if profile==CACHE_PROFILE:reserve+=CATALOG_BYTES
+    reserve = report_reserve_bytes(manifest,includes,limits,exact_targets,request_policy,cache_policy)
+    if profile in CACHE_PROFILES:reserve+=CATALOG_BYTES
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -184,8 +191,8 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     last_regular, regular_count = None, 0
     tar_eof = False
     source = reader = None
-    cache=PrefixCache(output,manifest,budget) if profile==CACHE_PROFILE else None
-    catalog=Catalog() if cache else None
+    cache=PrefixCache(output,manifest,budget,policy=cache_policy,expectation=expectation) if profile in CACHE_PROFILES else None
+    catalog=Catalog(max_sequences=cache.policy.sequences,policy=cache_policy) if cache else None
     try:
         if cache:
             validate_no_hidden_retries(authorized_session)
@@ -374,8 +381,17 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "report_disk_reserve_bytes":reserve}
     if cache:
         report.update(prefix_cache=cache_summary,observation_catalog=catalog_summary,
-            cache_limits={"max_network_body_bytes":limits.max_transfer_bytes,"max_logical_compressed_bytes":96*1024**2,
-                "max_local_io_bytes":196*1024**2,"max_cache_disk_bytes":128*1024**2,"max_catalog_bytes":CATALOG_BYTES})
+            cache_limits={"max_network_body_bytes":limits.max_transfer_bytes,"max_logical_compressed_bytes":cache.policy.logical_bytes,
+                "max_local_io_bytes":cache.policy.local_io_bytes,"max_cache_disk_bytes":cache.policy.disk_bytes,"max_catalog_bytes":CATALOG_BYTES})
+        if cache_policy:
+            report["cache_policy"]=policy_summary(cache_policy)
+            report["timing_scope"]={"clock":"monotonic wall time","total":"elapsed_seconds includes all preparation; separate initial metadata/auth/export excluded",
+                "cache_import_seconds":"ZIP import, chunk/whole hashes, local copy, cleanup",
+                "cache_read_seconds":"cached seek/read/hash only; gzip and tar parser excluded",
+                "cache_live_check_seconds":"cached-window live metadata pre/post only",
+                "remote_range_seconds":"new media and its metadata pre/post, retries/wait; cache append excluded",
+                "unsegmented":"gzip decode, tar parsing, append/catalog/report work; do not treat cache_read_seconds as full replay time",
+                "subsets_of_total":True}
     raw = canonical({**report,"content_sha256":digest(report)})+b"\n"
     if len(raw)+(catalog_summary["bytes"] if catalog_summary else 0)>reserve:
         raise PreparationError("report_reserve_exceeded")

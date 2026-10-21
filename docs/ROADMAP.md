@@ -30,6 +30,14 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 API8 구현 — 보존 캐시를 사용한 제한된 warm 확장
+
+- 사용자 진행 지시에 따라 `posePrefixWarm128MiB_v2`를 구현했다. 캐시를 필수로 요구하고 입력 manifest/prefix hash·크기를 고정한다. 작은 입력이나 누락 시 cold 재다운로드로 대체하지 않으며, 원본 identity·내용 hash·전후 검사를 유지한다.
+- 논리 압축입력128MiB와 새 network body40MiB를 분리하고 준비420초·392요청, 해제800MiB·header20,000·tar metadata2MiB를 적용한다. 초기 metadata를 포함한 상한은40.125MiB·450초·400요청이며 인증·cache upload/export·영구보관 비용은 별도다. 같은 원본의 전체 다운로드나192MiB 자동 확대는 하지 않는다.
+- 기존 v1 계약을 유지하면서 명시적 v2 cache 정책을 추가했다. Cache/ZIP160MiB·640chunk·local IO260MiB·export512MiB/60초·catalog sequence256을 사용하고 HTTP와 별개인 audit1,024행을 예약한다. 기존 입력100,561,588bytes에서는 첫 새 Range가 같은 offset부터 시작하며128MiB 도달 시513chunk가 된다. 캐시 읽기·import·원본 요청의 부분 시간을 기록하되 gzip/parser 전체 시간을 계측한 것으로 해석하지 않는다.
+- 전체240개 회귀가48.061초에 통과했고 검사 전후 코드·테스트 hash 변경은 없었다. 새 ZIP의 사전검사145개와 노트북7개 코드 셀의 모의 실행도 통과했다. 독립 합성6조건에서 목표 저장,128MiB 경계·513chunk,신판 export/import와 media0 재사용,원본 변경·cache post 실패·import 시간 초과의 unusable 처리를 확인했다. 보관된 실제 v1 cache도 새 정책에서 오프라인 import·byte0 해제551,914,001bytes/hash 일치를 확인했다. 실제 원본 네트워크 요청은0이며 근거는 Git 제외 `outputs/prefix_cache_warm128_20261021/`에 있다.
+- 사용자 시험은 고정 소스ZIP·ready notebook과 기존 cache 식별값을 테스트 세션에 인계하여 한 JOB만 진행한다. Cache 재사용/후속 탐색·목표 두 pose 확보·카탈로그/결과 보존을 별도 판정한다. 실제 Drive warm·원본 현재 상태·pose 내용·좌우 영상·시간·split·실제 학습은 미검증이며 M0~M3 전체 완료나 M4 착수로 올리지 않는다. 상세 계약과 중단 조건은 [캐시 안내](PREFIX_CACHE.md), [실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다.
+
 ### 2026-10-21 cold 결과 이후 작업 준비 — 캐시 재사용과 제한된 확장
 
 - [후속 작업 준비안](PREFIX_CACHE_NEXT_STEP.md)에 실제 캐시·관측 목록,128/192MiB 비용 비교, 현재 코드의 제한과 완료 기준을 정리한다. 구현된 API7과 새 제안을 구분하며 D2 운영 예산이나 마일스톤 완료로 확정하지 않는다.

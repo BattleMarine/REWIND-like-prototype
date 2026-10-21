@@ -14,12 +14,12 @@ PENDING = ["live_drive_colab_validation","joints","units","coordinates","calibra
     "split","original_motion_duplicates","stereo_rgb_pose_content_alignment","m1_actual_data_training"]
 
 
-def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract", profile=None, exact_targets=None, request_policy=None, cache_input=None):
+def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract", profile=None, exact_targets=None, request_policy=None, cache_input=None, cache_expectation=None):
     """새 output에서 1회 prepare 후 검사·pilot report 저장. 자동 retry/확대 없음."""
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
     extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session,mode=mode,
-        profile=profile,exact_targets=exact_targets,request_policy=request_policy,cache_input=cache_input)
+        profile=profile,exact_targets=exact_targets,request_policy=request_policy,cache_input=cache_input,cache_expectation=cache_expectation)
     verification={"status":"not_usable","reason":None,"verified_complete_files":0}
     if extraction["inspection_candidates_usable"]:
         try:
@@ -55,6 +55,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         report["metadata_stage_limits"]=copy.deepcopy(metadata_report["limits"])
     if "prefix_cache" in extraction:
         report.update(prefix_cache=extraction["prefix_cache"],observation_catalog=extraction["observation_catalog"],cache_limits=extraction["cache_limits"])
+        if "cache_policy" in extraction:report["cache_policy"]=extraction["cache_policy"]
+        if "timing_scope" in extraction:report["timing_scope"]=extraction["timing_scope"]
     report["content_sha256"]=digest(report)
     raw_path=Path(output)/"pilot_report.json"
     # 기존 max_disk_bytes 안의 report reserve에서 compact report도 사용한다.
@@ -67,8 +69,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
     return report
 
 
-def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract", profile=None, exact_targets=None, request_policy=None, cache_input=None):
+def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract", profile=None, exact_targets=None, request_policy=None, cache_input=None, cache_expectation=None):
     """성공한 metadata 결과의 hash/code를 대조한 뒤에만 media 경로를 시작한다."""
     manifest=validate_metadata_result(result)
     return run_pilot(manifest,output,includes,limits,authorized_session,
-        metadata_report=result["report"],mode=mode,profile=profile,exact_targets=exact_targets,request_policy=request_policy,cache_input=cache_input)
+        metadata_report=result["report"],mode=mode,profile=profile,exact_targets=exact_targets,request_policy=request_policy,cache_input=cache_input,cache_expectation=cache_expectation)
