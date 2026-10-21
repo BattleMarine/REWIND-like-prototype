@@ -12,15 +12,17 @@ from .drive_metadata import MetadataLimits, build_drive_manifest, provenance, sa
 from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
-from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .diagnostics import request_failure, safe_request_failure
 from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
+from .prefix_cache import validate_input_spec, export_cache
 
 
-NOTEBOOK_API_VERSION = 6
+NOTEBOOK_API_VERSION = 7
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 PREVIOUS_CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
-CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
+POLICY_CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
+CONFIG_FIELDS = POLICY_CONFIG_FIELDS | {"cache_input"}
 
 
 def read_report(path, maximum=8*1024**2):
@@ -51,13 +53,14 @@ def load_history(outputs):
 
 
 def make_preflight(config, history):
-    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,PREVIOUS_CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
+    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,POLICY_CONFIG_FIELDS,PREVIOUS_CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
         raise PreparationError("workflow_config_fields")
     config=copy.deepcopy(config)
     config.setdefault("profile",None)
     config.setdefault("exact_targets",[])
     # 누락된 legacy 필드는 config hash/유효 fingerprint까지 그대로 보존한다.
     request_policy=validate_request_policy(config.get("request_policy"))
+    cache_input=validate_input_spec(config.get("cache_input"))
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -79,11 +82,14 @@ def make_preflight(config, history):
     config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode)
     if config["profile"] in TARGET_PAIR_PROFILES and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
         raise PreparationError("counterpart_profile_requires_targeted_pair")
-    if config["profile"]==POSE_COUNTERPART_PROFILE and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
+    if config["profile"] in POSE_PROFILES and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
         raise PreparationError("pose_profile_requires_pose_kind")
-    if request_policy and (config["profile"]!=POSE_COUNTERPART_PROFILE or
+    if request_policy and (config["profile"] not in POSE_PROFILES or
             (mode!="review" and (mode,purpose)!=("extract","targeted")) or len(config["exact_targets"])!=2):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
+    if cache_input is not None and config["profile"]!=CACHE_PROFILE:raise PreparationError("cache_profile_required")
+    if config["profile"]==CACHE_PROFILE and (config["selection"].get("total_parts")!=1 or len(config["selection"].get("parts",[]))!=1):
+        raise PreparationError("cache_single_drive_part")
     config["limits"]=asdict(limits)
     config["metadata_limits"]=asdict(metadata)
     if not isinstance(config["previous_result"],str) or len(config["previous_result"].encode("utf-8"))>4096:
@@ -105,6 +111,7 @@ def make_preflight(config, history):
     if config["profile"] is not None or config["exact_targets"]:
         effective.update(profile=config["profile"],exact_targets=config["exact_targets"])
     if request_policy:effective["request_policy"]=request_policy
+    if config["profile"]==CACHE_PROFILE:effective["cache_input_manifest_sha256"]=cache_input["manifest_sha256"] if cache_input else None
     fingerprint=digest(effective)
     repeats=[r["job_id"] for r in history.values() if r.get("effective_sha256")==fingerprint]
     selection_hash=digest(config["selection"])
@@ -115,12 +122,17 @@ def make_preflight(config, history):
             "profile":config["profile"] if config["profile"] is not None else "custom_limits",
             "exact_targets":config["exact_targets"],
             "request_policy":policy_description(request_policy),
-            "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"]==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes,
+            "cache_input":cache_input,"prefix_cache_enabled":config["profile"]==CACHE_PROFILE,
+            "cache_limits":({"max_logical_compressed_bytes":96*1024**2,"max_local_io_bytes":196*1024**2,
+                "max_cache_disk_bytes":128*1024**2,"max_catalog_bytes":6*1024**2,
+                "max_catalog_sequences":128,"max_catalog_entries":16000,"export_max_seconds":60,
+                "export_max_local_read_bytes":384*1024**2} if config["profile"]==CACHE_PROFILE else None),
+            "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"] in POSE_PROFILES else limits.max_metadata_bytes,
             "stop_when_targets_stored":bool(config["exact_targets"]),
             "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,
             "total_cooperative_stage_upper_bound_seconds":limits.max_elapsed_seconds+metadata.max_elapsed_seconds if mode!="review" else 0,
             "total_request_upper_bound":limits.max_ranges+metadata.max_requests if mode!="review" else 0,
-            "excluded_costs":"authentication; whole wire; OS/RSS hard limits; separate result ZIP",
+            "excluded_costs":"authentication; whole wire; OS/RSS hard limits; separate result ZIP; cache upload/export/permanent storage",
             "metadata_limits":config["metadata_limits"],"same_config_previous_jobs":repeats,
             "same_selection_previous_jobs":same_source,"job_id_already_used":config["job_id"] in history,
             "source_size_version_modified_time":"not_checked_until_metadata" if mode!="review" else "no_network",
@@ -163,7 +175,7 @@ def write_job_record(path, record):
     Path(path).write_bytes(raw)
 
 
-def run_workflow_job(config, preflight, history, outputs, session_factory):
+def run_workflow_job(config, preflight, history, outputs, session_factory, cache_upload_report=None):
     """명시한 호출 1회. Claim 전 인증 없음. 실패도 job을 소비하고 자동 retry하지 않는다."""
     record=claim_workflow_job(config,preflight,history)
     config=record["config"]
@@ -173,9 +185,14 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
     write_job_record(root/"job.json",record)
     session=None
     try:
+        if config["profile"]==CACHE_PROFILE and cache_upload_report is not None:
+            record["stage"]="cache_upload_record"
+            if len(canonical(cache_upload_report))>4096 or cache_upload_report.get("manifest_sha256")!=(config.get("cache_input") or {}).get("manifest_sha256"):
+                raise PreparationError("cache_upload_report_mismatch")
+            record["cache_upload_report"]=copy.deepcopy(cache_upload_report)
         record["stage"]="authentication"
         session=session_factory()
-        if config.get("request_policy"):validate_no_hidden_retries(session)
+        if config.get("request_policy") or config["profile"]==CACHE_PROFILE:validate_no_hidden_retries(session)
         record["stage"]="metadata"
         metadata=build_drive_manifest(config["selection"],session,MetadataLimits.from_dict(config["metadata_limits"]))
         save_metadata_bundle(metadata,root/"metadata")
@@ -189,12 +206,14 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
             print({"source_identity_after_metadata":metadata["manifest"],"reads_from_byte_zero":True})
             record["stage"]="pilot"
             pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,
-                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"],request_policy=config.get("request_policy"))
+                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"],request_policy=config.get("request_policy"),cache_input=config.get("cache_input"))
             record.update(status="finished",stop_reason=pilot["stop_reason"],sample_acquired=pilot["sample_acquired"],
                 request_failure=safe_request_failure(pilot.get("request_failure")),
                 request_retry=pilot["request_retry"],
                 observed_regular_members=pilot["observed_regular_members"],profile=pilot["profile"],limits=pilot["limits"],
                 **{k:pilot[k] for k in ("exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status")})
+            for key in ("prefix_cache","observation_catalog","cache_limits"):
+                if key in pilot:record[key]=pilot[key]
     except KeyboardInterrupt:
         record.update(status="interrupted",stop_reason="interrupted")
     except Exception as exc:
@@ -232,6 +251,13 @@ def review_run(path):
             "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
         result["extraction"]["request_failure"]=safe_request_failure(report.get("request_failure"))
+        for key in ("prefix_cache","observation_catalog","cache_limits"):
+            if key in report:result["extraction"][key]=report[key]
+        if "observation_catalog" in report:
+            summary=report["observation_catalog"]
+            if summary["relative_path"]!="observation_catalog.json":raise PreparationError("catalog_report_path")
+            catalog=read_report(extraction_root/"observation_catalog.json",6*1024**2)
+            if catalog["content_sha256"]!=summary["content_sha256"]:raise PreparationError("catalog_report_hash")
         if "request_retry" in report:result["extraction"]["request_retry"]=report["request_retry"]
         result["request_failure"]=safe_request_failure(report.get("request_failure"))
         result["request_failure_recorded"]="request_failure" in report
@@ -258,9 +284,12 @@ def save_result_zip(path):
     root=Path(path).resolve()
     review_run(root)  # 잘못 고른 source/다른 디렉터리를 결과로 압축하지 않는다.
     paths=[]
-    allowed={"job.json","pilot_job.json","metadata","pilot","files","extraction_manifest.json","pilot_report.json"}
+    extraction_root=root/"pilot" if (root/"pilot").is_dir() else root
+    allowed={"job.json","pilot_job.json","metadata","pilot","files","extraction_manifest.json","pilot_report.json","observation_catalog.json","cache_export_report.json"}
     for i,p in enumerate(root.rglob("*")):
-        if i>=4096 or p.is_symlink() or not p.resolve().is_relative_to(root) or p.relative_to(root).parts[0] not in allowed:
+        if p.is_symlink() or not p.resolve().is_relative_to(root):raise PreparationError("workflow_result_paths")
+        if p==extraction_root/"cache" or p.is_relative_to(extraction_root/"cache") or p==extraction_root/"prefix_cache.zip":continue
+        if i>=4096 or p.relative_to(root).parts[0] not in allowed:
             raise PreparationError("workflow_result_paths")
         if p.is_file():paths.append(p)
     if len(paths)>256 or sum(p.stat().st_size for p in paths)>17*1024**2:
@@ -271,3 +300,8 @@ def save_result_zip(path):
         with ZipFile(target,"x",ZIP_DEFLATED) as bundle:
             for p in paths:bundle.write(p,(Path(root.name)/p.relative_to(root)).as_posix())
     return target
+
+
+def save_cache_zip(path):
+    root=Path(path);pilot=root/"pilot" if (root/"pilot").is_dir() else root
+    return export_cache(pilot/"cache")

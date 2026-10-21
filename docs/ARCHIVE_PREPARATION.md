@@ -1,10 +1,12 @@
 # 분할 압축 원본의 제한된 순차 준비
 
+2026-10-21 API7 후속 개발: opt-in `posePrefixCache96MiB_v1`에 bounded prefix cache와 관측 카탈로그를 연결했습니다. 기존 profile/API 입력은 유지하며 실제 Drive 시험은 별도입니다. Cold 한 번의 결과/cache 보관과 이후 명시적 warm 재사용,새 예산·ZIP/hash·실패 상태·디스크 비용은 [cache 실행 안내](PREFIX_CACHE.md)를 따릅니다. 기존16MiB 결과 공간에 cache 본체를 넣지 않습니다.
+
 2026-10-21 후속 API6: 실제 API5 사전 metadata 개시의 `requests.read_timeout`을 근거로 아래의 opt-in 정책을 추가했습니다. 실제 원인의 해결·pose 확보 여부는 새 사용자 테스트에서 따로 판단합니다. 기존 세 예산 preset의 수치와 기본5초·추가시도0은 유지합니다.
 
 ## API6 사전 metadata timeout과 제한 재시도
 
-- 단일 JOB의 새 `request_policy` 기본값은 `None`입니다. `metadataPreTimeout10sRetry1Global3_v1`은 `poseCounterpart64MiB_v1`의 targeted extract 경로2개에만 허용합니다. Review에서도 같은 정책을 표시합니다. API6 notebook/source를 함께 쓰며14셀·7코드 셀·사전 검사115개를 유지합니다.
+- 단일 JOB의 새 `request_policy` 기본값은 `None`입니다. `metadataPreTimeout10sRetry1Global3_v1`은 `poseCounterpart64MiB_v1`의 targeted extract 경로2개에 허용하며 API7에서는 `posePrefixCache96MiB_v1`에도 지원합니다. Review에서도 같은 정책을 표시합니다. API6 notebook/source를 함께 쓰며14셀·7코드 셀·사전 검사115개를 유지합니다.
 - 정책 선택 시 `metadata_pre`의 `session.get` 개시 timeout만 최대10초로 바꿉니다. 마지막 요청 예약 시점의 남은 준비시간으로 축소합니다. 본문·media·후검사·초기 metadata timeout은 기존5초이고, 초기 metadata의128KiB/30초/8요청 예산도 별도입니다. 요청 timeout은 socket/cooperative 제한입니다. DNS·OS hard deadline이나 전체 wire 상한을 뜻하지 않습니다.
 - 한 pre 개시당 추가1회(총2시도), 준비 전체에서는 part가 바뀌어도 추가3회까지 허용합니다. 각 retry 전0.5초 고정 대기를 수행하므로 요청한 대기 합계는 최대1.5초입니다. 실제 대기시간은 clock으로 측정해 보고하며 OS oversleep은 더 길 수 있습니다. 남은 시간이0.5초 이하이면 대기를 시작하지 않고, 깨어난 뒤에도 deadline을 확인합니다. 전체64MiB/300초/768요청은 늘리지 않습니다.
 - 실제 `requests`/`urllib3`의 직접 connect/read timeout 타입이고, `session_opener`가 get 개시에서 응답 없이 실패했으며 partial이 없을 때만 retry 자격을 부여합니다. 보고용 dict·임의 클래스명·포괄 TimeoutError·cause/reason wrapper는 자격 근거가 아닙니다. Response wrapping·본문·HTTP403/429 등 응답·media·metadata_post·원본 변경·파서/CRC 오류는 재시도하지 않습니다.
@@ -125,7 +127,7 @@ Notebook은 단일 `JOB["selection"]`에 다음 `drive_part_selection_v1` dict�
 }
 ```
 
-1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사94개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+diagnostics14)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. Notebook/source API는5이며7개 코드 셀의 순서는 유지합니다.
+1. 코드 source ZIP 한 개를 업로드하고 로컬 사전 검사137개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+diagnostics14+retry21+cache22)를 실행합니다. 배포 묶음을 올리면 내부 source ZIP 파일명을 안내하고 거부합니다. 중첩 ZIP을 자동 해제하지 않습니다. 새 source를 쓰려면 기존 결과를 먼저 보관하고 커널을 재시작합니다. 현재 Notebook/source API는7이며7개 코드 셀의 순서는 유지합니다.
 2. 단일 `JOB` 설정 셀(id=`job-config`)만 편집합니다. Generic 기본값은 `profile="smoke8MiB_v1"`, `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, `exact_targets=[]`입니다. 별도로 검토한 대응2파일 추출은 아래 `counterpart64MiB_v1` 계약을 사용합니다. 새 job_id와 목적 reason을 함께 기록합니다. 기존9필드 custom8MiB discovery 계약도 유지하며 이 경우 profile=None, limits.max_files2이하와 명시 glob을 사용합니다. Notebook이 목적이나 필터를 바꾸지 않습니다.
 3. Preflight에서 mode/purpose·selection/archive·필터·Range256KiB/IO64KiB·예산·동일 설정/선택 이력을 확인합니다. 이 단계는 원본 요청과 인증0입니다. 실제 source size/version/modifiedTime은 아직 unknown이며 metadata 성공 뒤 따로 표시합니다. `includes`는 gzip 위치 점프가 아닌 저장/선택 필터입니다.
 4. 다음 셀의 `EXECUTE_ONCE=True`를 명시해 한 번 실행합니다. 현재 JOB와 frozen preflight가 다르면 인증 전 거부합니다. 먼저 job을 기록하고 인증→metadata→scan/pilot을 실행합니다. Metadata는 [drive_metadata_limits_smoke.json](../configs/drive_metadata_limits_smoke.json)의 파일8·요청8, 응답16KiB·합128KiB,30초/요청5초입니다. 최초 metadata 단계와 선택한 준비 프로파일의 비용을 구분합니다. 실패도 job을 소비하고 자동 재시도하지 않습니다.
@@ -159,7 +161,7 @@ Session.get 요청 호출과 SessionResponse wrapping을 분리하지만 두 실
 
 새 구조는 닫힌 enum과 고정 key만 허용해256bytes 이내로 제한됩니다. 임의 key/값은 버리거나 unknown으로 정규화합니다. Fail-stop이므로 실패 진단을 무한 축적하지 않으며 정상 단계별 metadata audit도 기존 max_ranges에 묶입니다. Media1+전후metadata2의 report 비용(두 report의 metadata audit 복사 포함)은 기존 요청당1024bytes 예약 안인지 검사하고, 상위 진단의 작은 고정 복사도 기존 base reserve를 사용합니다. Disk/ZIP 상한은 늘리지 않습니다.
 
-정상/자체 중단 등 진단이 없으면 request_failure는 null입니다. 이전 보고서의 누락 필드는 review에서 null, request_failure_recorded=false로 표시하며 과거 원인을 새 코드로 소급 추정하지 않습니다. 새 optional 필드는 report 자체hash에 포함되고 report v1의 기존 입력은 읽을 수 있습니다. 코드 hash 검증을 임의로 해제하는 호환 기능은 아닙니다. API5 source와 notebook을 함께 사용하며 JOB11필드·14셀/7코드 셀·예산·정확한 목표는 그대로입니다.
+정상/자체 중단 등 진단이 없으면 request_failure는 null입니다. 이전 보고서의 누락 필드는 review에서 null, request_failure_recorded=false로 표시하며 과거 원인을 새 코드로 소급 추정하지 않습니다. 새 optional 필드는 report 자체hash에 포함되고 report v1의 기존 입력은 읽을 수 있습니다. 코드 hash 검증을 임의로 해제하는 호환 기능은 아닙니다. 진단을 도입한 당시 API5는 JOB11필드였습니다. 현재는 API7 source와 notebook을 함께 사용하며 JOB13필드·14셀/7코드 셀입니다. 이전9/11/12필드 입력은 유지하고 cache를 선택한 새 profile의 상한은 별도 안내를 따릅니다.
 
 직전 media39의 status 미기록/adapter 수신0bytes는 인증·연결·timeout·TLS나 wrapping 중 어느 것인지 구분할 근거가 아닙니다. Adapter의0bytes는 전체 network wire 전송0의 증거도 아닙니다. 동일 구버전 실행을 반복하지 않고 테스트 세션에 전달한 고정 진단 버전에서 수집한 결과만 검토합니다.
 

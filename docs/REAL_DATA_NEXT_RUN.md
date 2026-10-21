@@ -1,5 +1,13 @@
 # 다음 실제 데이터 준비 실행
 
+## 후속 API7 cold cache 테스트 인계 준비
+
+사용자의 cache·관측 보존 구현 지시에 따라 `posePrefixCache96MiB_v1`과 API7을 개발했습니다. 실제 원본 시험은 리뷰 후 고정 소스/ready notebook으로 테스트 세션에 따로 인계합니다. 절차·새 상한·산출물/별도ZIP·실패 시 보고서 보존은 [cache 실행 안내](PREFIX_CACHE.md)를 따릅니다. 아래 API6 기록의 source revision·JOB·설정은 새 테스트에 재사용하지 않습니다.
+
+첫 시험은 기존 Serena frame1·10 pose 목표를 유지하는 **cold 한 번**입니다. `cache_input=None`,준비 network body/논리입력 각96MiB·420초·1,157요청,header16,000·해제640MiB·tar metadata2MiB·cache128MiB입니다. 초기 metadata는 별도 기존 예산이며 인증 비용은 제외합니다. 목표 확보,cache ready,카탈로그 보존,두 ZIP export를 각각 판정합니다. 미확보/실패도 결과를 보존한 뒤 종료합니다.
+
+Warm 원본 시험은 이번 cold 셀에서 자동 실행하지 않습니다. 이후 별도 고정 JOB에서 검증된 기존 prefix의 재전송을 피하고 미보관 후속만 읽습니다. 동일96MiB profile도 실제 cold prefix가96MiB 미만이면 후속 요청을 할 수 있으므로 media0을 보장하지 않습니다. 입력ZIP과 생성cache·exportZIP·결과가 동시 존재하는 최대417MiB 정도의 disk 틀과 작은 보고서 여유,별도 export60초/384MiB IO·upload 후 local60초를 함께 안내합니다. 기존 오른쪽 성공 원본ZIP 회수·영상대조와 cache 독립 개발/검증을 구분합니다.
+
 현재는 아래 API6 테스트가 종료된 상태입니다. 후속 판단은 [데이터 확보 전략 검토](DATA_ACQUISITION_STRATEGY.md)를 따릅니다. 아래 고정 설정과 실행 순서는 종료된 테스트의 기록이며, 새 실행 지시가 아닙니다. 새 테스트는 개발·검토 후 테스트 세션에 별도 고정 버전으로 인계합니다.
 
 ### 2026-10-21 API6 실제 결과 — 오류 없이 요청 상한 도달, pose 미확보

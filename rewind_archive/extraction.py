@@ -11,15 +11,17 @@ from pathlib import Path
 
 from . import __version__
 from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
-from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
-from .sources import SplitStream
+from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .sources import SplitStream, CachedDriveSource
 from .diagnostics import safe_request_failure
-from .request_policy import validate_request_policy, retry_summary
+from .request_policy import validate_request_policy, retry_summary, validate_no_hidden_retries
+from .prefix_cache import PrefixCache, validate_input_spec
+from .catalog import Catalog, CATALOG_BYTES
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
     "transfer_bytes_limit", "decompressed_bytes_limit", "elapsed_limit", "files_limit", "members_limit",
-    "metadata_bytes_limit", "metadata_entry_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete"}
+    "metadata_bytes_limit", "metadata_entry_bytes_limit", "ranges_limit", "file_bytes_limit", "payload_disk_bytes_limit", "interrupted", "observed_members_limit", "targets_complete", "logical_input_limit"}
 
 
 MAX_OBSERVED_MEMBERS = 128
@@ -142,7 +144,7 @@ def read_payload(reader, size, sink=None, on_chunk=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None, cache_input=None):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
@@ -152,19 +154,24 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     includes = [] if mode=="scan" and includes==[] else validate_includes(includes)
     exact_targets = validate_exact_targets(exact_targets,includes,limits,mode)
     validate_request_policy(request_policy)
-    if request_policy and (profile!=POSE_COUNTERPART_PROFILE or mode!="extract" or len(exact_targets)!=2):
+    if request_policy and (profile not in POSE_PROFILES or mode!="extract" or len(exact_targets)!=2):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
     if profile is not None:
         validate_profile_limits(profile,limits)
         if profile in TARGET_PAIR_PROFILES and (mode!="extract" or len(exact_targets)!=2):
             raise PreparationError("counterpart_profile_requires_two_exact_targets")
-        if profile==POSE_COUNTERPART_PROFILE and manifest["kind"]!="pose":
+        if profile in POSE_PROFILES and manifest["kind"]!="pose":
             raise PreparationError("pose_profile_requires_pose_kind")
-    metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes
+    cache_input=validate_input_spec(cache_input)
+    if cache_input is not None and profile!=CACHE_PROFILE:raise PreparationError("cache_profile_required")
+    if profile==CACHE_PROFILE and (len(manifest["parts"])!=1 or manifest["total_parts"]!=1 or manifest["parts"][0]["source"]["type"]!="drive"):
+        raise PreparationError("cache_single_drive_part")
+    metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile in POSE_PROFILES else limits.max_metadata_bytes
     budget = Budget(limits,request_policy=request_policy,**({"clock":clock} if clock else {}),
         **({"sleeper":sleeper} if sleeper else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
     reserve = report_reserve_bytes(manifest,includes,limits,exact_targets,request_policy)
+    if profile==CACHE_PROFILE:reserve+=CATALOG_BYTES
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -177,8 +184,13 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     last_regular, regular_count = None, 0
     tar_eof = False
     source = reader = None
+    cache=PrefixCache(output,manifest,budget) if profile==CACHE_PROFILE else None
+    catalog=Catalog() if cache else None
     try:
-        source = SplitStream(manifest,base,budget,authorized_session)
+        if cache:
+            validate_no_hidden_retries(authorized_session)
+            cache.load(cache_input)
+        source = SplitStream(manifest,base,budget,authorized_session,cache=cache)
         reader = GzipReader(source,budget)
         pending_name, pending_pax = None, {}
         seen = set()
@@ -207,7 +219,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 raise PreparationError("invalid_tar_size")
             safe_path(info.name,limits.max_path_bytes)
             if info.type in (tarfile.GNUTYPE_LONGNAME,tarfile.XHDTYPE,tarfile.XGLTYPE):
-                if profile==POSE_COUNTERPART_PROFILE and info.size>metadata_entry_limit:
+                if profile in POSE_PROFILES and info.size>metadata_entry_limit:
                     raise PreparationError("metadata_entry_bytes_limit")
                 budget.add("metadata_bytes",info.size,limits.max_metadata_bytes)
                 chunks = []
@@ -253,6 +265,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
                 "member":name,"size_bytes":size,"selected":selected,"payload_complete":False,
                 "payload_bytes_returned":0,"stored":False}
             last_regular = observed
+            if catalog:catalog.add(observed)
             if len(observations)>=min(MAX_OBSERVED_MEMBERS,limits.max_members):
                 observation_cap_reached = True
                 if mode=="scan":
@@ -323,10 +336,21 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         reason = "output_or_read_error"
     finally:
         partial_dir.rmdir()
+    if source and reason in BENIGN_STOPS|{"complete"}:
+        try:
+            for item in source.sources:
+                if isinstance(item,CachedDriveSource):item.finish_cached_validation(budget)
+        except PreparationError as exc:
+            reason=exc.reason;failure=safe_request_failure(exc.request_failure)
     complete_source = len(manifest["parts"])==manifest["total_parts"]
     malformed_complete_tar = bool(reader and reader.gzip_eof_crc_valid and not tar_eof and reason in {"prefix_exhausted","incomplete_header","incomplete_payload","incomplete_padding"})
     pending_validation = bool(source and any(getattr(s,"pending_validation",False) for s in source.sources))
-    usable = (reason=="complete" or reason in BENIGN_STOPS) and not malformed_complete_tar and not pending_validation
+    warm_validated = (not cache or not cache.input_bytes or bool(source and all(
+        not isinstance(s,CachedDriveSource) or (s.cache_checked and not s.pending_validation) for s in source.sources)))
+    usable = ((reason=="complete" or reason in BENIGN_STOPS) and not malformed_complete_tar and not pending_validation
+        and warm_validated and (cache is None or cache.import_status in ("cold","verified")))
+    cache_summary=cache.finish(usable,code_hashes()) if cache else None
+    catalog_summary=catalog.save(output,usable) if catalog else None
     failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason in {"interrupted","targets_complete"} else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
     report = {"schema_version":"archive_extraction_v1","extractor_version":__version__,"code_sha256":code_hashes(),
         "archive_manifest":manifest,"archive_manifest_sha256":digest(manifest),"selection":includes,"limits":asdict(limits),
@@ -348,8 +372,12 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         "profile":profile if profile is not None else "custom_limits",
         **target_summary(exact_targets,files,usable),
         "report_disk_reserve_bytes":reserve}
+    if cache:
+        report.update(prefix_cache=cache_summary,observation_catalog=catalog_summary,
+            cache_limits={"max_network_body_bytes":limits.max_transfer_bytes,"max_logical_compressed_bytes":96*1024**2,
+                "max_local_io_bytes":196*1024**2,"max_cache_disk_bytes":128*1024**2,"max_catalog_bytes":CATALOG_BYTES})
     raw = canonical({**report,"content_sha256":digest(report)})+b"\n"
-    if len(raw)>reserve:
+    if len(raw)+(catalog_summary["bytes"] if catalog_summary else 0)>reserve:
         raise PreparationError("report_reserve_exceeded")
     (output/"extraction_manifest.json").write_bytes(raw)
     return report

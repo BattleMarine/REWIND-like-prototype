@@ -8,7 +8,9 @@ from .contracts import Limits, PreparationError
 SMOKE_PROFILE = "smoke8MiB_v1"
 COUNTERPART_PROFILE = "counterpart64MiB_v1"
 POSE_COUNTERPART_PROFILE = "poseCounterpart64MiB_v1"
-TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, POSE_COUNTERPART_PROFILE)
+CACHE_PROFILE = "posePrefixCache96MiB_v1"
+POSE_PROFILES = (POSE_COUNTERPART_PROFILE,CACHE_PROFILE)
+TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, *POSE_PROFILES)
 PROFILES = MappingProxyType({
     SMOKE_PROFILE:Limits(),
     COUNTERPART_PROFILE:Limits(max_transfer_bytes=64*1024**2,max_elapsed_seconds=300.0,
@@ -16,6 +18,9 @@ PROFILES = MappingProxyType({
     POSE_COUNTERPART_PROFILE:Limits(max_transfer_bytes=64*1024**2,max_elapsed_seconds=300.0,
         max_ranges=768,max_decompressed_bytes=512*1024**2,max_files=2,
         max_members=10000,max_metadata_bytes=1024**2),
+    CACHE_PROFILE:Limits(max_transfer_bytes=96*1024**2,max_elapsed_seconds=420.0,
+        max_ranges=1157,max_decompressed_bytes=640*1024**2,max_files=2,
+        max_members=16000,max_metadata_bytes=2*1024**2),
 })
 
 

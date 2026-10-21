@@ -30,6 +30,17 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 압축 prefix 캐시와 관측 카탈로그 구현
+
+- 사용자 승인으로 `posePrefixCache96MiB_v1`/API7을 추가한다. 기존 preset·입력 계약을 유지하고 현재 단일 Drive pose part·정확한 두 목표에 한정한다. 이 구현 범위는 M0 전체 완료나 실제 데이터 학습 완료가 아니다.
+- 원본 identity와 완료 Range hash를 기록한 연속 prefix만 재사용한다. 입력 캐시 hash와 원본 전후 검사를 통과한 뒤 byte0부터 순차 해제하고 미보관 후속 범위만 새로 읽는다. 검증 중단·원본 변경·불완전 범위·source/parser/CRC 실패는 사용 가능으로 올리지 않는다. gzip seek/state resume·여러 part 캐시는 미구현이다.
+- 준비 제한은 network body96MiB, 논리 압축입력96MiB, 협력적420초, 총1,157요청, header16,000, 해제640MiB, tar metadata누적2MiB/단일64KiB다. 최초 metadata의 별도128KiB·30초·8요청을 합치면96.125MiB·450초·1,165요청이며 인증/UI·전체 wire·export·영구보관은 별도다. 원본 검사를 위한 metadata도 준비 비용에 포함한다.
+- 캐시 import/재생 local IO196MiB, cache disk128MiB와 별도 export60초·local read384MiB 상한을 둔다. 결과 ZIP과 cache ZIP을 분리하고, warm 입력 ZIP까지 동시 보관하면 cache128+입력ZIP128+exportZIP128+추출/보고16+결과ZIP17MiB 수준의 별도 디스크 틀을 검토해야 한다. 소스/환경·업로드 UI 메모리와 OS/RSS hard 상한은 포함하지 않는다.
+- 카탈로그는 최대 sequence128개·관측16,000개·6MiB로 완료/저장/trust와 잘림을 보존하고 다른 보고서는 hash 참조와 요약만 둔다. 카탈로그는 전체 archive 목록이나 압축 seek index가 아니다. 목표 확보와 cache/catalog 보존을 별도로 판정한다.
+- 첫 사용자 시험은 cache 없는 cold JOB 한 번과 결과·cache 보관이다. 새 원본 시험은 개발·오케스트레이션 검토 및 로컬 커밋 후 고정 소스/노트북으로 테스트 세션에 인계한다. 실제 warm, 더 넓은 범위, sequence 전환을 자동 시작하지 않는다. 기존 API6에는 압축 본체가 없으므로 최초 cache 구축 읽기가 필요하다.
+
+- 로컬 검증: 전체232개 회귀(52.085초), cache 집중22개, fresh ZIP의 API7 사전137개 및 모의 notebook 흐름을 통과했다. 오케스트레이션 별도302-member fixture의 cold/warm/후속읽기/hash/원본변경/post실패/import시간초과8조건도 통과했다. 최초 notebook sandbox의 loopback 접근 실패는 보존하고 허용 환경에서 생략 없이 재검증했다. 실제 Google 요청·사용자 Colab cache 시험은0이며 근거는 Git 제외 `outputs/prefix_cache_20261021/`에 있다.
+
 ### 2026-10-21 후속 데이터 확보 전략 검토
 
 - [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)에 실제 보고서 기반 비용 비교와 기존 sample의 대응 여부, 구현된 재사용과 미구현 prefix 캐시의 경계를 정리한다.

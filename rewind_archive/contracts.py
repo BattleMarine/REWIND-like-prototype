@@ -197,6 +197,7 @@ class Budget:
         self.retry_attempts = 0
         self.retry_wait_seconds = 0.0
         self.retry_events = []
+        self.logical_compressed_bytes = self.local_io_bytes = self.cache_write_bytes = 0
 
     def check_time(self):
         remaining = self.limits.max_elapsed_seconds - (self.clock()-self.started)

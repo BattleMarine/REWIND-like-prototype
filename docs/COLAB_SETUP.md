@@ -1,5 +1,7 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
+2026-10-21 API7 cache 준비: [별도 실행 안내](PREFIX_CACHE.md)의 `posePrefixCache96MiB_v1`을 사용할 수 있습니다. 기존 인증·초기 metadata 절차는 유지합니다. 우선 고정 JOB의 cold 한 번과 결과ZIP/cacheZIP 보존을 테스트 세션에서 안내하며, 이후 warm은 cacheZIP 한 개를 명시적으로 업로드하는 별도 JOB입니다. 실제 warm의 media0이나 목표 확보를 보장하지 않습니다. 동시 disk는 input/export/cache/결과를 모두 계산하고, 준비420초와 별도 upload/export 비용을 구분합니다. 이번 cache 기능의 로컬 검증은 실제 Google/Colab 결과가 아닙니다.
+
 2026-10-15 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. 사용자의 실제 Colab 진단에서 Drive metadata HTTP 200 응답을 확인했습니다. 후속 사용자 보고서에서 manifest 생성과 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 구조·수치와 연속 18프레임을 검사했습니다. 공식 train 경로 소속과 annotation 재투영의 수치 정합성도 후속 확인했지만, 단위·좌표 의미·시간·원본 motion 독립성·실제 RGB 대응·GPU 실행은 남아 있습니다. 수치와 검토 범위는 [로드맵](ROADMAP.md)에 기록합니다.
 
 오케스트레이션 검토에서는 노트북의 환경 확인·테스트·합성 학습·재개·평가·캐시 셀을 Windows CPU에서 실행했습니다. 59개 테스트가 통과했고, 결과 17개 파일의 로컬 복사·SHA-256 일치를 확인했습니다. 업로드·Drive 인증 셀은 실행하지 않았으며 로컬 복사 검증을 실제 Drive 전송 성공으로 해석하지 않습니다.

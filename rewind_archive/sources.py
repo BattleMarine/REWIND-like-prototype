@@ -362,13 +362,45 @@ class DriveSource(HttpSource):
         return chunk
 
 
+class CachedDriveSource(DriveSource):
+    def __init__(self,part,session,cache):
+        super().__init__(part,session)
+        self.cache=cache;self.cache_checked=False;self.cache_window_pending=False
+
+    def finish_cached_validation(self,budget):
+        if not self.cache_window_pending:return
+        budget.reserve_requests(1)
+        if self.METADATA_RESPONSE_BYTES>budget.limits.max_transfer_bytes-budget.transfer_bytes:
+            raise PreparationError("transfer_bytes_limit")
+        self._check_metadata_once(budget,"metadata_post")
+        self.pending_validation=False;self.cache_window_pending=False
+
+    def read_range(self,start,end,budget,on_chunk):
+        if start>=self.cache.input_bytes:
+            chunk=super().read_range(start,end,budget,on_chunk)
+            self.cache.append(start,chunk)  # 원본 post 검사가 끝난 범위만 저장한다.
+            return chunk
+        if not self.cache_checked:
+            budget.reserve_requests(2)
+            if 2*self.METADATA_RESPONSE_BYTES>budget.limits.max_transfer_bytes-budget.transfer_bytes:
+                raise PreparationError("transfer_bytes_limit")
+            self._check_metadata_once(budget,"metadata_pre")
+            self.cache_checked=True;self.pending_validation=True;self.cache_window_pending=True
+        chunk=self.cache.read(start,end)
+        if end+1==self.cache.input_bytes:self.finish_cached_validation(budget)
+        on_chunk(chunk)
+        return chunk
+
+
 class SplitStream:
-    def __init__(self, manifest, base, budget, authorized_session=None):
+    def __init__(self, manifest, base, budget, authorized_session=None, cache=None):
         self.manifest, self.budget = manifest, budget
+        self.cache=cache
         self.sources = []
         for part in manifest["parts"]:
             kind = part["source"]["type"]
-            self.sources.append(LocalSource(part,base) if kind=="local" else HttpSource(part) if kind=="http" else DriveSource(part,authorized_session))
+            self.sources.append(LocalSource(part,base) if kind=="local" else HttpSource(part) if kind=="http" else
+                CachedDriveSource(part,authorized_session,cache) if cache else DriveSource(part,authorized_session))
         self.part_index = self.offset = 0
         self.audit = []
         self.compressed_bytes_received = 0
@@ -384,10 +416,13 @@ class SplitStream:
             return b""
         part = self.manifest["parts"][self.part_index]
         remaining = budget.limits.max_transfer_bytes-budget.transfer_bytes
-        if remaining <= 0:
+        cached=bool(self.cache and self.offset<self.cache.input_bytes)
+        if remaining <= 0 and not cached:
             raise PreparationError("transfer_bytes_limit")
         source = self.sources[self.part_index]
-        if isinstance(source, DriveSource):
+        if cached:
+            remaining=self.cache.input_bytes-self.offset
+        elif isinstance(source, DriveSource):
             budget.reserve_requests(3)
             remaining -= 2*source.METADATA_RESPONSE_BYTES
             if remaining <= 0:
@@ -396,8 +431,13 @@ class SplitStream:
             budget.reserve_requests(1)
         size = min(budget.limits.io_chunk_bytes if isinstance(source,LocalSource) else budget.limits.media_range_bytes,
             part["size_bytes"]-self.offset, remaining)
+        if self.cache:
+            from .prefix_cache import LOGICAL_BYTES
+            if budget.logical_compressed_bytes>=LOGICAL_BYTES:raise PreparationError("logical_input_limit")
+            size=source.cache.cap(self.offset,min(size,LOGICAL_BYTES-budget.logical_compressed_bytes))
         record = {"part_index":self.part_index,"start":self.offset,"end":self.offset+size-1,"bytes_received":0,"status":"pending"}
         self.audit.append(record)
+        if self.cache:record["input_source"]="cache" if cached else "drive"
         hash_ = hashlib.sha256()
         def received(chunk):
             record["bytes_received"] += len(chunk)
@@ -418,6 +458,7 @@ class SplitStream:
                 record["response"] = source.last_diagnostic
             record["sha256_received_bytes"] = hash_.hexdigest()
         budget.peak_input_chunk_bytes = max(budget.peak_input_chunk_bytes,len(chunk))
+        if self.cache:budget.logical_compressed_bytes+=len(chunk)
         self.offset += len(chunk)
         if self.offset == part["size_bytes"]:
             self.part_index += 1
