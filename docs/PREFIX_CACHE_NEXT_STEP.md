@@ -16,7 +16,7 @@
 | 카탈로그 |92sequence·6,318관측,완료payload6,317·미완료1,잘림/미분류0 |
 | 목표 pose / retry |0개 /0회 |
 
-이96MiB profile의 논리입력 잔여는101,708bytes뿐이다. 같은 설정으로 끝까지 warm 재생해도 새로 진행할 압축량은 약0.097MiB이며,원본 pre/post·import·기존 약526.347MiB 해제를 다시 지불한다. 목표 위치 근거 없이 같은 warm을 반복하지 않는다.
+이96MiB profile의 논리입력 잔여는101,708bytes뿐이다. 같은 설정으로 끝까지 warm 재생해도 새로 진행할 압축량은 약0.097MiB이며,원본 pre/post·import·기존 약526.346MiB 해제를 다시 지불한다. 목표 위치 근거 없이 같은 warm을 반복하지 않는다.
 
 92sequence의 인물은 Adanna26·Amit19·Kyle15·Joko14·Carla18이며 Serena는 없다. 이는 **이번 보존 카탈로그에 기존 Serena 목표가 없다는 근거**다. 전체 pose 원본의 부재나 다른 인물의 RGB 확보 비용이 작다는 뜻은 아니다. 기존 Adanna pose나 CityPark 쪽으로 옮겨도 대응 좌우RGB 위치·연속성·시간·split 비용은 미확정이다.
 
@@ -52,7 +52,7 @@ HTTP는 suffix의 각 pre/media/post와 cache 전체의 live pre/post2회를 포
 
 기존640MiB 해제 제한은 약116.611MiB,header16,000은 약117.483MiB 논리입력에서 먼저 걸리는 계산이다.192안의 sequence 수도 현128 cap을 넘을 수 있다. Catalog cap은 잘림을 표시하며 parser를 멈추는 header cap과 다르다.
 
-시간은 `warm import(C)+기존C 재해제/파싱+suffix 수신/해제+보고/저장`으로 나눠야 한다. Cache는 압축 본체의 재전송을 줄여도 약95.9MiB 입력·526.347MiB 해제와13,061header 처리를 없애지 않는다. Cold 단순 비례의128=415.5초·192=623.3초는 **cold 상당 비용 참고**이며 warm 예상시간이 아니다.420초 안에 도달할지는 Colab cache IO·CPU·새Range 응답을 분리 측정해야 한다. 로컬1.563초와 Colab cold 시간을 섞어 총시간을 보장하지 않는다.
+시간은 `warm import(C)+기존C 재해제/파싱+suffix 수신/해제+보고/저장`으로 나눠야 한다. Cache는 압축 본체의 재전송을 줄여도 약95.9MiB 입력·526.346MiB 해제와13,061header 처리를 없애지 않는다. Cold 단순 비례의128=415.5초·192=623.3초는 **cold 상당 비용 참고**이며 warm 예상시간이 아니다.420초 안에 도달할지는 Colab cache IO·CPU·새Range 응답을 분리 측정해야 한다. 로컬1.563초와 Colab cold 시간을 섞어 총시간을 보장하지 않는다.
 
 ## 4. Limits 숫자만 올려서는 안 되는 코드 경계
 
@@ -89,6 +89,8 @@ HTTP는 suffix의 각 pre/media/post와 cache 전체의 live pre/post2회를 포
 
 이번v1 inputZIP 상한128+새cache160+export160+일반출력16+결과17=481MiB에 작은 보고서 여유가 필요하다. 신규v2 ZIP을다시입력하는일반warm에서는160×3+16+17=513MiB다.192 비교안의일반warm은224×3+16+17=705MiB다.실제보관ZIP은95.945477MiB로작지만 이를모든입력의상한으로일반화하지않는다. 업로드·영구보관의전송/시간은별도이며기존417MiB틀을확장안에그대로쓰지않는다.
 
+현재 notebook 경로는 보관ZIP 약95.945MiB를 다시 업로드하고 새cache ZIP을 내려받는다. 따라서 원본API의prefix 재전송 절감과 사용자 업로드/export까지 합친 전체wire 절감을 혼동하지 않는다. 런타임·영구보관에서 이미 접근 가능한 cache인지도 인계 때 명시한다.
+
 ### 완료 기준과 테스트 진입 조건
 
 1. 현 실제 v1의manifest/hash·byte0 해제 기준을 보존하고 재현script/환경을 연결한다. 필요하면 네트워크가 구조적으로 차단된 offline-only 검사 진입점을 얇게 제공하되 live warm과 별도 결과로 표시한다.
@@ -96,7 +98,7 @@ HTTP는 suffix의 각 pre/media/post와 cache 전체의 live pre/post2회를 포
 3. Network/local/logical/decompressed/header·audit/report/catalog·disk·시간계수를 분리하고 post 미완료를 usable로 바꾸지 않는다. 구형profile/API/실패결과ZIP 보존을 회귀 확인한다.
 4. 고정 계약·코드·소스ZIP/notebook과 실cache 식별값을 리뷰한 뒤 **테스트 세션에한JOB만** 인계한다. 보관prefix는재전송하지않고첫새Range는offset100,561,588부터여야한다. 원본identity가다르면중단하며cold재수신을자동대안으로쓰지않는다.
 
-필수 인계 정보: 프로젝트/세션ID,고정revision·소스/ready notebook SHA,입력ZIP SHA·manifest/prefixhash,새profile·모든단계상한·디스크,실행순서와중단조건,cache/catalog/목표각판정,새network와local재생시간분리,회수할두ZIP/보고서와영구보관위치다. 기존prefix SHA는 `6354437b0a27b8050e8111c81a71eec0cc35d915da0852d7978d4298016e857e`,입력ZIP SHA는 `4d63187ff49de40b5af1843aa4ded51caed255fda9996d78c028c47bf58c3319`다.
+필수 인계 정보: 프로젝트/세션ID,고정revision·소스/ready notebook SHA,입력ZIP SHA·manifest/prefixhash,새profile·모든단계상한·디스크,실행순서와중단조건,cache/catalog/목표각판정,새network와local재생시간분리,회수할두ZIP/보고서와영구보관위치다. 기존prefix SHA는 `6354437b0a27b8050e8111c81a71eec0cc35d915da0852d7978d4298016e857e`,입력ZIP SHA는 `4d63187ff49de40b5af1843aa4ded51caed255fda9996d78c028c47bf58c3319`,manifest content SHA는 `9b253b0f4f6c8153fa17daffa7f11f8cedd6e70b66252991fffdb2b37708db3c`다.
 
 전체pose 약351MiB의 인덱싱·gzip state resume·모든sequence 재포장·RGB52GB대탐색은 별도 장기 작업이다. 최초 전구간 읽기와 더 큰cache/catalog/parser/보관비가 필요하고,새index를만들어도RGB와pose대응·시간·분할·내용검증이완료되는것은아니다.이번묶음에포함하지않는다.
 
