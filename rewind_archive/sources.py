@@ -10,6 +10,8 @@ from pathlib import Path
 
 from .contracts import PreparationError
 from .diagnostics import attach_failure, request_failure, safe_request_failure
+from .request_policy import (PRE_OPEN_TIMEOUT_SECONDS, MAX_RETRIES_PER_PRE, MAX_RETRIES_TOTAL,
+    RETRY_DELAY_SECONDS, eligible_open_timeout, mark_open_timeout, validate_no_hidden_retries)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -64,7 +66,8 @@ def session_opener(session, operation="unknown"):
             response=session.get(url, headers=headers, stream=True, allow_redirects=False, timeout=timeout)
         except Exception as exc:
             # Session 예외에 token/URL이 들어 있더라도 로그에 전달하지 않는다.
-            raise PreparationError("authorized_request_failed",request_failure=request_failure(exc,operation,"request_open")) from None
+            error=PreparationError("authorized_request_failed",request_failure=request_failure(exc,operation,"request_open"))
+            raise mark_open_timeout(error,exc,operation) from None
         try:
             return SessionResponse(response)
         except Exception as exc:
@@ -255,15 +258,63 @@ class DriveSource(HttpSource):
 
     METADATA_RESPONSE_BYTES = 16384
 
-    def check_metadata(self, budget, operation="metadata_pre"):
-        budget.request("metadata")
+    def check_metadata(self, budget, operation="metadata_pre", media_bytes=0):
+        if not budget._request_policy or operation!="metadata_pre":
+            return self._check_metadata_once(budget,operation)
+        validate_no_hidden_retries(self.authorized_session)
+        attempt=0;previous_failure=None;retry_event=None
+        while True:
+            try:
+                # 대기 후 실제 시도 직전의 검사 실패도 앞선 timeout을 보존한다.
+                budget.reserve_requests(3)
+                if media_bytes+2*self.METADATA_RESPONSE_BYTES > budget.limits.max_transfer_bytes-budget.transfer_bytes:
+                    raise PreparationError("transfer_bytes_limit")
+                return self._check_metadata_once(budget,operation,
+                    timeout=min(PRE_OPEN_TIMEOUT_SECONDS,budget.check_time()),retry_event=retry_event)
+            except PreparationError as exc:
+                decisions={"ranges_limit":"request_budget","transfer_bytes_limit":"transfer_budget","elapsed_limit":"time_budget"}
+                if retry_event is not None and not retry_event.get("retry_started",False) and exc.reason in decisions:
+                    retry_event["decision"]=decisions[exc.reason]
+                    raise previous_failure from None
+                if not eligible_open_timeout(exc):raise
+                event={"metadata_audit_index":len(budget.metadata_response_audit)-1,
+                    "attempt":attempt+1,"request_failure":safe_request_failure(exc.request_failure),
+                    "decision":"waiting","retry_started":False}
+                budget.retry_events.append(event)  # 전역 retry3회 + 마지막 실패1행 이하
+                if attempt>=MAX_RETRIES_PER_PRE:event["decision"]="per_pre_limit"
+                elif budget.retry_attempts>=MAX_RETRIES_TOTAL:event["decision"]="global_limit"
+                else:
+                    try:
+                        budget.reserve_requests(3)
+                        if media_bytes+2*self.METADATA_RESPONSE_BYTES>budget.limits.max_transfer_bytes-budget.transfer_bytes:
+                            raise PreparationError("transfer_bytes_limit")
+                        if budget.check_time()<=RETRY_DELAY_SECONDS:raise PreparationError("elapsed_limit")
+                    except PreparationError as limit:
+                        event["decision"]=decisions[limit.reason]
+                    else:
+                        before=budget.clock()
+                        try:budget._sleeper(RETRY_DELAY_SECONDS)
+                        finally:budget.retry_wait_seconds+=max(0.0,budget.clock()-before)
+                        previous_failure=exc;retry_event=event;attempt+=1
+                        continue
+                raise  # 첫 timeout과 실패 audit를 상한 오류로 바꾸지 않는다.
+
+    def _check_metadata_once(self, budget, operation, timeout=None, retry_event=None):
+        remaining=budget.request("metadata")
+        # 정책 경로는 마지막 시간 검사와 요청 계수를 같은 commit에서 처리한다.
+        # 이 뒤 get()까지 추가 check_time이 없어 미발송 retry/benign elapsed 경계가 없다.
+        open_timeout=None if timeout is None else min(timeout,remaining)
+        if retry_event is not None:
+            budget.retry_attempts+=1
+            retry_event.update(decision="retry_started",retry_started=True)
         if not hasattr(budget,"metadata_response_audit"):
             budget.metadata_response_audit=[]
         audit={"operation":operation,"response":None,"bytes_received":0,"status":"pending"}
         budget.metadata_response_audit.append(audit)
         response=None;stage="request_open";failed=True
         try:
-            response=session_opener(self.authorized_session,operation)(self.metadata_url,{"Accept-Encoding":"identity"},budget.timeout())
+            response=session_opener(self.authorized_session,operation)(self.metadata_url,{"Accept-Encoding":"identity"},
+                budget.timeout() if open_timeout is None else open_timeout)
             stage="response_validation"
             audit["response"]=metadata_diagnostic(response)
             def received(chunk):
@@ -303,7 +354,7 @@ class DriveSource(HttpSource):
         budget.reserve_requests(3)
         if end-start+1+2*self.METADATA_RESPONSE_BYTES > budget.limits.max_transfer_bytes-budget.transfer_bytes:
             raise PreparationError("transfer_bytes_limit")
-        self.check_metadata(budget,"metadata_pre")
+        self.check_metadata(budget,"metadata_pre",end-start+1)
         self.pending_validation = True
         chunk = super().read_range(start,end,budget,on_chunk)
         self.check_metadata(budget,"metadata_post")

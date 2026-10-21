@@ -184,13 +184,19 @@ class Limits:
 
 
 class Budget:
-    def __init__(self, limits, clock=time.monotonic):
+    def __init__(self, limits, clock=time.monotonic, request_policy=None, sleeper=time.sleep):
+        from .request_policy import validate_request_policy
+        self._request_policy = validate_request_policy(request_policy)
+        self._sleeper = sleeper
         self.limits, self.clock, self.started = limits, clock, clock()
         self.transfer_bytes = self.decompressed_bytes = self.payload_disk_bytes = 0
         self.members = self.metadata_bytes = self.files = self.ranges = 0
         self.media_requests = self.metadata_requests = self.local_reads = 0
         self.peak_output_chunk_bytes = self.peak_input_chunk_bytes = 0
         self.peak_payload_disk_bytes = 0
+        self.retry_attempts = 0
+        self.retry_wait_seconds = 0.0
+        self.retry_events = []
 
     def check_time(self):
         remaining = self.limits.max_elapsed_seconds - (self.clock()-self.started)
@@ -202,19 +208,21 @@ class Budget:
         return min(self.limits.request_timeout_seconds, self.check_time())
 
     def add(self, field, amount, maximum):
-        self.check_time()
+        remaining=self.check_time()
         if getattr(self,field) + amount > maximum:
             raise PreparationError(field+"_limit")
         setattr(self, field, getattr(self,field)+amount)
+        return remaining
 
     def stats(self):
-        return {key:value for key,value in vars(self).items() if key not in ("limits", "clock", "started")} | {"elapsed_seconds":self.clock()-self.started,
+        return {key:value for key,value in vars(self).items() if not key.startswith("_") and key not in ("limits", "clock", "started")} | {"elapsed_seconds":self.clock()-self.started,
             "http_requests_total":self.media_requests+self.metadata_requests}
 
     def request(self, kind, maximum=None):
-        self.add("ranges", 1, self.limits.max_ranges if maximum is None else maximum)
+        remaining=self.add("ranges", 1, self.limits.max_ranges if maximum is None else maximum)
         field = {"media":"media_requests", "metadata":"metadata_requests", "local":"local_reads"}[kind]
         setattr(self, field, getattr(self, field)+1)
+        return remaining
 
     def reserve_requests(self, count):
         self.check_time()

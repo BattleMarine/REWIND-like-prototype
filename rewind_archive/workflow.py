@@ -14,11 +14,13 @@ from .matching import verify_extraction
 from .pilot import run_metadata_pilot
 from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .diagnostics import request_failure, safe_request_failure
+from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
 
 
-NOTEBOOK_API_VERSION = 5
+NOTEBOOK_API_VERSION = 6
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
-CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
+PREVIOUS_CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
+CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
 
 
 def read_report(path, maximum=8*1024**2):
@@ -49,11 +51,13 @@ def load_history(outputs):
 
 
 def make_preflight(config, history):
-    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
+    if not isinstance(config,dict) or set(config) not in (CONFIG_FIELDS,PREVIOUS_CONFIG_FIELDS,LEGACY_CONFIG_FIELDS):
         raise PreparationError("workflow_config_fields")
     config=copy.deepcopy(config)
     config.setdefault("profile",None)
     config.setdefault("exact_targets",[])
+    # 누락된 legacy 필드는 config hash/유효 fingerprint까지 그대로 보존한다.
+    request_policy=validate_request_policy(config.get("request_policy"))
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -77,6 +81,9 @@ def make_preflight(config, history):
         raise PreparationError("counterpart_profile_requires_targeted_pair")
     if config["profile"]==POSE_COUNTERPART_PROFILE and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
         raise PreparationError("pose_profile_requires_pose_kind")
+    if request_policy and (config["profile"]!=POSE_COUNTERPART_PROFILE or
+            (mode!="review" and (mode,purpose)!=("extract","targeted")) or len(config["exact_targets"])!=2):
+        raise PreparationError("request_policy_requires_pose_targeted_pair")
     config["limits"]=asdict(limits)
     config["metadata_limits"]=asdict(metadata)
     if not isinstance(config["previous_result"],str) or len(config["previous_result"].encode("utf-8"))>4096:
@@ -97,6 +104,7 @@ def make_preflight(config, history):
     effective={k:config[k] for k in ("mode","purpose","selection","includes","limits","metadata_limits")}
     if config["profile"] is not None or config["exact_targets"]:
         effective.update(profile=config["profile"],exact_targets=config["exact_targets"])
+    if request_policy:effective["request_policy"]=request_policy
     fingerprint=digest(effective)
     repeats=[r["job_id"] for r in history.values() if r.get("effective_sha256")==fingerprint]
     selection_hash=digest(config["selection"])
@@ -106,6 +114,7 @@ def make_preflight(config, history):
             "selection":config["selection"],"includes":config["includes"],"limits":config["limits"],
             "profile":config["profile"] if config["profile"] is not None else "custom_limits",
             "exact_targets":config["exact_targets"],
+            "request_policy":policy_description(request_policy),
             "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"]==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes,
             "stop_when_targets_stored":bool(config["exact_targets"]),
             "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,
@@ -141,6 +150,7 @@ def claim_workflow_job(config, preflight, history):
         **target_summary(config["exact_targets"],[],True),
         "reads_from_byte_zero":True,"train_ready":False}
     record["request_failure"]=None
+    record["request_policy"]=policy_description(config.get("request_policy"))
     history[config["job_id"]]=record
     return record
 
@@ -165,6 +175,7 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
     try:
         record["stage"]="authentication"
         session=session_factory()
+        if config.get("request_policy"):validate_no_hidden_retries(session)
         record["stage"]="metadata"
         metadata=build_drive_manifest(config["selection"],session,MetadataLimits.from_dict(config["metadata_limits"]))
         save_metadata_bundle(metadata,root/"metadata")
@@ -178,9 +189,10 @@ def run_workflow_job(config, preflight, history, outputs, session_factory):
             print({"source_identity_after_metadata":metadata["manifest"],"reads_from_byte_zero":True})
             record["stage"]="pilot"
             pilot=run_metadata_pilot(metadata,root/"pilot",config["includes"],Limits.from_dict(config["limits"]),session,
-                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"])
+                mode=config["mode"],profile=config["profile"],exact_targets=config["exact_targets"],request_policy=config.get("request_policy"))
             record.update(status="finished",stop_reason=pilot["stop_reason"],sample_acquired=pilot["sample_acquired"],
                 request_failure=safe_request_failure(pilot.get("request_failure")),
+                request_retry=pilot["request_retry"],
                 observed_regular_members=pilot["observed_regular_members"],profile=pilot["profile"],limits=pilot["limits"],
                 **{k:pilot[k] for k in ("exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status")})
     except KeyboardInterrupt:
@@ -206,6 +218,8 @@ def review_run(path):
         record=read_report(root/"job.json",256*1024)
         result["job"]={k:record[k] for k in ("job_id","config","status","stage","stop_reason") if k in record}
         result["job"]["request_failure"]=safe_request_failure(record.get("request_failure"))
+        for key in ("request_policy","request_retry"):
+            if key in record:result["job"][key]=record[key]
         result["request_failure"]=safe_request_failure(record.get("request_failure"))
         result["request_failure_recorded"]="request_failure" in record
     extraction_root=root/"pilot" if (root/"pilot").is_dir() else root
@@ -218,6 +232,7 @@ def review_run(path):
             "exact_targets","stored_targets","completed_targets","missing_targets","targets_complete","targets_status") if k in report}
         result["complete_stored_files"]=len(report["files"])
         result["extraction"]["request_failure"]=safe_request_failure(report.get("request_failure"))
+        if "request_retry" in report:result["extraction"]["request_retry"]=report["request_retry"]
         result["request_failure"]=safe_request_failure(report.get("request_failure"))
         result["request_failure_recorded"]="request_failure" in report
         try:
@@ -231,6 +246,8 @@ def review_run(path):
         result["sample_status"]=pilot.get("sample_status","legacy_report")
         result["request_failure"]=safe_request_failure(pilot.get("request_failure"))
         result["request_failure_recorded"]="request_failure" in pilot
+        result["request_retry"]=pilot.get("request_retry")
+        result["request_retry_recorded"]="request_retry" in pilot
         result["target_verification"]={k:pilot[k] for k in ("completed_targets","missing_targets","targets_complete","targets_status") if k in pilot}
     if len(result)==3:
         raise PreparationError("workflow_no_result_reports")

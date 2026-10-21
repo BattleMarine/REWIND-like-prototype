@@ -1,6 +1,23 @@
 # 분할 압축 원본의 제한된 순차 준비
 
-2026-10-19 후속: Pose 전용 API4의 실제 실행은39번째 media에서 `authorized_request_failed`로 중단했습니다. 해당 보고서에는 예외 타입/정확한 발생 단계가 없어 원인을 확정하지 않습니다. 이번 API5는 예산/목표/재시도를 바꾸지 않고 안전한 요청 실패 진단을 추가합니다. 고정 revision을 테스트 세션에 인계해 별도 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다. 목표 pose·좌표/영상 검증은 여전히 미완료입니다.
+2026-10-21 후속 API6: 실제 API5 사전 metadata 개시의 `requests.read_timeout`을 근거로 아래의 opt-in 정책을 추가했습니다. 실제 원인의 해결·pose 확보 여부는 새 사용자 테스트에서 따로 판단합니다. 기존 세 예산 preset의 수치와 기본5초·추가시도0은 유지합니다.
+
+## API6 사전 metadata timeout과 제한 재시도
+
+- 단일 JOB의 새 `request_policy` 기본값은 `None`입니다. `metadataPreTimeout10sRetry1Global3_v1`은 `poseCounterpart64MiB_v1`의 targeted extract 경로2개에만 허용합니다. Review에서도 같은 정책을 표시합니다. API6 notebook/source를 함께 쓰며14셀·7코드 셀·사전 검사115개를 유지합니다.
+- 정책 선택 시 `metadata_pre`의 `session.get` 개시 timeout만 최대10초로 바꿉니다. 마지막 요청 예약 시점의 남은 준비시간으로 축소합니다. 본문·media·후검사·초기 metadata timeout은 기존5초이고, 초기 metadata의128KiB/30초/8요청 예산도 별도입니다. 요청 timeout은 socket/cooperative 제한입니다. DNS·OS hard deadline이나 전체 wire 상한을 뜻하지 않습니다.
+- 한 pre 개시당 추가1회(총2시도), 준비 전체에서는 part가 바뀌어도 추가3회까지 허용합니다. 각 retry 전0.5초 고정 대기를 수행하므로 요청한 대기 합계는 최대1.5초입니다. 실제 대기시간은 clock으로 측정해 보고하며 OS oversleep은 더 길 수 있습니다. 남은 시간이0.5초 이하이면 대기를 시작하지 않고, 깨어난 뒤에도 deadline을 확인합니다. 전체64MiB/300초/768요청은 늘리지 않습니다.
+- 실제 `requests`/`urllib3`의 직접 connect/read timeout 타입이고, `session_opener`가 get 개시에서 응답 없이 실패했으며 partial이 없을 때만 retry 자격을 부여합니다. 보고용 dict·임의 클래스명·포괄 TimeoutError·cause/reason wrapper는 자격 근거가 아닙니다. Response wrapping·본문·HTTP403/429 등 응답·media·metadata_post·원본 변경·파서/CRC 오류는 재시도하지 않습니다.
+- 매 시도 전에 남은 pre+media+post 최소3요청과 media body+metadata32KiB 여유를 다시 확인합니다. 실패한 pre도 metadata/총요청에 포함합니다. 수신 body·해제·파일·disk 계수는 초기화하지 않습니다. 대기·요청 시간은 같은 준비 clock을 사용합니다. 후속 retry 발송 전 예약/시간 실패는 최초 timeout을 유지하고 blocked decision을 남겨 정상 bounded stop으로 잘못 바꾸지 않습니다.
+- Opt-in은 선택된 Drive HTTPS adapter 및 내부/custom auth Request의 session까지 retry0인지 검사합니다. Google-auth 기본 내부 auth session은 adapter retry3일 수 있어 notebook이 별도 retry0 session을 주입합니다. Refresh 재시도는0이며, 이 custom session은 성공·실패 모두 닫습니다. 기본 None 분기는 기존 인증 설정을 유지합니다. 최초 사용자 인증 비용은 기존처럼 준비예산 밖입니다.
+- `request_retry`는 extraction/pilot/job/review/ZIP에 같은 요약을 남깁니다. 정책 수치·실제 추가시도·실제 wait·최대4행의 실패 event·exhausted를 확인합니다. Retry 성공 시 최종 `request_failure=null`이지만 실패한 metadata audit와 event는 남습니다. `decision=per_pre_limit/global_limit`은 재시도 상한, `request_budget/transfer_budget/time_budget`은 준비예산 차단입니다. 실제 시작된 retry만 `retry_started=true`와 횟수에 반영합니다. 제한 실패는 최초 timeout의 진단을 유지하며 media를 시작하지 않습니다.
+- 이전9/11필드 JOB을 계속 받으며 누락된 정책 필드를 config에 강제로 추가하지 않습니다. 기존 config hash와 effective fingerprint를 보존하고, 새 정책을 선택하면 effective fingerprint에도 포함합니다. 정책 None과 누락은 같은 실행 동작입니다. 이전 진단/정책 없는 보고서도 review에서 계속 읽되 코드 hash 검증은 유지합니다.
+
+2026-10-21 로컬 검증: 최종 소스의 전체210개 unittest를47.177초에 통과했습니다. 추가21개는 일시/영구 timeout·서로 다른4개 part ID의 전역 상한·매 검사마다 진행하는 clock의 발송 전 만료·실제 wait·요청/전송 예약·post/source change/partial/403/429 비재시도·이전 설정/fingerprint·보고서/ZIP을 포함합니다. 타입 판별을 주입한 상태기계 단위 검사와 별도로 실제 requests/urllib3/google-auth20조건, 기존 실제 예외 분류23조건, localhost 전송 오류15조건도 통과했습니다. 최초 sandbox 실행의 localhost 실패 로그는 보존하고, 연결이 허용된 환경에서 전체 검사를 생략 없이 다시 실행했습니다.
+
+Fresh source ZIP의14모듈/API6 notebook을 모의 실행하고 사전115개·기본 인증0·stale/중복 차단·실제 ReadTimeout 타입을 발생시킨 pre 재시도 성공/영구 실패·최종 null과 별도 이력·adapter retry0·review/ZIP 전달을 확인했습니다. 실제 Google/Colab 인증·원본 요청은0입니다. 로그·검토 JSON·최종 파일 hash는 Git 제외 `outputs/request_retry_20261021/developer/final_manifest.json`에 연결합니다. 실제 원인 해결·pose 확보·성능 개선을 입증한 결과는 아닙니다.
+
+2026-10-19 후속: Pose 전용 API4의 실제 실행은39번째 media에서 `authorized_request_failed`로 중단했습니다. 해당 보고서에는 예외 타입/정확한 발생 단계가 없어 원인을 확정하지 않습니다. 당시 API5는 예산/목표/재시도를 바꾸지 않고 안전한 요청 실패 진단을 추가합니다. 고정 revision을 테스트 세션에 인계해 별도 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다. 목표 pose·좌표/영상 검증은 여전히 미완료입니다.
 
 2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 최신 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 

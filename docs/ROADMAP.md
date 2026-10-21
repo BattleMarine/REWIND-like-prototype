@@ -30,6 +30,15 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 metadata 사전 요청 timeout·제한 재시도 준비
+
+- 사용자 승인에 따라 별도 opt-in `metadataPreTimeout10sRetry1Global3_v1` 정책을 준비한다. 기존 profile/예산/기본5초·재시도0 동작은 유지한다. 새 API6는 pose targeted 준비에서 정책을 명시하며 설정hash와 실행 보고서에 기록한다.
+- Metadata 사전 요청의 개시만 최대10초(남은 준비시간 이내)로 조정한다. 직접 확인한 requests/urllib3 connect/read timeout이며 응답을 받지 못한 경우에만 해당 pre당 추가1회, 준비전체 추가3회를 허용한다. 대기는0.5초씩이며 전체 준비300초 안에서 차감한다. 초기 metadata·media·후검사·본문은 기존5초와 재시도0을 유지한다.
+- 실제 모든 시도를 요청 횟수에 포함하고 재시도 전 pre+media+post의 요청/전송량 여유를 다시 확인한다. 인증·HTTP403/429·원본변경·parser/CRC·부분본문은 재시도하지 않는다. 회복된 timeout 이력과 최종 request_failure를 구분하며 제한 소진·최종 실패도 보존한다.
+- 동일 pose 목표의 새 JOB `archvis_pose_1_10_retry_001`로 테스트 세션에서1회 실행하도록 준비한다. 성공을 보장하거나 이전 실패의 근본 원인이 해결됐다고 주장하지 않는다. 검토·로컬 커밋 후 고정 소스/노트북을 인계하며 실제 원본 요청은 개발 검증에 포함하지 않는다.
+
+- 최종 로컬 검증: 전체210개 회귀(47.177초), 재시도21개·실제 라이브러리 retry 경계20조건·기존 진단23조건·localhost 전송15조건 및 fresh ZIP의 API6 사전115개/모의 notebook 실행을 통과했다. 오케스트레이션은21개(0.785초)와 별도 회복/소진/기존정책/후검사4시나리오를 검증했다. 초기 localhost sandbox 실패는 로그로 보존하고 연결을 허용한 환경에서 생략 없이 재검증했다. 실제 Google 요청은0이며 근거는 Git 제외 `outputs/request_retry_20261021/`에 있다.
+
 ### 2026-10-21 API5 실제 진단 결과 — 사전 metadata 읽기 시간 초과
 
 - `1ea5ff5`/API5, `archvis_pose_1_10_diagnostic_001`에서 `request_failure`는 `read_timeout / requests / metadata_pre / request_open`이다. 안전한 진단 회수는 확인했지만 pose 목표0개·미확보2개, `targets_status=unusable`, 검증 `not_usable`로 추출은 실패했다.

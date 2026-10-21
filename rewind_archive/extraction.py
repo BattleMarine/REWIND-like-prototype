@@ -14,6 +14,7 @@ from .contracts import Budget, Limits, PreparationError, canonical, digest, safe
 from .profiles import POSE_COUNTERPART_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
 from .sources import SplitStream
 from .diagnostics import safe_request_failure
+from .request_policy import validate_request_policy, retry_summary
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
@@ -24,13 +25,14 @@ BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "
 MAX_OBSERVED_MEMBERS = 128
 
 
-def report_reserve_bytes(manifest, includes, limits, exact_targets=None):
+def report_reserve_bytes(manifest, includes, limits, exact_targets=None, request_policy=None):
     # name JSON escape 최악은 UTF-8 경로 bytes의 2배. 관측목록은 pilot에 복사하지 않는다.
     observation_reserve = min(MAX_OBSERVED_MEMBERS,limits.max_members)*(2*limits.max_path_bytes+512)
     return (16384+2*len(canonical(manifest))+len(canonical(includes))+limits.max_ranges*1024
         +limits.max_files*(3*limits.max_path_bytes+1024)+observation_reserve
         +2*(2*limits.max_path_bytes+512)  # last regular 행을 extraction/pilot에 각각 예약
-        +(6*len(canonical(exact_targets))+1024 if exact_targets else 0))
+        +(6*len(canonical(exact_targets))+1024 if exact_targets else 0)
+        +(8192 if request_policy else 0))  # 상한 있는 retry 요약/실패행을 extraction/pilot 양쪽에 예약
 
 
 def code_hashes():
@@ -140,7 +142,7 @@ def read_payload(reader, size, sink=None, on_chunk=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
@@ -149,6 +151,9 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         raise PreparationError("preparation_mode")
     includes = [] if mode=="scan" and includes==[] else validate_includes(includes)
     exact_targets = validate_exact_targets(exact_targets,includes,limits,mode)
+    validate_request_policy(request_policy)
+    if request_policy and (profile!=POSE_COUNTERPART_PROFILE or mode!="extract" or len(exact_targets)!=2):
+        raise PreparationError("request_policy_requires_pose_targeted_pair")
     if profile is not None:
         validate_profile_limits(profile,limits)
         if profile in TARGET_PAIR_PROFILES and (mode!="extract" or len(exact_targets)!=2):
@@ -156,9 +161,10 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         if profile==POSE_COUNTERPART_PROFILE and manifest["kind"]!="pose":
             raise PreparationError("pose_profile_requires_pose_kind")
     metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile==POSE_COUNTERPART_PROFILE else limits.max_metadata_bytes
-    budget = Budget(limits,**({"clock":clock} if clock else {}))
+    budget = Budget(limits,request_policy=request_policy,**({"clock":clock} if clock else {}),
+        **({"sleeper":sleeper} if sleeper else {}))
     # Metadata report 자체의 logical bytes도 disk 상한 안에 예약한다.
-    reserve = report_reserve_bytes(manifest,includes,limits,exact_targets)
+    reserve = report_reserve_bytes(manifest,includes,limits,exact_targets,request_policy)
     if reserve >= limits.max_disk_bytes:
         raise PreparationError("disk_report_reserve")
     output = Path(output).resolve()
@@ -324,7 +330,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     failure_class = "complete_declared_input" if reason=="complete" else ("bounded_stop" if reason.endswith("_limit") or reason in {"interrupted","targets_complete"} else "incomplete_contiguous_prefix") if usable else "invalid_or_changed_source"
     report = {"schema_version":"archive_extraction_v1","extractor_version":__version__,"code_sha256":code_hashes(),
         "archive_manifest":manifest,"archive_manifest_sha256":digest(manifest),"selection":includes,"limits":asdict(limits),
-        "stop_reason":reason,"request_failure":failure,"failure_class":failure_class,"active_incomplete_member":active,"files":files,"range_audit":source.audit if source else [],
+        "stop_reason":reason,"request_failure":failure,"request_retry":retry_summary(budget),"failure_class":failure_class,"active_incomplete_member":active,"files":files,"range_audit":source.audit if source else [],
         "stats":budget.stats(),"compressed_bytes_received":source.compressed_bytes_received if source else 0,
         "gzip_eof_crc_valid":reader.gzip_eof_crc_valid if reader else False,"tar_end_blocks_seen":tar_eof,
         "declared_source_complete":complete_source,

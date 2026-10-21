@@ -14,12 +14,12 @@ PENDING = ["live_drive_colab_validation","joints","units","coordinates","calibra
     "split","original_motion_duplicates","stereo_rgb_pose_content_alignment","m1_actual_data_training"]
 
 
-def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract", profile=None, exact_targets=None):
+def run_pilot(manifest, output, includes, limits, authorized_session=None, base=".", metadata_report=None, mode="extract", profile=None, exact_targets=None, request_policy=None):
     """새 output에서 1회 prepare 후 검사·pilot report 저장. 자동 retry/확대 없음."""
     if not isinstance(limits,Limits):
         raise PreparationError("limits_required")
     extraction=prepare(manifest,output,includes,limits,base=base,authorized_session=authorized_session,mode=mode,
-        profile=profile,exact_targets=exact_targets)
+        profile=profile,exact_targets=exact_targets,request_policy=request_policy)
     verification={"status":"not_usable","reason":None,"verified_complete_files":0}
     if extraction["inspection_candidates_usable"]:
         try:
@@ -33,6 +33,7 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
         "complete_files":len(extraction["files"]),"verification":verification,"stats":extraction["stats"],
         "stop_reason":extraction["stop_reason"],"failure_class":extraction["failure_class"],
         "request_failure":safe_request_failure(extraction.get("request_failure")),
+        "request_retry":extraction["request_retry"],
         "inspection_candidates_usable":extraction["inspection_candidates_usable"] and verification["status"]=="passed",
         "gzip_eof_crc_valid":extraction["gzip_eof_crc_valid"],"tar_end_blocks_seen":extraction["tar_end_blocks_seen"],
         "whole_archive_integrity_verified":extraction["whole_archive_integrity_verified"],
@@ -63,8 +64,8 @@ def run_pilot(manifest, output, includes, limits, authorized_session=None, base=
     return report
 
 
-def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract", profile=None, exact_targets=None):
+def run_metadata_pilot(result, output, includes, limits, authorized_session, mode="extract", profile=None, exact_targets=None, request_policy=None):
     """성공한 metadata 결과의 hash/code를 대조한 뒤에만 media 경로를 시작한다."""
     manifest=validate_metadata_result(result)
     return run_pilot(manifest,output,includes,limits,authorized_session,
-        metadata_report=result["report"],mode=mode,profile=profile,exact_targets=exact_targets)
+        metadata_report=result["report"],mode=mode,profile=profile,exact_targets=exact_targets,request_policy=request_policy)

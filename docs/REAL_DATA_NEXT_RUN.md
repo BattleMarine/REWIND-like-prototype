@@ -18,9 +18,9 @@
 - 오케스트레이션은 ZIP CRC·보고서4개 자체hash·배포 소스12개 hash·ready JOB/설정hash·보고서 연결을 독립 확인했다. 원본 ZIP SHA256은 `6e554d053340f9d074c3f486642bc68cc0455989bcd965432dfd1255e9f2fc99`다. 원본 사본·검토 근거는 Git 제외 `outputs/test_archvis_pose_density_20261019/`의 `verification.json`, `orchestrator_review.json`에 보존한다. 이번 실제 실행의80개 사전검사 전체로그·실행notebook·Drive 영구보관은 미확인이다.
 - 동일 실행 반복은 종료한다. 다음 개발 검토는 비밀정보 없는 예외 종류·발생 단계 진단과 로컬 재현이다. 원시 예외문·token·URL을 기록하지 않으며 예산/timeout 확대나 자동 재시도는 이번 결과만으로 적용하지 않는다.
 
-## 종료된 테스트의 절차: 동일 목표 요청 실패 진단
+## 이번 테스트: metadata 사전 요청 제한 재시도
 
-2026-10-19 사용자 승인에 따라 요청 예외 종류와 발생 단계를 안전하게 기록하는 수정본을 준비한다. 이전 `4571f30` 실행의 실패 원인은 소급 확정할 수 없다. 새 실행은 같은 두 목표와 예산을 유지하며, 오류가 재발하면 진단을 회수하고 재발하지 않으면 그 실행 결과만 평가한다. 이번 요청은 위 종료된 실행의 반복 안내가 아니라 검토·커밋된 새 진단 버전의 1회 테스트다.
+2026-10-21 사용자 승인으로 새 API6의 opt-in `metadataPreTimeout10sRetry1Global3_v1`을 검증한다. 기존 API5 실행은 위 결과로 종료됐다. 새 정책은 metadata_pre의 요청 개시 timeout만 최대10초로 늘리고, 직접 확인된 connect/read timeout 무응답에 한해 pre당 추가1회·전체 추가3회와0.5초 대기를 허용한다. 남은 전체 준비시간으로 timeout/대기를 제한하며 초기 metadata·media·post·본문에는 적용하지 않는다.
 
 대상은 그대로 Serena `Getting_Up__1_` frame1·10의 pose JSON이다. 전송64MiB·300초·768요청과 저장2파일·16MiB disk는 유지한다. 기존 smoke와 RGB용 counterpart 프로파일은 바꾸지 않는다. 실제 pose 위치·이번 예산 내 확보 여부는 미확정이며, 성공·부분·0개·오류 모두 한 번의 실행 결과를 보관한 뒤 중단한다.
 
@@ -28,7 +28,8 @@
 
 ## 고정 설정
 
-- `job_id="archvis_pose_1_10_diagnostic_001"`, `mode="extract"`, `purpose="targeted"`, `profile="poseCounterpart64MiB_v1"`.
+- `request_policy="metadataPreTimeout10sRetry1Global3_v1"`을 미리 채운다. 다른 profile로 옮기거나 숫자를 임의 변경하지 않는다.
+- `job_id="archvis_pose_1_10_retry_001"`, `mode="extract"`, `purpose="targeted"`, `profile="poseCounterpart64MiB_v1"`.
 - `selection.kind="pose"`, `total_parts=1`, index0의 `ArchVisInterior_ArchVis_RT.tar.gz000`을 사용한다. RGB archive와 파일명이 같아도 Drive ID와 원본이 다르다. 개인 Drive ID는 검토한 사용자용 notebook에만 채우고 저장소에는 기록하지 않는다.
 - 과거 pose metadata의 크기368,145,316bytes/version1은 참고 이력이다. 실행 당시 metadata와 각 Range 전후 검사를 다시 거치며 과거 값을 현재 상태로 간주하지 않는다.
 - 아래 두 exact 경로를 `exact_targets`와 `includes`에 동일하게 지정한다. 기존 JSON 규칙에서 파생한 후보 경로이며 아직 이번 sequence의 실제 pose payload를 확보한 것은 아니다.
@@ -53,26 +54,30 @@ ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Sh
 
 두 단계 합계는64.125MiB·협력적330초·776요청이다. 인증·업로드·사전검사·ZIP 생성·전체wire 비용은 별도이며 OS hard deadline/RSS 상한이 아니다. 결과ZIP은 최대17MiB와 그에 필요한 별도 디스크 공간을 사용한다. 이전 pose 관측을64/7.5배로 단순 환산하면 header약8,534개·metadata약534,110bytes·해제약342MiB·약255초다. 이를 참고해 여유를 둔 설정이며 분포·목표 위치·실행 시간을 보장하지 않는다. 어느 상한이든 먼저 도달하면 종료한다. 512MiB는 누적 해제량이며 전체를 RAM이나 disk에 보관하는 크기가 아니다.
 
-새 실행은 byte0부터 다시 읽는다. 중간 gzip 조각의 독립 해제·seek·resume가 아니다. 두 목표를 완전히 저장하면 즉시 종료하고, 미확보·부분·오류도 보고 후 중단한다. 실패를 이유로 사용자나 테스트 세션이 예산·필터·코드를 바꾸거나 반복 실행하지 않는다.
+새 실행은 byte0부터 다시 읽는다. 중간 gzip 조각의 독립 해제·seek·resume가 아니다. 두 목표를 완전히 저장하면 즉시 종료하고, 미확보·부분·오류도 보고 후 중단한다. 정책 내 자동 재시도 외에 사용자나 테스트 세션이 예산·필터·코드를 바꾸거나 job을 반복 실행하지 않는다.
 
 최대10,000개의 중복 검사 경로는 각UTF-8 1024bytes 이내이며 Python 문자열·casefold·set overhead는 별도다. 내부 IO/해제 chunk는64KiB이고 단일 tar metadata도64KiB로 제한한다. 프로세스 전체 RAM의 하드 상한이라고 해석하지 않는다.
 
-API5에서도 보고서는 처음128개 관측과 별도로 마지막 regular 관측1개·관측한 regular 총수를 기록한다. 목록 cap 뒤 진행 확인용이며 source 실패 때는 신뢰하지 않는다. Seek offset이나 전체 목록으로 사용하지 않는다.
+API6에서도 보고서는 처음128개 관측과 별도로 마지막 regular 관측1개·관측한 regular 총수를 기록한다. 목록 cap 뒤 진행 확인용이며 source 실패 때는 신뢰하지 않는다. Seek offset이나 전체 목록으로 사용하지 않는다.
 
 진단 필드 `request_failure`는 `category`, `library`, `operation`, `stage`와 schema 버전만 허용한다. 요청 열기·응답 wrapping·본문 읽기·응답 검사·정리 단계와 초기/전후 metadata·media를 구분한다. 원시 예외문이나 URL은 기록하지 않는다. 기존 보고서의 필드 부재와 새 정상 실행의 null은 구분하며, HTTP 상태만으로 추정한 인증 실패를 예외 타입 진단과 혼동하지 않는다.
 
+Library의 숨은 재시도를 막기 위해 새 정책은 media 및 인증 session의 adapter retry0을 검사한다. 별도 인증 session도 retry0으로 만들어 주입한다. 기존 기본 정책은 유지한다. Timeout은 socket/협력적 상한이며 OS hard deadline은 아니다.
+
 ## 사용자 실행과 결과 회수
 
-실행 안내와 중간 질문은 이 프로젝트의 **테스트 세션**이 담당한다. 검토한 고정 revision의 사용자용 `archive_prepare_pose_diagnostic_ready_<revision>.ipynb`와 직접 소스 `rewind-archive-source-<revision>.zip`을 전달한다. 이전 왼쪽용 notebook을 재실행하지 않는다.
+실행 안내와 중간 질문은 이 프로젝트의 **테스트 세션**이 담당한다. 검토한 고정 revision의 사용자용 `archive_prepare_pose_retry_ready_<revision>.ipynb`와 직접 소스 `rewind-archive-source-<revision>.zip`을 전달한다. 이전 왼쪽용 notebook을 재실행하지 않는다.
 
 1. 기존 결과를 보관하고 새 CPU 런타임에서 전달된 pose notebook을 연다. GPU는 필요 없다.
 2. 첫 셀에 직접 소스 ZIP 한 개를 업로드한다. 결과 ZIP이나 바깥 배포 묶음은 소스가 아니다.
-3. 전달된 수정본의 사전94검사 전체 로그를 보관한 뒤 미리 채운 JOB와 preflight의 pose kind·두 경로·고정 예산을 확인한다.
+3. 전달된 수정본의 사전115검사 전체 로그를 보관한 뒤 미리 채운 JOB와 preflight의 pose kind·두 경로·고정 예산을 확인한다.
 4. `EXECUTE_ONCE=True`로 실행 셀을 한 번 실행한다. 인증→metadata→pose 추출 순서이며 별도 선택 JSON이나 새 셀이 없다.
-5. 결과 검토 셀과 `DOWNLOAD_RESULT_ZIP=True` 셀을 실행해 `archive_job_archvis_pose_1_10_diagnostic_001.zip`을 보관한다. 실패했어도 가능한 보고서를 보존한다.
+5. 결과 검토 셀과 `DOWNLOAD_RESULT_ZIP=True` 셀을 실행해 `archive_job_archvis_pose_1_10_retry_001.zip`을 보관한다. 실패했어도 가능한 보고서를 보존한다.
 6. 결과 ZIP·사전검사 로그·마지막 출력·실행 notebook을 테스트 세션에 전달한다. Drive 프로젝트 `reports/`의 영구보관 여부는 별도로 기록한다.
 
 ## 성공 판정과 후속 로컬 검토
+
+- 재시도 발생 시 각 시도·대기·요청 계수와 최종 회복/소진 상태를 확인한다. 최종 request_failure가 null이어도 이전 실패 이력은 남아야 한다. 재시도가 없었던 성공은 해당 실행 성공이며 실제 timeout 회복 검증과 구분한다.
 
 - 진단 검증과 추출 성공을 구분한다. 오류가 발생하면 안전한 예외 분류·발생 단계가 보고서와 ZIP에 남았는지 확인한다. unknown도 유효한 제한적 진단이며 원인을 추측하지 않는다. 오류가 재발하지 않았다는 사실만으로 과거 원인이 해결됐다고 판정하지 않는다.
 

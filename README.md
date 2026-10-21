@@ -51,6 +51,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 2026-10-21 API5 실제 테스트에서 다음 media 요청 전 metadata 확인의 `requests.read_timeout` 진단을 회수했습니다. 압축14.5MiB·준비58.15초 뒤 중단했으며 예산 상한이 원인은 아닙니다. 목표 pose0개로 추출은 실패했고 근본 원인은 미확정입니다. 동일 실행은 종료했으며 [결과와 후속 검토 범위](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
 
+2026-10-21 API6에 별도 `metadataPreTimeout10sRetry1Global3_v1` 정책을 추가했습니다. Pose targeted 준비의 사전 metadata 요청 개시만 최대10초, 허용된 무응답 timeout은 요청당 추가1회·전체 추가3회로 제한하며 대기도 기존300초 예산에 포함합니다. 기본 정책과 전체 상한은 유지하고 숨은 라이브러리 재시도를 거부합니다. 전체210개 회귀와 fresh ZIP의115개 사전검사·모의 실행을 통과했습니다. 로컬 검증과 실제 Drive 회복·pose 확보는 구분하며 [새1회 실행 안내](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다.
+
 ## 문서 안내
 
 | 문서 | 역할 |
