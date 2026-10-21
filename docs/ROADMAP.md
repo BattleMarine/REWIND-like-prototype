@@ -30,6 +30,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 후속 데이터 확보 전략 검토
+
+- [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)에 실제 보고서 기반 비용 비교와 기존 sample의 대응 여부, 구현된 재사용과 미구현 prefix 캐시의 경계를 정리한다.
+- 권고하는 다음 개발 묶음은 상한 있는 압축 prefix 보관·재사용과 sequence/frame 관측 카탈로그다. 현재 미구현이며 원본 identity/hash·실패 제외·로컬/원격 비용·디스크/영구보관의 검증 기준을 전략 문서에 둔다.
+- 기존 64MiB 실행 반복은 종료 상태를 유지한다. 더 넓은 탐색은 전송·시간·요청·header·해제량·metadata 상한을 함께 설계해야 하며 목표 도달은 미확정이다.
+- 이번 작업은 오프라인 검토와 계획 문서화다. 새 원본 요청·예산 변경 구현·Colab 실행·학습은 없으며 M0~M3의 실제 데이터 완료 상태를 올리지 않는다.
+
 ### 2026-10-21 API6 실제 결과 — 오류 없이 요청 상한 도달, pose 미확보
 
 - `cb76a3c`/API6의 `archvis_pose_1_10_retry_001`은 `ranges_limit`/bounded_stop으로 종료했다. 준비768요청(media256+metadata512), body67,076,276bytes,232.180825초로 상한을 준수했다. 최초 metadata는 별도1요청·290bytes·0.158772초다. 전체 응답body64MiB에도 근접했으므로 요청 횟수만 늘려 해결될 것으로 보지 않는다.
