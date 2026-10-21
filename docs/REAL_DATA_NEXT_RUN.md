@@ -1,5 +1,7 @@
 # 다음 실제 데이터 준비 실행
 
+다음 개발·검토 범위는 [캐시 재사용과 후속 탐색 준비안](PREFIX_CACHE_NEXT_STEP.md)을 따른다. 현재 문서의 cold 절차는 종료된 실행 기록이며 새 warm 실행용 고정 notebook은 아직 배포하지 않았다. 사용자 실행 안내는 구현·검토 후 테스트 세션에서 진행한다.
+
 ### 2026-10-21 API7 cold 실제 결과 — 캐시·관측 보존 성공, pose 미확보
 
 - 고정 `696c234`/API7, `archvis_pose_1_10_cache_cold_001`은 `transfer_bytes_limit`/bounded_stop으로 종료했다. 준비311.326445초·응답body100,630,708bytes·1,152요청(media384+metadata768)이며 초기 metadata는 별도1요청·290bytes·0.145105초다. 시간/요청 상한이 아닌 body 예산에서 멈췄다. 목표 pose0개·missing2·targets_status=incomplete·sample_acquired=false이고 빈 파일목록의 verification passed는 추출 성공이 아니다.

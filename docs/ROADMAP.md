@@ -30,6 +30,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 1 데이터 준비와 입력 파이프라인
 
+### 2026-10-21 cold 결과 이후 작업 준비 — 캐시 재사용과 제한된 확장
+
+- [후속 작업 준비안](PREFIX_CACHE_NEXT_STEP.md)에 실제 캐시·관측 목록,128/192MiB 비용 비교, 현재 코드의 제한과 완료 기준을 정리한다. 구현된 API7과 새 제안을 구분하며 D2 운영 예산이나 마일스톤 완료로 확정하지 않는다.
+- 보존 캐시의 기존 API import·byte0 해제를 로컬에서 확인했다. 원본 네트워크 요청0이며 실제 Drive warm이나 tar 내용 검증은 아니다. 다음 개발 후보는 논리128MiB까지의 제한된 warm 확장이다. 새 media는33,656,140bytes지만 압축 해제는 처음부터 다시 수행한다. 현512chunk 제한은 기존 짧은 마지막 chunk 때문에 필요한513개를 허용하지 못하므로 profile 숫자만 바꾸지 않는다.
+- 원본 identity/hash, 캐시 형식 호환, 해제/header/카탈로그·로컬IO·disk/export 상한과 실패 보존을 함께 검증한다. 새 원본 읽기나192MiB 자동 확대·전체 인덱싱·학습은 이 준비에서 실행하지 않는다.
+- 구현·독립 검토·로컬 커밋 후 테스트 세션에 고정revision/ZIP/notebook·입력캐시hash·예산·중단 및 성공 기준을 전달한다. 실제 warm 검증과 목표 두 pose 확보는 별도 판정하며, 미확보 시 결과와 확장 캐시를 검토한 뒤 다음 범위를 판단한다.
+
 ### 2026-10-21 API7 cold 실제 결과 — 캐시·관측 보존 성공, pose 미확보
 
 - 고정 `696c234`/API7, `archvis_pose_1_10_cache_cold_001`은 `transfer_bytes_limit`/bounded_stop으로 종료했다. 준비311.326445초·응답body100,630,708bytes·1,152요청(media384+metadata768)이며 초기 metadata는 별도1요청·290bytes·0.145105초다. 시간/요청 상한이 아닌 body 예산에서 멈췄다. 목표 pose0개·missing2·targets_status=incomplete·sample_acquired=false이고 빈 파일목록의 verification passed는 추출 성공이 아니다.
