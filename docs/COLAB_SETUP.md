@@ -1,5 +1,7 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
+API9 warm192는 [고정 계약](PREFIX_CACHE.md)에 따라 128MiB 이상의 보관 cache를 byte0부터 재생하고 미보관 64MiB만 추가로 탐색합니다. 검토된 cache_expectation/단일 JOB를 사용하며 cold fallback은 없습니다. 일반 단계 disk 합 705MiB에 source/환경/보고서와 사전검사 임시 공간이 더 필요합니다. 큰 합성 fixture는 검사 후 제거하고 실제 cache/기존 files는 삭제하지 않습니다. 실제 원본 검증은 고정 버전 인계 후 테스트 세션에서 한 번만 진행합니다.
+
 API8 warm128 준비: [cache 안내](PREFIX_CACHE.md)의 새 profile은 검토된 기존 cache ZIP과 `cache_expectation`이 필수입니다. Source와 notebook을 같은 고정 버전으로 쓰며 단일 JOB에서 명시적 cache upload만 추가합니다. 첫 새 원본 Range는 기존 prefix 끝에서 시작하고,누락/변경/실패 cache를 cold로 다시 읽지 않습니다. 준비420초와 초기metadata·인증·upload/export의 별도 범위를 구분합니다. 실제 사용자 시험은 오케스트레이션 검토 뒤 테스트 세션의 한 번 실행 인계로 진행합니다.
 
 2026-10-21 API7 cache 준비: [별도 실행 안내](PREFIX_CACHE.md)의 `posePrefixCache96MiB_v1`을 사용할 수 있습니다. 기존 인증·초기 metadata 절차는 유지합니다. 우선 고정 JOB의 cold 한 번과 결과ZIP/cacheZIP 보존을 테스트 세션에서 안내하며, 이후 warm은 cacheZIP 한 개를 명시적으로 업로드하는 별도 JOB입니다. 실제 warm의 media0이나 목표 확보를 보장하지 않습니다. 동시 disk는 input/export/cache/결과를 모두 계산하고, 준비420초와 별도 upload/export 비용을 구분합니다. 이번 cache 기능의 로컬 검증은 실제 Google/Colab 결과가 아닙니다.

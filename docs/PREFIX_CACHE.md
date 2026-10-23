@@ -1,8 +1,20 @@
 # 제한된 압축 prefix cache와 관측 카탈로그
 
+## API9:128MiB cache에서192MiB까지
+
+`posePrefixWarm192MiB_v3`를 추가했습니다. 기존 128MiB 이상의 cache와 고정 `cache_expectation`이 필수이며 cold fallback은 없습니다. 새 network body 80MiB·논리입력 192MiB·420초·773HTTP, 해제 1200MiB·header 30,000·tar metadata 2MiB/단일 64KiB입니다. 초기 metadata는 기존 별도 예산이므로 합계 80.125MiB·450초·781회이며 인증·upload/export 비용은 별도입니다.
+
+V3 format/policy는 `bounded_prefix_cache_v3` / `pose_prefix_warm192_v3`입니다. Cache와 각 ZIP 224MiB·896chunk·local IO 388MiB·export 640MiB/60초, sequence 256/entry 16,000/catalog 6MiB를 사용합니다. HTTP와 독립된 audit 897행을 예약합니다. 기존 v1/v2 계약은 그대로 검사하고 v3 출력은 구버전 reader가 거부합니다. 호출은 `input_spec(path,policy=WARM192_POLICY)`, `prepare(...,profile=WARM192_PROFILE,cache_input=spec,cache_expectation=expected)`이며 export는 판에 맞게 자동 선택합니다.
+
+실제 고정 입력은 134,217,728bytes/513chunk입니다. 첫 새 Range는 같은 offset에서 시작하고 64MiB/256범위를 추가하면 192MiB/769chunk입니다. 최소 입력 128MiB와 세 semantic 핀을 preflight/실제 import에서 검사합니다. 단일 JOB/기본 비활성·실패 결과ZIP·원본 전후 검사·재시도·시간 계측은 API8과 동일합니다. 실제 192MiB 원본 시험은 로컬 개발 검증과 구분합니다.
+
+일반 동시 disk 합은 224×3+16+17=705MiB와 작은 보고서/코드/환경 여유입니다. 일반 출력 16MiB는 aggregate 한계여서 최장 경로에서 두 4MiB 파일의 최대 동시 저장을 보장하지 않습니다. 예약에 걸리면 안전 중단하며 현재 pose 목표에 맞춰 출력 상한을 임의 확대하지 않습니다. 사전 153개 합성 검사는 큰 fixture를 임시 생성·제거하고 그 시간/공간은 준비 예산 밖입니다. [160/192 비교·예약 근거](PREFIX_CACHE_192_PLAN.md)를 따릅니다.
+
+## 기존 API8 / v2 계약
+
 ## API8:128MiB bounded warm 확장
 
-`posePrefixWarm128MiB_v2`는 기존 cache를 필수 입력으로 받습니다. 새 network body40MiB, 논리입력128MiB, 준비420초·HTTP392회, 해제800MiB·header20,000·tar metadata2MiB/단일64KiB입니다. 초기 metadata는 기존 별도128KiB·30초·8회이며 전체는 최대40.125MiB·450초·400회입니다. 기존 네 가지 profile과 v1 계약은 변경하지 않습니다. 실제 원본 warm과 목표 확보는 별도 테스트 전 미검증입니다.
+`posePrefixWarm128MiB_v2`는 기존 cache를 필수 입력으로 받습니다. 새 network body40MiB, 논리입력128MiB, 준비420초·HTTP392회, 해제800MiB·header20,000·tar metadata2MiB/단일64KiB입니다. 초기 metadata는 기존 별도128KiB·30초·8회이며 전체는 최대40.125MiB·450초·400회입니다. 기존 네 가지 profile과 v1 계약은 변경하지 않습니다. 후속 실제 warm128에서 cache 재사용·확장은 확인했으나 목표 pose는 미확보입니다. 이 절은 구형 v2 계약을 설명합니다.
 
 노트북 사전 검사145개에는 큰 합성 gzip과128MiB 경계 cache를 생성하는 검사가 있습니다. 이 단계의 CPU·RAM·임시 disk·시간은 원본 준비420초 및 단계별 disk 합513MiB에 포함되지 않으며,여러 fixture/cache를 동시에 만들기 때문에 추가 임시 공간이 필요합니다.
 

@@ -2,7 +2,7 @@
 
 import re
 from .contracts import canonical, digest
-from .cache_policy import WARM128_POLICY
+from .cache_policy import WARM_POLICIES
 
 CATALOG_BYTES=6*1024**2
 MAX_SEQUENCES=128
@@ -11,7 +11,7 @@ MAX_ENTRIES=16000
 
 class Catalog:
     def __init__(self,max_sequences=MAX_SEQUENCES,max_entries=MAX_ENTRIES,policy=None):
-        self.max_sequences=min(max_sequences,256 if policy==WARM128_POLICY else MAX_SEQUENCES)
+        self.max_sequences=min(max_sequences,256 if policy in WARM_POLICIES else MAX_SEQUENCES)
         self.max_entries=min(max_entries,MAX_ENTRIES)
         self.sequences=[];self.entries=[];self.observed=[]
         self.truncated=False;self.unclassified=0;self.last_unclassified=None

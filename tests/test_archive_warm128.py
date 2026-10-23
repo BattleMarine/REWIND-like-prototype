@@ -70,10 +70,9 @@ class Warm128Tests(unittest.TestCase):
         first=next(k["headers"]["Range"] for url,k in self.session.calls if "alt=media" in url)
         self.assertTrue(first.startswith(f"bytes={C}-"))
         self.assertLessEqual(e["stats"]["ranges"],389);self.assertEqual(e["prefix_cache"]["schema_version"],"bounded_prefix_cache_v2")
-        self.assertGreater(e["stats"]["cache_import_seconds"],0)
-        self.assertGreater(e["stats"]["cache_read_seconds"],0)
-        self.assertGreater(e["stats"]["remote_range_seconds"],0)
-        self.assertGreaterEqual(e["stats"]["cache_live_check_seconds"],0)  # 짧은 fixture는 clock 해상도 이하일 수 있다.
+        for field in ("cache_import_seconds","cache_read_seconds","remote_range_seconds","cache_live_check_seconds"):
+            self.assertGreaterEqual(e["stats"][field],0)  # 짧은 fixture는 clock 해상도 이하일 수 있다.
+            self.assertLessEqual(e["stats"][field],e["stats"]["elapsed_seconds"])
         self.assertIn("gzip",e["timing_scope"]["unsegmented"])
 
     def test_02_logical128_513chunks_roundtrip_and_old_reader_rejection(self):

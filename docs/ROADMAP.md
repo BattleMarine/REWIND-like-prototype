@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 21일 운영·검증 상태 보완
+검토 초안 v0.2   |   2026년 10월 23일 운영·검증 상태 보완
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -29,6 +29,25 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 1 데이터 준비와 입력 파이프라인
+
+### 2026-10-23 API9 구현 — 보존128MiB 뒤의 제한된192MiB 탐색
+
+- `posePrefixWarm192MiB_v3`는 입력 cache와 manifest/prefix hash·크기 expectation을 필수로 요구한다. 최소128MiB이며 누락·불일치 시 cold로 대체하지 않는다. 테스트용 ready notebook은 실제 v2 입력134,217,728bytes의 식별값을 고정한다. 기존 v1/v2 상한과 형식을 유지하고 새 `bounded_prefix_cache_v3`를 추가한다. 신판은 구판 입력을 해당 구판의 상한으로 검증하고 구판 reader는 v3를 거부한다.
+- 논리192MiB·새 응답body80MiB·420초·773요청, 해제1200MiB·header30,000·tar metadata누적2MiB/단일64KiB로 제한한다. 초기 metadata까지80.125MiB·450초·781요청이며 인증/UI·별도cache upload/export·영구보관은 제외한다. 새 media64MiB/256Range, 정상770HTTP와 추가재시도3회의 여유를 둔다. 실제 원본 시간과 목표 위치는 보장하지 않는다.
+- Cache/입력ZIP/exportZIP 각각224MiB, 최대896chunk·local IO388MiB·export640MiB/60초, catalog256sequence/16,000entry/6MiB다. 실제 입력513chunk에서 상한까지 도달하면769chunk가 된다. Audit897행을 예약하고 기존 결과16MiB/ZIP17MiB를 유지한다. 경로·manifest 크기에 따라2×4MiB 파일이 동시에 들어간다고 보장하지 않으며 누적 출력 상한에서 안전 중단한다. [비용 비교와 저장 공간 산정](PREFIX_CACHE_192_PLAN.md)을 따른다.
+- 오케스트레이션 독립 합성6조건에서 목표 저장,192MiB/769chunk 경계, 첫 새 offset134,217,728·256media+514metadata=770요청, v3 export/reimport media0, source change·cache post failure·import deadline의 unusable 처리를 확인했다. 실제 보존 v2 캐시도 새 정책으로 import/hash 및 byte0 해제736,578,064bytes를 오프라인 확인했다. 전체gzip CRC·원본 현재 identity·실제192MiB 탐색 검증은 아니다. 개발·검토의 대용량 합성 fixture는 임시 디렉터리에서 제거하고 작은 근거만 Git 제외 `outputs/prefix_cache_warm192_20261023/`에 남긴다.
+- 전체248개 회귀가59.026초에 통과했고 검사 전후 코드·테스트 hash 변경은 없었다. 최종 테스트를 담은 새 소스 ZIP의153개 사전검사와7개 코드 셀 모의 실행도 통과했다. 첫 sandbox 실행의 로컬 HTTP 연결 실패와 후속 모의 계측0초 assertion 실패를 보존했다. 로컬 연결을 허용한 환경에서 검사하고 계측값을0이상/전체시간 이하로 확인하도록 테스트를 보완한 최종 결과다.
+- 고정revision/소스ZIP/ready notebook·입력캐시hash·예산·중단/성공 기준을 테스트 세션에 전달해 한 JOB만 실행한다. 같은128MiB 실행 반복이나 목표 sequence 변경·추가 확대·실제 학습은 자동으로 시작하지 않는다. Sample 확보와 cache/catalog 보존은 별도 판정하며 M0~M3 실제 완료 및 M4 상태는 유지한다.
+
+### 2026-10-23 API8 warm128 실제 결과 — 캐시 재사용·확장 성공, pose 미확보
+
+- 고정 `2c5e334`/API8, `archvis_pose_1_10_cache_warm128_001`의 결과ZIP·보고서 hash와 17개 소스 모듈을 대조했다. 기존 100,561,588bytes를 로컬 캐시에서 읽고 첫 새 Range를 같은 offset부터 시작했다. 새 media33,656,140bytes, 논리입력134,217,728bytes·513chunk이며 기존 prefix와 chunk가 보존됐다. Cache는 `usable_prefix`, `ready_for_reuse=true`, source_validation_pending=false다.
+- 준비112.093802초·응답body33,679,540bytes·389요청(media129+metadata260), 초기 metadata는 별도1요청·290bytes·0.226849초다. `logical_input_limit`/bounded_stop이며 목표0개·missing2·sample_acquired=false·train_ready=false다. 빈 파일목록의 검증 통과를 추출 성공으로 해석하지 않는다. 재시도0·request_failure=null이므로 timeout 회복은 실제 검증되지 않았다.
+- 관측118sequence·8,434entry 중8,433개는 payload 완료 관측이고 마지막 Eric `005/Singing__16_` frame267은 미완료다. 저장0·truncated=false이며 Serena는 기록된 관측 범위에 없다. 전체 archive에서의 부재나 전체 gzip CRC 무결성을 뜻하지 않는다. 해제736,578,064bytes·header17,411·tar metadata1,080,639bytes를 기록했다.
+- Cache import1.206625초·cache read0.603257초·원본 Range 관련102.287038초·cache live check0.222880초는 부분 계측이다. 별도 export2.322986초/local read402,830,324bytes이고 upload/export·byte0 재해제·영구보관 비용은 새 원본 전송 절감과 구분한다. 전체 wire/사용자 경과시간 절감이나 GPU 성능은 측정하지 않았다.
+- 보존 위치는 Git 제외 `outputs/test_archvis_pose_cache_warm128_20261021/`다. 결과ZIP SHA256 `6afc6253491819744cbf92adc0fb3b457a94afa215202cb9c99ee7bce20faf70`, 새 `prefix_cache (1).zip` SHA256 `2029041c8601f858b4728a80d26a9c85b726c3f4f0d8e935ff4c886ed464c06c`다. 입력을 다음 실행에 고정할 때 manifest SHA256 `de57a189205a4ddeb7dc61379e09fca08b4d5cd5ec033d0b7a8d2b50abc775c1`, prefix SHA256 `2e05f6850bd5a019b232de3383efc03e91982bb38681523f0a2ac9c824029268`, 크기134,217,728bytes를 함께 사용한다.
+- 사용자 사전검사 출력은 비어 있었다고 보고됐고 실행 notebook/PDF도 미제출이다. 사용자 런타임145개 개별검사·모든 셀 변경 여부·Drive 영구보관은 확인하지 못했다. 기존 오른쪽 성공ZIP도 미수령이며 좌표·영상·시간·split·실제 학습 검증은 남아 있다. M0~M3 전체 완료나 M4 착수로 올리지 않는다.
+- 동일128MiB 반복은 새 탐색을 만들지 않는다. 사용자 다음 단계 지시에 따라 기존128MiB 뒤64MiB만 새로 읽는 논리192MiB 경로를 개발·검토한다. 원본 목표 도달과 소요시간은 보장하지 않으며 고정 버전의 실제1회 실행은 테스트 세션에 인계한다.
 
 ### 2026-10-21 API8 구현 — 보존 캐시를 사용한 제한된 warm 확장
 

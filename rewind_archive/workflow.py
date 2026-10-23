@@ -16,10 +16,10 @@ from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CA
 from .diagnostics import request_failure, safe_request_failure
 from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
 from .prefix_cache import validate_input_spec, export_cache
-from .cache_policy import WARM128_POLICY,validate_expectation,summary as policy_summary
+from .cache_policy import for_profile,validate_expectation,summary as policy_summary
 
 
-NOTEBOOK_API_VERSION = 8
+NOTEBOOK_API_VERSION = 9
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 PREVIOUS_CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 POLICY_CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
@@ -63,7 +63,9 @@ def make_preflight(config, history):
     # 누락된 legacy 필드는 config hash/유효 fingerprint까지 그대로 보존한다.
     request_policy=validate_request_policy(config.get("request_policy"))
     cache_input=validate_input_spec(config.get("cache_input"))
-    expectation=validate_expectation(config.get("cache_expectation"),required=config.get("profile")==WARM128_PROFILE)
+    cache_policy=for_profile(config.get("profile"))
+    expectation=validate_expectation(config.get("cache_expectation"),required=cache_policy is not None,
+        **({"policy":cache_policy} if cache_policy else {}))
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -91,8 +93,8 @@ def make_preflight(config, history):
             (mode!="review" and (mode,purpose)!=("extract","targeted")) or len(config["exact_targets"])!=2):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
     if cache_input is not None and config["profile"] not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
-    if expectation is not None and config["profile"]!=WARM128_PROFILE:raise PreparationError("warm_profile_required")
-    if config["profile"]==WARM128_PROFILE:
+    if expectation is not None and cache_policy is None:raise PreparationError("warm_profile_required")
+    if cache_policy:
         if cache_input is None:raise PreparationError("warm_cache_required")
         if cache_input["manifest_sha256"]!=expectation["manifest_sha256"]:raise PreparationError("cache_expected_manifest_mismatch")
     if config["profile"] in CACHE_PROFILES and (config["selection"].get("total_parts")!=1 or len(config["selection"].get("parts",[]))!=1):
@@ -131,15 +133,15 @@ def make_preflight(config, history):
             "exact_targets":config["exact_targets"],
             "request_policy":policy_description(request_policy),
             "cache_input":cache_input,"cache_expectation":expectation,"prefix_cache_enabled":config["profile"] in CACHE_PROFILES,
-            "cache_policy":policy_summary(WARM128_POLICY) if config["profile"]==WARM128_PROFILE else None,
+            "cache_policy":policy_summary(cache_policy) if cache_policy else None,
             "cache_limits":({"max_logical_compressed_bytes":96*1024**2,"max_local_io_bytes":196*1024**2,
                 "max_cache_disk_bytes":128*1024**2,"max_catalog_bytes":6*1024**2,
                 "max_catalog_sequences":128,"max_catalog_entries":16000,"export_max_seconds":60,
                 "export_max_local_read_bytes":384*1024**2} if config["profile"]==CACHE_PROFILE else
-                {"max_logical_compressed_bytes":128*1024**2,"max_local_io_bytes":260*1024**2,
-                "max_cache_disk_bytes":160*1024**2,"max_catalog_bytes":6*1024**2,"max_catalog_sequences":256,
-                "max_catalog_entries":16000,"max_range_audit_rows":1024,"export_max_seconds":60,
-                "export_max_local_read_bytes":512*1024**2} if config["profile"]==WARM128_PROFILE else None),
+                {"max_logical_compressed_bytes":cache_policy.logical_bytes,"max_local_io_bytes":cache_policy.local_io_bytes,
+                "max_cache_disk_bytes":cache_policy.disk_bytes,"max_catalog_bytes":6*1024**2,"max_catalog_sequences":cache_policy.sequences,
+                "max_catalog_entries":16000,"max_range_audit_rows":cache_policy.audit_rows,"export_max_seconds":60,
+                "export_max_local_read_bytes":cache_policy.export_io_bytes} if cache_policy else None),
             "metadata_entry_limit_bytes":min(limits.max_metadata_bytes,64*1024) if config["profile"] in POSE_PROFILES else limits.max_metadata_bytes,
             "stop_when_targets_stored":bool(config["exact_targets"]),
             "total_body_upper_bound_bytes":limits.max_transfer_bytes+metadata.max_transfer_bytes if mode!="review" else 0,

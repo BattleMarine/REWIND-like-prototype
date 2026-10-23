@@ -22,9 +22,18 @@ class CachePolicy:
 
 WARM128_POLICY=CachePolicy("pose_prefix_warm128_v2","bounded_prefix_cache_v2",128*MIB,160*MIB,
     260*MIB,640,512*MIB,256,1024,383*256*1024)
+WARM192_POLICY=CachePolicy("pose_prefix_warm192_v3","bounded_prefix_cache_v3",192*MIB,224*MIB,
+    388*MIB,896,640*MIB,256,897,128*MIB)
+WARM_POLICIES=(WARM128_POLICY,WARM192_POLICY)
 
 
-def validate_expectation(value,required=False):
+def for_profile(profile):
+    if not isinstance(profile,str):return None
+    from .profiles import WARM128_PROFILE,WARM192_PROFILE
+    return {WARM128_PROFILE:WARM128_POLICY,WARM192_PROFILE:WARM192_POLICY}.get(profile)
+
+
+def validate_expectation(value,required=False,policy=WARM128_POLICY):
     if value is None:
         if required:raise PreparationError("warm_cache_expectation_required")
         return None
@@ -33,7 +42,8 @@ def validate_expectation(value,required=False):
     if not isinstance(value,dict) or set(value)!=fields:raise PreparationError("cache_expectation_fields")
     if any(not isinstance(value[k],str) or not re.fullmatch("[0-9a-f]{64}",value[k]) for k in ("manifest_sha256","prefix_sha256")):
         raise PreparationError("cache_expectation_hash")
-    if type(value["prefix_bytes"]) is not int or not WARM128_POLICY.min_input_bytes<=value["prefix_bytes"]<=WARM128_POLICY.logical_bytes:
+    if policy not in WARM_POLICIES:raise PreparationError("unsupported_cache_policy")
+    if type(value["prefix_bytes"]) is not int or not policy.min_input_bytes<=value["prefix_bytes"]<=policy.logical_bytes:
         raise PreparationError("warm_cache_prefix_length")
     return dict(value)
 

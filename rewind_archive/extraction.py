@@ -17,7 +17,7 @@ from .diagnostics import safe_request_failure
 from .request_policy import validate_request_policy, retry_summary, validate_no_hidden_retries
 from .prefix_cache import PrefixCache, validate_input_spec
 from .catalog import Catalog, CATALOG_BYTES
-from .cache_policy import WARM128_POLICY,validate_expectation,summary as policy_summary
+from .cache_policy import for_profile,validate_expectation,summary as policy_summary
 
 
 BENIGN_STOPS = {"prefix_exhausted", "incomplete_header", "incomplete_payload", "incomplete_padding",
@@ -166,11 +166,12 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
             raise PreparationError("pose_profile_requires_pose_kind")
     cache_input=validate_input_spec(cache_input)
     if cache_input is not None and profile not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
-    expectation=validate_expectation(cache_expectation,required=profile==WARM128_PROFILE)
-    if profile==WARM128_PROFILE and cache_input is None:raise PreparationError("warm_cache_required")
-    if expectation and profile!=WARM128_PROFILE:raise PreparationError("warm_profile_required")
+    cache_policy=for_profile(profile)
+    expectation=validate_expectation(cache_expectation,required=cache_policy is not None,
+        **({"policy":cache_policy} if cache_policy else {}))
+    if cache_policy and cache_input is None:raise PreparationError("warm_cache_required")
+    if expectation and cache_policy is None:raise PreparationError("warm_profile_required")
     if expectation and cache_input["manifest_sha256"]!=expectation["manifest_sha256"]:raise PreparationError("cache_expected_manifest_mismatch")
-    cache_policy=WARM128_POLICY if profile==WARM128_PROFILE else None
     if profile in CACHE_PROFILES and (len(manifest["parts"])!=1 or manifest["total_parts"]!=1 or manifest["parts"][0]["source"]["type"]!="drive"):
         raise PreparationError("cache_single_drive_part")
     metadata_entry_limit = min(limits.max_metadata_bytes,64*1024) if profile in POSE_PROFILES else limits.max_metadata_bytes

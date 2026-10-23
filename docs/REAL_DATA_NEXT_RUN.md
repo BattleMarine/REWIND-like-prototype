@@ -1,6 +1,18 @@
 # 다음 실제 데이터 준비 실행
 
-## API8 bounded warm128 인계 준비
+## API9 bounded warm192 인계 준비
+
+실제 API8 warm128은 112.094초에 cache 재사용/128MiB 확장을 완료했으나 목표 pose는 0개였습니다. 같은 128MiB 반복은 새 검색이 없으므로 `posePrefixWarm192MiB_v3`로 한 번의 후속 탐색을 준비합니다. 실제 192MiB 원본 실행은 아직 하지 않았습니다. [계획/실측 가정](PREFIX_CACHE_192_PLAN.md)과 [실행 계약](PREFIX_CACHE.md)을 따릅니다.
+
+필수 입력은 128MiB v2 cache이며 manifest SHA `de57a189205a4ddeb7dc61379e09fca08b4d5cd5ec033d0b7a8d2b50abc775c1`, prefix SHA `2e05f6850bd5a019b232de3383efc03e91982bb38681523f0a2ac9c824029268`, 길이 134,217,728을 ready `cache_expectation`에 고정합니다. 원본 identity·입력 ZIP SHA도 인계에서 대조합니다. 기존 Serena frame1·10 목표를 유지하고 다른 sequence의 새 RGB 비용은 미확정으로 둡니다.
+
+새 network body 80MiB·논리입력 192MiB·420초·773요청, 해제 1200MiB·header 30,000·tar metadata 2MiB, cache/각 ZIP 224MiB·chunk 896·local IO 388MiB·export 640MiB/60초입니다. 첫 새 Range 134,217,728·새 256범위·결과 769chunk를 확인합니다. 원본 후검사 미완료/실패·부분 본문·손상·import 검증 중단은 unusable로 유지합니다. 정상 상한에서 멈추고 후검사를 완료한 연속 prefix는 usable일 수 있습니다. Catalog 256/16,000/6MiB, audit 897/aggregate 출력 16MiB/결과 ZIP 17MiB를 지키며 기본 disk 합 705MiB 외 사전검사/환경 공간도 필요합니다.
+
+고정 코드/ZIP/notebook 검토·커밋 뒤 테스트 세션에 한 JOB를 인계합니다. 목표0·부분·오류도 두 ZIP/보고서를 보존하고 종료하며 cold 재수신·자동 반복·192 이후 확대는 하지 않습니다. 아래 API8 절차와 JOB는 이력이며 새 고정 인계로 대체합니다.
+
+## 종료된 API8 bounded warm128 인계 준비 기록
+
+이 절은 API8 준비 당시 기록입니다. 이후 실제 warm128의 cache 재사용·확장 성공과 목표 pose0개를 확인했으며,이 절의 미실행/미배포 표현은 당시 상태를 가리킵니다. 현재 새 실행 안내는 위 API9 고정 인계를 따릅니다.
 
 `posePrefixWarm128MiB_v2`는 실제 cold가 남긴100,561,588bytes/384chunk의 cache를 재사용하는 별도 고정 JOB입니다. 실제 원본 warm은 아직 실행하지 않았습니다. 새 network40MiB·논리128MiB·준비420초·392요청,해제800MiB·header20,000·tar metadata2MiB/단일64KiB,cache/ZIP160MiB·640chunk·local IO260MiB·export512MiB/60초를 적용합니다. 초기 metadata는 기존 별도 예산입니다. [최신 계약](PREFIX_CACHE.md)을 따릅니다.
 

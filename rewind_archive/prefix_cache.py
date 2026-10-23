@@ -11,7 +11,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_STORED, BadZipFile
 
 from .contracts import PreparationError,canonical,digest,validate_manifest
-from .cache_policy import CachePolicy,WARM128_POLICY,validate_expectation
+from .cache_policy import CachePolicy,WARM128_POLICY,WARM192_POLICY,WARM_POLICIES,validate_expectation
 
 MIB=1024**2
 CACHE_DISK_BYTES=128*MIB
@@ -28,7 +28,7 @@ def resolve_policy(policy=None,budget=None):
     legacy=CachePolicy("pose_prefix96_v1","bounded_prefix_cache_v1",LOGICAL_BYTES,CACHE_DISK_BYTES,
         LOCAL_IO_BYTES,MAX_CHUNKS,EXPORT_IO_BYTES,128,1157)
     if policy is None:return legacy
-    if policy not in (WARM128_POLICY,legacy):
+    if policy not in (*WARM_POLICIES,legacy):
         raise PreparationError("unsupported_cache_policy")
     return policy
 
@@ -104,8 +104,12 @@ def read_manifest(bundle,policy=None):
     try:doc=json.loads(raw)
     except (ValueError,UnicodeError):raise PreparationError("cache_manifest_json") from None
     fields={"schema_version","archive_manifest","archive_manifest_sha256","prefix_bytes","prefix_sha256","chunks","status","producer_code_sha256","content_sha256"}
-    if isinstance(doc,dict) and doc.get("schema_version")=="bounded_prefix_cache_v2":
-        if policy!=WARM128_POLICY or doc.get("policy_id")!=policy.name:raise PreparationError("unsupported_cache_format_or_policy")
+    warm_formats={p.schema:p for p in WARM_POLICIES}
+    if isinstance(doc,dict) and doc.get("schema_version") in warm_formats:
+        incoming=warm_formats[doc["schema_version"]]
+        if policy.logical_bytes<incoming.logical_bytes or doc.get("policy_id")!=incoming.name:
+            raise PreparationError("unsupported_cache_format_or_policy")
+        policy=incoming
         fields=fields|{"policy_id"}
     else:policy=resolve_policy()
     if not isinstance(doc,dict) or set(doc)!=fields or doc["schema_version"]!=policy.schema:
@@ -154,7 +158,7 @@ def save_uploaded_cache(uploaded,directory,policy=None,expectation=None):
     try:
         with partial.open("xb") as f:f.write(data)
         spec=input_spec(partial,policy)
-        if expectation and spec["manifest_sha256"]!=validate_expectation(expectation)["manifest_sha256"]:
+        if expectation and spec["manifest_sha256"]!=validate_expectation(expectation,policy=policy)["manifest_sha256"]:
             raise PreparationError("cache_expected_manifest_mismatch")
         if time.monotonic()-started>60:raise PreparationError("cache_upload_elapsed_limit")
         os.rename(partial,target);spec["path"]=str(target.resolve())
@@ -169,7 +173,8 @@ def save_uploaded_cache(uploaded,directory,policy=None,expectation=None):
 class PrefixCache:
     def __init__(self,output,manifest,budget,policy=None,expectation=None):
         self.policy=resolve_policy(policy);budget._cache_policy=self.policy
-        self.expectation=validate_expectation(expectation,required=self.policy==WARM128_POLICY)
+        self.expectation=validate_expectation(expectation,required=self.policy in WARM_POLICIES,
+            policy=self.policy if self.policy in WARM_POLICIES else WARM128_POLICY)
         self.directory=output/"cache";self.directory.mkdir()
         self.path=self.directory/"prefix.bin";self.manifest=manifest;self.budget=budget
         self.chunks=[];self.size=0;self.input_bytes=0;self.hash=hashlib.sha256()
@@ -182,7 +187,7 @@ class PrefixCache:
 
     def _load(self,spec):
         if spec is None:
-            if self.policy==WARM128_POLICY:raise PreparationError("warm_cache_required")
+            if self.policy in WARM_POLICIES:raise PreparationError("warm_cache_required")
             self.stream=self.path.open("x+b");return
         self.import_status="validating"
         source=bundle=None;partial=self.directory/"prefix.partial"
@@ -260,7 +265,7 @@ class PrefixCache:
         body={"schema_version":self.policy.schema,"archive_manifest":self.manifest,
             "archive_manifest_sha256":digest(self.manifest),"prefix_bytes":self.size,"prefix_sha256":self.hash.hexdigest(),
             "chunks":self.chunks,"status":"usable_prefix" if usable else "unusable","producer_code_sha256":producer}
-        if self.policy==WARM128_POLICY:body["policy_id"]=self.policy.name
+        if self.policy in WARM_POLICIES:body["policy_id"]=self.policy.name
         doc={**body,"content_sha256":digest(body)};raw=canonical(doc)+b"\n"
         if len(raw)>MANIFEST_BYTES or self.size+len(raw)>self.policy.disk_bytes:raise PreparationError("cache_manifest_size")
         (self.directory/"manifest.json").write_bytes(raw)
@@ -268,7 +273,7 @@ class PrefixCache:
             "ready_for_reuse":usable and self.size>0,
             "prefix_bytes":self.size,"input_prefix_bytes":self.input_bytes,"chunks":len(self.chunks),
             "import_status":self.import_status,"cache_disk_bytes":self.size+len(raw),"producer_code_sha256":producer}
-        if self.policy==WARM128_POLICY:self.final.update(schema_version=self.policy.schema,policy_id=self.policy.name,
+        if self.policy in WARM_POLICIES:self.final.update(schema_version=self.policy.schema,policy_id=self.policy.name,
             expected_input=self.expectation)
         return self.final
 
@@ -282,7 +287,7 @@ def export_cache(directory,policy=None):
     if policy is None:
         try:version=json.loads(manifest_path.read_bytes()).get("schema_version")
         except (ValueError,UnicodeError,AttributeError):raise PreparationError("cache_manifest_json") from None
-        policy=WARM128_POLICY if version==WARM128_POLICY.schema else None
+        policy={p.schema:p for p in WARM_POLICIES}.get(version)
     policy=resolve_policy(policy)
     if sum(p.stat().st_size for p in (manifest_path,prefix))>policy.disk_bytes-4096:
         raise PreparationError("cache_export_size")
