@@ -4,6 +4,8 @@
 
 ## 근거와 확인 범위
 
+후속 구현에서는 이 문서의 후보를 검토해 별도 `real_archvis62_v1` 규격과 candidate 변환기를 추가했다. [실제 pose 준비 안내](REAL_DATA_PREPARATION.md)를 따르며 아래 표·미구현 표현은 대응표 작성 당시 기록으로 보존한다. 기존 개발용 설정·합성 checkpoint의 의미를 바꾸거나 실제 학습 완료로 올리지 않는다.
+
 같은 날 후속 [단위·좌표계 및 학습 관절 검토](COORDINATE_AND_TRAINING_REVIEW.md)에서 이 이름 목록의 body22+finger40/upper13을 초기 학습 구성으로 권고했다. 기존 M3 역할 계약의 이름·소유 구조 검사와 실제 좌표 변환을 대조했으며, 해부학적 parent·공식72 목록을 확정한 것은 아니다. 아래 표의 raw/Dev/Eval 순서와 기존 설정은 유지한다.
 
 | 구분 | 근거 | 이 문서에서의 취급 |
@@ -191,6 +193,8 @@ M3의 `body owns wrist`를 실제 key에 적용하려면 우선 `hand_l/r`가 �
 이번 대응표는 위 후보를 검토 가능하게 했지만 skeleton·bone 길이·부모 연결·landmark 정의를 검증하거나 실제 모델을 선정한 것은 아니다. 기존 합성 checkpoint를 87/62개 실제 입력에 연결하지 않는다.
 
 ## 필드 검사·추적성과 한계
+
+아래 `outputs/joint_mapping_20261016/...` 조사 근거와 재현 스크립트는 로컬 아카이브에 있다. [개별 복원 안내](LOCAL_STORAGE.md#개별-파일-복원)에 따라 스크립트와 참조하는 이전 manifest·보고서를 먼저 복원한다. 원본 raw32개는 보존되어 있으며 아래 명령은 복원 후 재현용이다.
 
 각 field의 vector shape·수치 타입(bool 제외)·finite를 직접 검사했다. 관절당 joint field7개가 32파일 모두 동일했으며 누락·invalid vector는0이다.
 

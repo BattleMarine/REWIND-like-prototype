@@ -21,7 +21,7 @@ Python 3.10 이상과 표준 라이브러리만 필요하다. `rewind_data`는 �
 | `rewind_data/windows.py` | Field별 snapshot과 causal offline/streaming window 조립 |
 | `rewind_data/window_fixture.py`, `tests/test_windows.py` | 데이터 없는 합성 window 실행·검증 |
 
-프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이전 검증은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다. 아래 데이터 의존 명령은 추출된 JSON 디렉터리와 준비된 sample 산출물용이다. `rewind_data --input`은 archive 또는 분할 압축 파일을 직접 읽지 않는다. 별도 `rewind_archive`의 제한된 선택 추출은 부분 구현·로컬 검증했고 실제 사용자 Drive/Colab 실행은 남아 있다.
+프로젝트 root에서 실행한다. `python`/`node`는 각각 실제 실행파일을 선택해야 한다. Windows의 Python 설치 안내용 실행 별칭과 혼동하지 않는다. 이전 검증은 Codex 번들 Python 3.12.14·Node.js 24.19.0을 사용했다. 아래 데이터 의존 명령은 추출된 JSON 디렉터리와 준비된 sample 산출물용이다. `rewind_data --input`은 archive 또는 분할 압축 파일을 직접 읽지 않는다. 별도 `rewind_archive`의 제한된 선택 추출은 당시 부분 구현·로컬 검증 단계였다. 이후 실제 사용자 Drive/Colab 추출과 캐시 확장은 [최신 확보 상태](REAL_DATA_NEXT_RUN.md)에 기록했으며, 이 문서의 초기 실행 이력과 구분한다.
 
 ```sh
 python -m rewind_data --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --dataset-version UnrealEgo2_train_val_pose_unverified --provenance data/sample_source.json --output outputs/m0_sample

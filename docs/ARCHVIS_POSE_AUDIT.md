@@ -35,6 +35,8 @@ Window는 현재·과거와 같은 sequence만 포함하고, 원본 좌표·mask
 
 ## 산출물과 다음 단계
 
+2026-10-23 정리 후 아래 `outputs/...` 증거·재현 스크립트는 로컬 아카이브로 이동했다. [개별 복원 안내](LOCAL_STORAGE.md#개별-파일-복원)에서 인덱스를 확인하고 필요한 스크립트와 입력 근거를 원래 경로로 복원한 후 재현한다. `data/raw/...` 원본은 보존하며 이 문서 갱신으로 스크립트를 실행하지 않는다.
+
 Git 제외 로컬 보관 위치는 다음과 같다. 새 checkout에는 자동으로 포함되지 않으므로 재검사에는 위 Drive ZIP을 사용한다.
 
 - `data/raw/colab_archvis_pose_20261015/`: ZIP과 `bundle/pilot/files`의 원본 JSON.
@@ -54,7 +56,7 @@ Git 제외 로컬 보관 위치는 다음과 같다. 새 checkout에는 자동�
 - 숫자 suffix를 제거한 motion 이름 후보가 다른 split에도 존재한다(Brutal train/validation/test 12/0/1, Opening 109/20/18). 이름만으로 같은 원본 mocap이라고 판정하거나 split 누수가 없다고 선언하지 않는다.
 - Drive RGB 목록에 ArchVis `000`~`004` 5개가 있으며 공식 다운로드 스크립트의 part 수와 일치한다. 총 목록 크기는 52,441,303,081 bytes다. 내용·hash·전체 무결성 검사가 아니다. Drive media는 이번에 읽지 않았다.
 - 별도의 공식 서버 RGB 부분 읽기는 기본 8MiB/60초/16MiB 저장 상한으로 실행했다. 사용자 중단 전 실행은 최종 보고서 없이 partial 983,040 bytes를 남겨 재사용하지 않는다(전송량 미확정). 재개 실행은 새 폴더에서 2,301,530 bytes/60.031초 뒤 `http_body_failed`로 종료했고 `inspection_candidates_usable=false`, verify `not_usable`이다. 완전 파일 기록 1개도 다른 인물의 Getting_Up__1_/camera_right/final_10.png여서 목표 pose와 대응하지 않는다. 실패 추출본은 학습에 쓰지 않고 예산을 자동 확대하지 않았다. 이 결과를 Drive/Colab 전송 성능이나 원본 손상 증거로 해석하지 않는다.
-- Git 제외 `outputs/m0_next_evidence_20261015/`에 공식 파일·수신 log·split/재투영 결과·독립 검토·RGB 실패 보고서를 보존한다. `root/archvis_rgb_selection.json`은 기존 Colab notebook의 `INPUT_MODE=json_upload`에 넣을 개인용 선택 입력이며 metadata를 새로 확인해야 한다. `root/colab_target.json`의 glob은 목표 sequence frame 0의 좌우 PNG만 선택한다. 형식과 이름 계약만 검사했으며 Drive RGB 실행은 미완료다. 상한 내 결과가 0이어도 원본에 해당 frame이 없다는 뜻은 아니다.
+- Git 제외 `outputs/m0_next_evidence_20261015/`에 공식 파일·수신 log·split/재투영 결과·독립 검토·RGB 실패 보고서를 보존한다. `root/archvis_rgb_selection.json`은 당시 Colab notebook의 `INPUT_MODE=json_upload`용 개인 선택 입력이었다. 이 종료된 입력 방식은 현재 API9 단일 JOB notebook에 적용하지 않으며 최신 [실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다. `root/colab_target.json`의 glob은 목표 sequence frame 0의 좌우 PNG만 선택한다. 형식과 이름 계약만 검사했으며 Drive RGB 실행은 미완료다. 상한 내 결과가 0이어도 원본에 해당 frame이 없다는 뜻은 아니다.
 
 M0에서 남은 실제 RGB·좌표/단위·시간·skeleton·원본 motion 검증을 유지한다. 후속 M2/M3의 합성 구현 검증은 이 데이터의 학습 준비 완료와 구분한다.
 

@@ -1,10 +1,16 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
-API9 warm192는 [고정 계약](PREFIX_CACHE.md)에 따라 128MiB 이상의 보관 cache를 byte0부터 재생하고 미보관 64MiB만 추가로 탐색합니다. 검토된 cache_expectation/단일 JOB를 사용하며 cold fallback은 없습니다. 일반 단계 disk 합 705MiB에 source/환경/보고서와 사전검사 임시 공간이 더 필요합니다. 큰 합성 fixture는 검사 후 제거하고 실제 cache/기존 files는 삭제하지 않습니다. 실제 원본 검증은 고정 버전 인계 후 테스트 세션에서 한 번만 진행합니다.
+## 현재 안내 — API9 / 사용자 테스트 보류
 
-API8 warm128 준비: [cache 안내](PREFIX_CACHE.md)의 새 profile은 검토된 기존 cache ZIP과 `cache_expectation`이 필수입니다. Source와 notebook을 같은 고정 버전으로 쓰며 단일 JOB에서 명시적 cache upload만 추가합니다. 첫 새 원본 Range는 기존 prefix 끝에서 시작하고,누락/변경/실패 cache를 cold로 다시 읽지 않습니다. 준비420초와 초기metadata·인증·upload/export의 별도 범위를 구분합니다. 실제 사용자 시험은 오케스트레이션 검토 뒤 테스트 세션의 한 번 실행 인계로 진행합니다.
+2026-10-27 사용자 결정으로 Colab 테스트를 일시 보류합니다. 아래 실행법은 재개 시 참고용이며 지금 새 실행을 요구하지 않습니다. 재개 전 테스트 세션이 [고정 인계와 식별값](REAL_DATA_NEXT_RUN.md)을 확인하며, 기존 revision `0f6c5ca`의 소스 ZIP·ready notebook·입력 캐시는 유지합니다. 일반 notebook의 문서 수정으로 고정 배포본을 교체하지 않습니다.
 
-2026-10-21 API7 cache 준비: [별도 실행 안내](PREFIX_CACHE.md)의 `posePrefixCache96MiB_v1`을 사용할 수 있습니다. 기존 인증·초기 metadata 절차는 유지합니다. 우선 고정 JOB의 cold 한 번과 결과ZIP/cacheZIP 보존을 테스트 세션에서 안내하며, 이후 warm은 cacheZIP 한 개를 명시적으로 업로드하는 별도 JOB입니다. 실제 warm의 media0이나 목표 확보를 보장하지 않습니다. 동시 disk는 input/export/cache/결과를 모두 계산하고, 준비420초와 별도 upload/export 비용을 구분합니다. 이번 cache 기능의 로컬 검증은 실제 Google/Colab 결과가 아닙니다.
+API9 `posePrefixWarm192MiB_v3`는 [캐시 계약](PREFIX_CACHE.md)에 따라 검증된 128MiB 이상 캐시와 `cache_expectation`이 필수이며 cold fallback이 없습니다. Gzip/tar는 **byte0부터 로컬 캐시를 다시 해제**하고, 원격 Drive에서는 캐시에 없는 후속 범위만 읽습니다. 이번 고정 128MiB 입력에서 새 media는 최대64MiB입니다. Gzip 내부 상태의 이어받기·임의 seek가 아닙니다.
+
+준비는 논리192MiB·새 응답body80MiB·420초·773HTTP이며 초기 metadata128KiB·30초·8HTTP는 별도입니다. 합계80.125MiB·450초·781HTTP이고 인증·upload/export·영구보관 비용은 별도입니다. 일반 단계 disk 합705MiB에 소스·환경·사전검사 임시 공간과 여유가 필요합니다. 사전검사의 큰 합성 fixture는 검사 후 제거하며 실제 캐시·기존 결과는 보존합니다. 상한의 상세 범위는 [192MiB 계획](PREFIX_CACHE_192_PLAN.md)을 따릅니다.
+
+API8 warm128의 실제 캐시 재사용·확장 성공과 목표 pose0개는 [실행 기록](REAL_DATA_NEXT_RUN.md)에 구분합니다. 아래의 API7 cold 및 초기 모델·metadata 검증 기록은 과거 결과이며 새 cold/warm 반복 지시가 아닙니다.
+
+## 초기 Colab·로컬 검증 이력
 
 2026-10-15 · 개인 Google 계정의 Colab 관리형 런타임을 사용하는 안내입니다. 로컬 검증과 실제 Colab 검증은 구분합니다. 사용자의 실제 Colab 진단에서 Drive metadata HTTP 200 응답을 확인했습니다. 후속 사용자 보고서에서 manifest 생성과 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 구조·수치와 연속 18프레임을 검사했습니다. 공식 train 경로 소속과 annotation 재투영의 수치 정합성도 후속 확인했지만, 단위·좌표 의미·시간·원본 motion 독립성·실제 RGB 대응·GPU 실행은 남아 있습니다. 수치와 검토 범위는 [로드맵](ROADMAP.md)에 기록합니다.
 
@@ -119,7 +125,7 @@ Drive 마운트와 Drive API를 통한 부분 읽기는 별개입니다. `drive.
 
 구현은 `000`부터 이어지는 조각을 작은 바이트 범위로 읽고 gzip/tar를 순차 해제합니다. 중간 조각만 독립 해제하거나 전체 조각을 합친 파일을 만들지 않습니다. 필요한 파일의 위치가 뒤쪽이면 선택하지 않은 앞부분도 읽어야 하므로, 작은 추출본이 작은 전송량을 보장하지 않습니다. 기본 상한·중단 이유·지원하는 응답 조건은 부분 압축 준비 안내를 따릅니다. 상한에 도달하면 보고서를 확인하고 다음 실행의 비용을 판단합니다.
 
-추출 보고서에는 완전한 파일의 hash, 읽은 범위와 바이트 수, 중단 이유를 남깁니다. 잘린 파일은 보관하지 않습니다. 추출 manifest와 파일을 함께 보관하면 재사용 검사로 크기·hash·코드·원본 manifest의 일치를 확인할 수 있습니다. 런타임 재생성으로 추출본을 잃으면 앞부분 읽기 비용이 다시 발생합니다. 진행 중인 gzip 내부 상태를 checkpoint에서 재개하는 기능은 없습니다.
+추출 보고서에는 완전한 파일의 hash, 읽은 범위와 바이트 수, 중단 이유를 남깁니다. 잘린 파일은 보관하지 않습니다. 추출 manifest와 파일을 함께 보관하면 재사용 검사로 크기·hash·코드·원본 manifest의 일치를 확인할 수 있습니다. 런타임 재생성으로 추출본을 잃으면 재준비가 필요합니다. 보관한 검증 캐시가 있으면 byte0 로컬 재해제 비용을 지불하고 미보관 범위만 원격으로 읽으며, 캐시가 없으면 앞부분 원격 읽기 비용도 다시 발생합니다. 진행 중인 gzip 내부 상태를 checkpoint에서 재개하는 기능은 없습니다.
 
 Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않습니다. 좌우 RGB·pose의 sequence/frame 식별자 대응, 관절·단위·좌표·split을 검증해야 합니다. 이름 대응이 성공해도 실제 내용 정합성이나 학습 준비 완료를 뜻하지 않으며, 현재 준비 보고서는 항상 `train_ready=false`입니다. 실제 입력의 검증 조건은 README 및 M1 안내를 확인합니다.
 
@@ -130,10 +136,10 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 ### Archive 준비 notebook: 한 방향 실행
 
 1. **CPU 런타임**에서 사용자용 `archive_prepare.ipynb`와 같은 revision의 코드 source ZIP을 준비합니다. 배포 묶음 전체 대신 내부 source ZIP만 업로드합니다. 이전 모듈이 import되어 있으면 결과를 먼저 내려받고 커널을 재시작합니다. Source 업로드는 한 번이며 별도 plan/선택 JSON 업로드는 없습니다.
-2. 위에서 아래로 로컬 사전 검사115개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+request-diagnostics14+request-retry21)를 실행합니다. 실제 데이터·Google 인증 없이 합성/모의/localhost만 검사합니다. Notebook/source API는6이며 기존14셀/7코드 셀 순서는 유지합니다. 이후 **JOB 한 설정 셀(id=job-config)**을 확인합니다. 사용자용 사본은 검토한 selection·profile·exact_targets가 이 셀에 미리 채워질 수 있으며 generic notebook은 직접 입력합니다.
+2. 위에서 아래로 로컬 사전 검사153개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+request-diagnostics14+request-retry21+prefix-cache22+warm128 8+warm192 8)를 실행합니다. 실제 데이터·Google 인증 없이 합성/모의/localhost만 검사합니다. Notebook/source API는9이며 기존14셀/7코드 셀 순서는 유지합니다. 이후 **JOB 한 설정 셀(id=job-config)**을 확인합니다. 사용자용 사본은 검토한 selection·profile·exact_targets가 이 셀에 미리 채워질 수 있으며 generic notebook은 직접 입력합니다.
 3. Generic 기본값은 `profile="smoke8MiB_v1"`, `mode="scan"`, `purpose="prefix_inventory"`, `includes=[]`, `exact_targets=[]`입니다. Job ID·reason·selection·profile·targets·limits·metadata_limits를 같은 셀에 둡니다. Scan은 최대128개 regular header를 관측하고 payload는 저장하지 않지만 실제 Drive의 선행 payload를 읽고 해제하는 비용은 발생합니다. 별도로 검토한 **대응2파일 추출**은 아래 고정 counterpart 프로파일을 사용합니다.
-4. 다음 preflight에서 effective 설정과 동일 설정/선택 이력을 확인합니다. 이 단계는 인증/원본 요청0입니다. Profile·정확한 목표·body/time/requests/decompressed/disk·두 단계 상한 합계를 확인합니다. Source size/version/modifiedTime은 아직 unknown이며 metadata 이후 표시합니다. 이름·glob은 저장 필터이지 gzip 위치 점프가 아닙니다. 새 작업은 선택한 더 큰 상한에서도 byte0부터 다시 읽으며 이전8MiB 뒤에서 이어받지 않습니다.
-5. 다음 실행 셀의 **`EXECUTE_ONCE=True`**를 명시해 한 번 실행합니다. Profile/targets/budget 등 JOB가 preflight 뒤에 바뀌면 인증 전 차단합니다. 먼저 job 기록→사용자 인증→metadata 확인→scan/pilot 순서로 실행하며 자동 재시도하지 않습니다. 최초Metadata128KiB/30초는 선택한 준비 프로파일과 별도입니다. Range256KiB·read1/해제64KiB와 매 Range의 총3요청(media1+전후 metadata2)·metadata 최대32KiB 예약은 유지합니다.
+4. 다음 preflight에서 effective 설정과 동일 설정/선택 이력을 확인합니다. 이 단계는 인증/원본 요청0입니다. Profile·정확한 목표·body/time/requests/decompressed/disk·두 단계 상한 합계를 확인합니다. Source size/version/modifiedTime은 아직 unknown이며 metadata 이후 표시합니다. 이름·glob은 저장 필터이지 gzip 위치 점프가 아닙니다. 캐시 없는 scan/extract는 byte0부터 원격으로 다시 읽습니다. 검증된 cache 입력이 있는 profile은 byte0부터 로컬 재해제하고 미보관 suffix만 원격으로 읽습니다. 필터나 더 큰 상한만으로 이전8MiB 뒤에서 이어받지는 않습니다.
+5. 다음 실행 셀의 **`EXECUTE_ONCE=True`**를 명시해 한 번 실행합니다. Profile/targets/budget 등 JOB가 preflight 뒤에 바뀌면 인증 전 차단합니다. 먼저 job 기록→사용자 인증→metadata 확인→scan/pilot 순서로 실행하며 JOB 자체를 자동 재실행하지 않습니다. `request_policy=None`은 추가시도0이며, 허용한 pose targeted profile에 명시한 opt-in 정책만 사전 metadata 개시 timeout을 제한 재시도합니다. 최초Metadata128KiB/30초는 선택한 준비 프로파일과 별도입니다. Range256KiB·read1/해제64KiB와 새 media Range마다 총3요청(media1+전후 metadata2)·metadata 최대32KiB 예약을 유지합니다. Cache 재생은 매 chunk를 원격으로 다시 읽지 않으며 live 검사·재시도 비용은 별도로 집계합니다.
 6. 아래 결과 셀에서 관측 목록·중단 이유·trust를 확인합니다. `scan`의 완전 저장 파일0개는 의도한 동작입니다. `payload_complete`는 header의 payload+padding을 소비했다는 뜻이며 PNG/JSON 내용 검증·학습 sample 확보와 다릅니다. Source/CRC/parser/unsafe/후검사 실패면 전체 목록은 untrusted입니다. 순서는 archive 도달 순서이며 frame 순서가 아닙니다. 전체 source 목록·seek index·원본 무결성은 별도입니다.
 7. 마지막 결과 ZIP 셀을 실행하고 **`DOWNLOAD_RESULT_ZIP=True`**로 내려받습니다. 현재 job/metadata/pilot·관측목록/완전 파일만 넣으며 실패로 job.json만 있어도 보관합니다. 기존 ZIP은 덮어쓰거나 추가하지 않고 재다운로드할 수 있습니다. 최대17MiB 결과와 비슷한 별도 임시 ZIP 공간이 필요합니다. 개인 ID/sample이 포함될 수 있어 개인 보관합니다. 이번 목록 조사 후에는 ZIP을 검토하고 중단합니다.
 
@@ -161,7 +167,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 기존 pose 테스트는 같은64MiB 상한에서도 header1000에서 먼저 멈췄고 tar metadata64KiB 상한에도 근접했습니다. 동일 설정을 반복하지 않습니다. 별도 `poseCounterpart64MiB_v1`은 body64MiB/300초/768요청은 유지하고 **header10000·누적 tar metadata1MiB·해제512MiB**를 명시합니다. [설정 JSON](../configs/archive_limits_poseCounterpart64MiB_v1.json)과 실제 limits의 정확한 일치를 검사합니다. 기존 smoke/RGB-counterpart 정책은 그대로입니다.
 
-JOB 한 셀의 profile과 고정 limits만 새 정책으로 정하고 kind=pose·extract/targeted·정확한2목표를 유지합니다. 사용자용 고정 사본은 테스트 세션에서 인계합니다. 새 정책이 없는 API3 소스와 섞지 않도록 API6에서 진단 및 선택적 재시도 정책 지원까지 확인하며 입력 셀이나 plan 업로드를 추가하지 않습니다. 상한 변경은 이 고정 preset에 한정되며 목표 위치·실제 완료를 보장하지 않습니다.
+JOB 한 셀의 profile과 고정 limits만 새 정책으로 정하고 kind=pose·extract/targeted·정확한2목표를 유지합니다. 사용자용 고정 사본은 테스트 세션에서 인계합니다. 현재 안내의 API9 소스·notebook을 맞춰 진단 및 선택적 재시도 정책 지원을 확인하며 입력 셀이나 plan 업로드를 추가하지 않습니다. 상한 변경은 이 고정 preset에 한정되며 목표 위치·실제 완료를 보장하지 않습니다.
 
 개별 GNU/PAX payload는64KiB를 유지해 큰 단일 항목을 읽기 전에 거부하고, 누적 metadata만1MiB까지 허용합니다. 내부IO/해제 chunk64KiB와 HTTP Range256KiB를 구분합니다. 최대10000개 seen 경로·metadata parser·Python/set 비용이 있어 disk16MiB를 프로세스 RAM 상한으로 해석하지 않습니다. 전체 해제512MiB를 모아서 저장하지 않습니다.
 
@@ -195,4 +201,4 @@ JOB 한 셀의 profile과 고정 limits만 새 정책으로 정하고 kind=pose�
 
 Colab 실행 전후의 실제 확인 범위는 실행 보고서에 남깁니다. GPU 메모리 부족 시에는 작은 모델·해상도·batch로 pilot부터 다시 측정하고, 장시간 학습 규모는 자원·예산을 정한 뒤 확대합니다.
 
-새 pose 테스트의 `metadataPreTimeout10sRetry1Global3_v1` 정책은 metadata 사전 요청 개시만 최대10초로 기다리며, 허용된 무응답 timeout에 한해 요청당 추가1회·전체 추가3회와0.5초 대기를 적용합니다. 전체 예산은 늘리지 않습니다. 초기 metadata·media·후검사·부분본문에는 재시도가 없으며, 사용자가 job을 다시 실행하는 것과 구분합니다. 정확한 고정 설정과 판정은 [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따릅니다.
+명시적으로 선택한 pose targeted JOB의 `metadataPreTimeout10sRetry1Global3_v1` 정책은 metadata 사전 요청 개시만 최대10초로 기다리며, 허용된 무응답 timeout에 한해 요청당 추가1회·전체 추가3회와0.5초 대기를 적용합니다. 선택한 profile의 전체 준비 예산(smoke60초, counterpart/pose-counterpart300초, cache/warm420초)을 늘리지 않습니다. 이 opt-in 정책은 허용된 pose targeted profile에만 적용되며 smoke는 선택할 수 없습니다. 초기 metadata·media·후검사·부분본문에는 재시도가 없으며, 사용자가 job을 다시 실행하는 것과 구분합니다. 정확한 고정 설정과 판정은 [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따릅니다.

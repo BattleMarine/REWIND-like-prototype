@@ -12,9 +12,9 @@
 
 | 근거 | 이번에 확인한 내용 | 제한 |
 | --- | --- | --- |
-| [API6 verification](../outputs/test_archvis_pose_retry_20261021/verification.json), [독립 검토](../outputs/test_archvis_pose_retry_20261021/orchestrator_review.json), 같은 폴더의 `archive_job_archvis_pose_1_10_retry_001.zip` | ZIP 내 extraction/pilot/metadata/job 수치와 종료 상태 | 원본 전체 무결성·목표 위치는 미확정 |
-| [API5 결과](../outputs/test_archvis_pose_diagnostic_20261019/verification.json), [API4 결과](../outputs/test_archvis_pose_density_20261019/verification.json), [이전 header 상한 결과](../outputs/test_archvis_pose_counterpart_20261017/verification.json) | 이전 prefix와 최신 실행의 겹친 완료 Range hash·원본 identity | 부분 hash 일치는 전체 archive 무결성 증명이 아님 |
-| [왼쪽 추출 결과](../outputs/test_archvis_left_counterpart_20261017/verification.json), [RGB scan 결과](../outputs/test_archvis_prefix_scan_20261017/verification.json) | 왼쪽 완전 PNG2개와 오른쪽 경로 관측 | Scan은 payload를 저장하지 않음. 과거 오른쪽 성공 ZIP은 현재 미수령 |
+| [API6 verification 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_retry_20261021/verification.json`), [독립 검토 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_retry_20261021/orchestrator_review.json`), 같은 폴더의 `archive_job_archvis_pose_1_10_retry_001.zip` | ZIP 내 extraction/pilot/metadata/job 수치와 종료 상태 | 원본 전체 무결성·목표 위치는 미확정 |
+| [API5 결과 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_diagnostic_20261019/verification.json`), [API4 결과 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_density_20261019/verification.json`), [이전 header 상한 결과 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_counterpart_20261017/verification.json`) | 이전 prefix와 최신 실행의 겹친 완료 Range hash·원본 identity | 부분 hash 일치는 전체 archive 무결성 증명이 아님 |
+| [왼쪽 추출 결과](../outputs/test_archvis_left_counterpart_20261017/verification.json), [RGB scan 결과 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_prefix_scan_20261017/verification.json`) | 왼쪽 완전 PNG2개와 오른쪽 경로 관측 | Scan은 payload를 저장하지 않음. 과거 오른쪽 성공 ZIP은 현재 미수령 |
 | [ArchVis pose 감사](ARCHVIS_POSE_AUDIT.md), `data/raw/colab_archvis_pose_20261015/bundle/pilot/` | 기존32개 JSON의 파일 크기·SHA-256을 extraction manifest와 다시 대조 | 대응 RGB와 원본 motion 독립성·시간 검증은 별도 |
 | `outputs/archive_efficiency_20261016/root/replay_allowed_rgb/`, `replay_allowed_pose/` | 저장된 공식 CityPark prefix의 기존 replay 보고서와 파일 이름 | 사용자 Drive/Colab 시험과 구분. 완전한 stereo clip이 아님 |
 | [현재 Source 코드](../rewind_archive/sources.py), [추출 코드](../rewind_archive/extraction.py) | 예약·계수·byte0 시작·LocalSource·gzip 상태의 실제 구현 | 지속 cache·hybrid source·gzip resume는 미구현 |

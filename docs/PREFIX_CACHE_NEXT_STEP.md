@@ -1,6 +1,6 @@
 # Cold cache 결과 이후의 최소 후속 작업안
 
-후속 사용자 지시로 이 문서의128MiB bounded warm 경로를 API8 `posePrefixWarm128MiB_v2`로 구현했습니다. 고정 계약·필수 cache expectation·v1/v2 호환·단계 시간 계측은 [최신 cache 안내](PREFIX_CACHE.md)를 따릅니다. 아래는 설계 당시의 근거와 비용 비교이며192MiB는 여전히 비교 후보일 뿐입니다. 실제 원본 warm은 구현 검증과 구분합니다.
+후속 구현·실제 결과: 이 문서의128MiB 경로는 API8 `posePrefixWarm128MiB_v2`로 구현했고 실제 캐시 재사용·128MiB 확장도 확인했습니다. 이어 API9 `posePrefixWarm192MiB_v3`를 구현해 고정 버전으로 인계했습니다. [192MiB 계획·계약](PREFIX_CACHE_192_PLAN.md), [최신 캐시 안내](PREFIX_CACHE.md), [현재 실행 보류·재개 기준](REAL_DATA_NEXT_RUN.md)을 따릅니다. 아래192MiB 비교 후보·미구현 표현은 설계 당시 기록이며 실제192MiB 원본 탐색이나 목표 pose 확보가 확인됐다는 뜻은 아닙니다.
 
 2026-10-21 · 기준 `f0607fa` · **오프라인 검토와 계획 문서이며 새 profile·원본 실행을 적용하지 않았다.**
 
@@ -29,7 +29,7 @@
 - Import는 `verified`,384chunk·100,561,588bytes의 개별/전체hash를 통과했다.
 - byte0부터 해제한 출력은551,914,001bytes로 cold의 누적 해제량과 정확히 같았다. Gzip EOF/전체CRC는false다. Tar parser·카탈로그를 새로 생성하거나 RGB/pose 내용을 검증한 결과는 아니다.
 - Local IO는201,212,292bytes로 현196MiB 안이었다. Windows CPU/Python3.12.14에서 import(copy/hash)0.172초,replay+gzip+출력SHA1.391초였으며 **Colab 재생시간이나 warm 총시간으로 사용하지 않는다.**
-- 결과는 [오프라인 기록](../outputs/prefix_cache_next_20261021/developer/offline_import_replay.json),재현 script는 같은 폴더 `offline_import_replay.py`다. 프로젝트 루트에서 `python outputs/prefix_cache_next_20261021/developer/offline_import_replay.py --output outputs/prefix_cache_next_20261021/developer/replay_rerun.json`으로 별도 새 결과를 만들 수 있다. 기존 결과는 덮어쓰지 않는다.
+- 결과는 [오프라인 기록 복원 안내](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/prefix_cache_next_20261021/developer/offline_import_replay.json`), 재현 script는 같은 폴더 `offline_import_replay.py`다. 재현 명령 전에 아카이브의 script와 참조하는 의존 입력을 인덱스에서 확인해 원래 경로로 복원해야 한다. 프로젝트 루트에서 `python outputs/prefix_cache_next_20261021/developer/offline_import_replay.py --output outputs/prefix_cache_next_20261021/developer/replay_rerun.json`으로 별도 새 결과를 만들 수 있다. 기존 결과는 덮어쓰지 않는다.
 
 이는 module-level 오프라인 검증이다. 현재 workflow/notebook의 warm은 인증·초기metadata·live pre/post를 호출하며 offline-only 진입점을 제공하지 않는다. 따라서 이 결과를 실제 Drive warm 성공·현재 서버identity 확인·전송 절감 실측으로 올리지 않는다. 기존 cache를 import했다는 이유로 가짜 live 검사를 넣어 usable 실행을 만들지 않는다.
 

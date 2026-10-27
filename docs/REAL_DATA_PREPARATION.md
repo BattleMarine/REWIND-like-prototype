@@ -96,7 +96,15 @@ Brutal18의 연속 구간은 overfit 후보로 유지한다. Opening의14개를 
 
 ## 로컬에서 재현한 명령
 
-아래 경로는 **이번 Windows 로컬 저장소에서 이미 준비된 Git 제외 파일**이다. 새 checkout/Colab에 존재한다고 가정하지 않는다. 프로젝트 root에서 실행했으며 이번 `python`은 `.venv/Scripts/python.exe`다.
+2026-10-23 정리 후 아래 명령의 `outputs/...` 입력은 아카이브에 보관한다. [개별 복원 안내](LOCAL_STORAGE.md#개별-파일-복원)에서 원래 경로와 SHA256을 확인해 다음 입력을 복원한 뒤 사용한다. 원본 `data/raw/...`와 현재 코드·spec은 기존 위치에 보존한다. 이번 문서 갱신은 변환·학습 실행을 요청하지 않는다.
+
+- `outputs/m0_next_evidence_20261015/developer/official_split/UnrealEgoData2/`의 `train.txt`, `validation.txt`, `test.txt`
+- `outputs/m0_next_evidence_20261015/developer/official_calibration/fisheye_calib_unrealego_scaramuzza.json`
+- `outputs/real_data_prepare_20261016/developer/motion_map.json`
+
+Colab 참조 bundle 예시를 재현할 때 필요한 `outputs/real_pose_references_20261016.zip`도 아카이브에서 개별 복원한다. 과거 실행 근거·manifest와 변환 입력을 구분하고 현재 고정 warm192 테스트 자료를 대신 사용하지 않는다.
+
+아래 경로는 **당시 Windows 로컬 저장소에서 준비했던 Git 제외 파일**의 원래 경로다. 현재는 위 입력 복원이 선행되어야 한다. 새 checkout/Colab에 존재한다고 가정하지 않는다. 프로젝트 root에서 실행했으며 이번 `python`은 `.venv/Scripts/python.exe`다.
 
 ```sh
 python -m rewind_prepare --input data/raw/colab_archvis_pose_20261015/bundle/pilot/files --extraction-manifest data/raw/colab_archvis_pose_20261015/bundle/pilot/extraction_manifest.json --split-dir outputs/m0_next_evidence_20261015/developer/official_split/UnrealEgoData2 --motion-map outputs/real_data_prepare_20261016/developer/motion_map.json --spec configs/real_archvis62_v1.json --calibration outputs/m0_next_evidence_20261015/developer/official_calibration/fisheye_calib_unrealego_scaramuzza.json --output outputs/real_pose_candidate_new

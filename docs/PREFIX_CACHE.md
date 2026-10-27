@@ -107,7 +107,7 @@ archive_job_<job_id>/
 
 Cache ZIP은 `manifest.json`, `prefix.bin` 두 member의 STORED 형식이다. ZIP 파싱 전 EOCD의2entry·central directory4KiB·무comment/무다중disk를 검사한다. 중복·경로변형·링크·junction·압축bomb·과대manifest/ZIP을 거부하고,새 파일을 기존 파일 위에 덮어쓰지 않는다. 실패한 import/export `.partial`은 제거한다. 기존 export를 다시 받으면 ZIP SHA-256을 검증하고 재사용 검사 IO/시간을 표시한다.
 
-Cache manifest의 `producer_code_sha256`은 생성 코드 출처다. 재사용은 지원하는cacheformat v1과 원본identity/bytes/hash로 검사하며 현재코드hash 일치를 강요하지 않는다. 이것은 원본 전체hash·서명·신뢰할 수 없는 제공자의 진위를 증명하지 않는다. 개인이 보존한 검증된 cache를 입력으로 사용한다. 추출 파일의 기존 현재코드hash 검증 정책은 유지한다.
+Cache manifest의 `producer_code_sha256`은 생성 코드 출처다. Reader 호환은 v1 정책에서 v1, v2 정책에서 v1/v2, v3 정책에서 v1/v2/v3이며 입력 format별 고정 schema·필드·논리크기·chunk 상한을 검증한다. v2/v3는 해당 고정 `policy_id`도 대조하고 구형 정책으로 신형 format을 읽지 않는다. 실제 실행에는 선택한 profile의 최소 입력 크기와 필수 expectation 조건도 적용하므로 reader 호환만으로 warm 입력이 승인되지는 않는다. 원본 identity·bytes·hash와 manifest/chunk/prefix hash를 검사하며 producer hash의 현재 코드 일치를 강요하지 않는다. 이것은 원본 전체 hash·서명·신뢰할 수 없는 제공자의 진위를 증명하지 않는다. 개인이 보존한 검증된 cache를 입력으로 사용한다. 추출 파일의 기존 현재 코드 hash 검증 정책은 유지한다.
 
 `observation_catalog.json`은 단일 파일이며 자체hash와크기·건수·trust·cap/truncation 요약만 extraction/pilot/job/review에 연결한다. Entry의sequence_ref는같은파일sequences표의완전경로를가리키고frame/kind/side/header/regular ordinal/payload완료/반환bytes/stored/trust를보존한다. 명명규칙미인식건수와마지막경로도표시한다. Header관측은payload내용검증·전체목록·seekindex가아니다. 기존first128/last1진단도유지한다.
 
