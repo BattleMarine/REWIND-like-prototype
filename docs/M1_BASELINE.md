@@ -12,9 +12,18 @@
 | `rewind_m1/training.py`, `__main__.py` | 학습·평가 CLI, 전체 학습 상태 checkpoint, 재개·주기 보고서 |
 | `rewind_m1/frontend.py` | 작은 Conv heatmap 개발 모델, 버전·weights fingerprint가 있는 예측 cache |
 | `rewind_m1/predicted_fixture.py` | Train-only 합성 RGB front-end → 고정 예측 → cache 검증 → regression·평가 |
+| `rewind_m1/local_rgb.py` | 별도 로컬 RGB manifest의 lazy sample/batch 로더. 2026-10-27 구현, 실행 미검증 |
 | [Colab notebook](../notebooks/m1_baseline.ipynb) | 소스 ZIP 업로드, 환경·테스트, 합성 실행·재개, 선택적 결과 export |
 
-Notebook은 실행 진입점이며 핵심 로직은 위 Python 모듈에 있습니다. 원본 archive를 다운로드·결합·추출하거나 RGB 파일을 실제 dataset에서 읽는 기능은 이 묶음에 포함하지 않습니다. 기존 [데이터·window 계약](DATA_CONTRACT.md)을 유지합니다.
+Notebook은 실행 진입점이며 핵심 로직은 위 Python 모듈에 있습니다. 원본 archive를 다운로드·결합·추출하거나 실제 RGB 파일을 읽는 기능은 초기 합성 묶음에 포함하지 않았습니다. 후속 로컬 RGB 로더는 아래처럼 분리했으며 기존 [데이터·window 계약](DATA_CONTRACT.md)을 유지합니다.
+
+## 2026-10-27 로컬 RGB 로더 — 구현, 실행 미검증
+
+사용자의 테스트 없이 다음 구현을 진행하라는 지시에 따라 추출된 PNG의 `LocalStereoRGB`와 `RGBLimits`를 별도 모듈에 추가했습니다. 생성자는 manifest·경로·파일 metadata만 검사하고, `loader[index]` 또는 명시적인 작은 `load_batch`에서 해당 좌우 PNG만 읽어 CPU float32 RGB0~1의 `2,3,H,W` 또는 `B,2,3,H,W` tensor를 반환하도록 작성했습니다. 모든 view/record는 원래 크기가 같아야 하며 resize·augmentation·전역 이미지 캐시는 없습니다.
+
+별도 `local_stereo_rgb_v1` manifest는 sequence/frame·좌우 view와 파일 크기/hash·출처·split 선언을 보존합니다. Pose candidate나 기존 학습 계약으로 취급하지 않으며 verified/train_ready를 발급하지 않습니다. Pillow를 선택적 [requirements-rgb.txt](../requirements-rgb.txt)에 선언했고 자동 설치는 하지 않았습니다. 상세 규격·상한·실행하지 않은 사용 예시는 [로컬 RGB 로더 안내](LOCAL_RGB_LOADER.md)를 따릅니다.
+
+이번에는 정적 코드·계약·diff 검토만 수행합니다. 로컬 회귀·합성 검사·decoder import/실행·모델 forward·학습·Colab/Drive 요청은 하지 않았고 기능 동작·성능은 미검증입니다. 아래 초기 합성 실행 결과를 새 로더의 검증 결과로 사용하지 않습니다. 실제 front-end와 prediction cache/pose 학습 release 연결은 후속이며 M1 전체 완료가 아닙니다.
 
 ## 환경과 의존성
 
@@ -90,7 +99,7 @@ Sequence와 원본 motion의 split 중복을 거부합니다. Sequence record는
 
 예측 입력은 `input_source=predicted_2d`와 front-end 버전·weights fingerprint를 요구합니다. 각 record의 `prediction`에는 정확한 `joint_names`, 동일한 모델·전처리 버전, 좌우 `coordinates`, `valid_mask`, `confidence`, `visibility`가 있습니다. Missing prediction을 GT 2D로 대체하지 않습니다. `predicted_2d_cache_v1`은 전체 JSON 내용 hash, RGB manifest hash, 영상 크기, 관절 순서, 모델/전처리 버전과 record별 메타데이터를 검증한 뒤 연결합니다. 통합 fixture의 특징 manifest에도 RGB manifest와 prediction cache hash를 기록합니다.
 
-현재 준비 문서 전체를 메모리에 올려 tensor로 조립합니다. 대형 dataset의 lazy RGB 로더·disk cache 및 실제 RGB/pose 준비 CLI는 후속 구현입니다.
+기존 학습 경로는 준비 문서 전체를 메모리에 올려 tensor로 조립합니다. 후속 로컬 lazy RGB 로더는 별도로 구현했으나 실행·기존 학습 연결은 미검증입니다. Disk cache와 실제 RGB/pose 준비·학습 release CLI는 후속 구현입니다.
 
 ## 특징·mask·causality
 
@@ -143,4 +152,4 @@ GT confidence·visibility는 unknown이고 0/known=false로 표현합니다. 값
 
 실제 데이터 small sample의 관절·단위·좌표/calibration·timestamp·split·좌우 RGB/pose 정합성을 근거와 함께 확보한 뒤 명시적 특징 계약을 준비해야 합니다. 이후 실제 GT 입력 진단, 실제 RGB front-end 학습/고정·캐시와 예측 입력 baseline을 순서대로 검증합니다.
 
-EfficientNet 계열 encoder/decoder, body/hand 2D·3D 지표, 실제 RGB 로더·augmentation·대형 cache, full front-end resume, CUDA/AMP·Colab VRAM/시간/준비 비용, 장시간 학습·failure recovery·전체 latency는 남아 있습니다. Camera encoding·Diffusion teacher/student·물리 loss는 이 단계에서 구현하지 않았습니다. [Colab 준비 안내](COLAB_SETUP.md)와 [로드맵](ROADMAP.md)의 완료 기준·D1~D5는 유지하며 M1 전체 완료를 선언하지 않습니다.
+EfficientNet 계열 encoder/decoder, body/hand 2D·3D 지표, 로컬 RGB 로더의 실행·실제 front-end 연결, augmentation·대형 cache, full front-end resume, CUDA/AMP·Colab VRAM/시간/준비 비용, 장시간 학습·failure recovery·전체 latency는 남아 있습니다. Camera encoding·Diffusion teacher/student·물리 loss는 이 단계에서 구현하지 않았습니다. [Colab 준비 안내](COLAB_SETUP.md)와 [로드맵](ROADMAP.md)의 완료 기준·D1~D5는 유지하며 M1 전체 완료를 선언하지 않습니다.

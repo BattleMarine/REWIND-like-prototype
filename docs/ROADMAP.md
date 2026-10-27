@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 27일 문서 탐색·사용자 테스트 보류 반영
+검토 초안 v0.2   |   2026년 10월 27일 문서 정리·로컬 RGB 구현(실행 미검증) 반영
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -34,7 +34,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ### 2026-10-27 사용자 결정 — Colab 테스트 일시 보류
 
-사용자는 테스트를 잠시 건너뛰고 다음 독립 작업을 먼저 진행하도록 지시했다. 현재 작업은 문서 정리이며 사용자 재실행·새 Drive 요청·추가 학습을 시작하지 않는다. 이전에 인계한 warm192 소스 ZIP·ready notebook·v2 입력 캐시와 근거는 기존 경로·hash로 보존한다. 기존 예산·학습 guard·실험 상태는 유지한다.
+사용자는 테스트를 잠시 건너뛰고 다음 독립 작업을 먼저 진행하도록 지시했다. 당시 문서 정리를 먼저 진행했고, 이후 별도 사용자 지시에 따라 아래 로컬 RGB 로더를 구현했다. 이번에도 사용자 재실행·새 Drive 요청·추가 학습과 로컬 회귀·합성 테스트를 시작하지 않는다. 이전에 인계한 warm192 소스 ZIP·ready notebook·v2 입력 캐시와 근거는 기존 경로·hash로 보존한다. 기존 예산·학습 guard·실험 상태는 유지한다.
 
 사용자가 테스트 재개를 지시하면 테스트 세션에서 고정 revision·소스 ZIP·ready notebook·cache expectation과 실제 ZIP hash, 단일 JOB·환경·예산·중단 조건·이미 실행된 이력을 확인한다. 문서의 최신 커밋을 기존 테스트 revision으로 대체하지 않는다. 수정본이 필요하면 개발·검토 후 별도 고정 revision으로 인계하고 이전 실행과 구분한다. 기존 테스트의 성공을 전제하거나 동일 JOB를 자동 반복하지 않는다.
 
@@ -45,6 +45,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 ### 날짜별 구현·검토 기록
 
 이 절의 상세 이력은 이동하지 않았다. 각 날짜의 미검증·제안 상태는 그 시점의 기록으로 읽고 현재 실행 여부는 위 사용자 결정을 우선한다.
+
+### 2026-10-27 M1 로컬 RGB 로더 구현 — 실행 미검증
+
+- 사용자 지시는 문서 정리 후 테스트 없이 다음 구현을 진행하는 것이다. [로컬 RGB 로더](LOCAL_RGB_LOADER.md)에 별도 manifest와 필요한 sample/batch만 읽는 API를 추가했다. 생성자는 metadata만 검사하고 이미지 요청 시 해당 좌우 PNG를 size/hash·원래 해상도·decode 조건과 대조하도록 작성했다. CPU float32 RGB0~1, 원래크기를 유지하고 resize·augmentation·전역 image cache를 추가하지 않는다.
+- `read_json/digest/safe_path/validate_manifest/identify`를 재사용해 전체 sequence/frame/view와 원본 출처·split 선언을 보존한다. 파일·픽셀·batch 상한은 새 로컬 로더 전용이며 archive 압축읽기 예산을 바꾸지 않는다. 선택적 Pillow 요구사항을 별도로 선언했고 설치·import·실행은 하지 않았다.
+- 정적 코드·계약·diff 검토만 수행하며 로컬 회귀·합성/decoder/모델 실행·Colab/Drive·학습은 하지 않는다. **M1 로컬 RGB 로더 구현, 실행 미검증**이며 동작·성능·memory는 확인되지 않았다. 기존 248회귀·153사전검사는 새 로더 검증 근거가 아니다.
+- Candidate→학습 release, 실제 front-end 학습/예측 cache의 전체 연결, EfficientNet·대형 cache·M4는 이번 범위 밖이다. 기존 data_kind·학습 guard와 warm192 배포본·실제 캐시를 보존한다. M0~M3 실제 미완료와 M4 미착수 상태를 유지한다.
 
 ### 2026-10-23 API9 구현 — 보존128MiB 뒤의 제한된192MiB 탐색
 

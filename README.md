@@ -6,12 +6,12 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-10-27 기준입니다. **사용자 Colab 테스트는 일시 보류**하고 독립적인 문서 정리를 진행합니다. 재개 전에는 테스트 세션이 기존 고정 인계의 revision·소스 ZIP·ready notebook·캐시 식별값과 실행 조건을 다시 확인합니다. 이번 문서 수정으로 배포본을 교체하거나 같은 테스트를 반복하지 않습니다.
+2026-10-27 기준입니다. **사용자 Colab 테스트는 일시 보류**하며, 문서 정리 후 별도 지시에 따라 **M1 로컬 RGB 로더 구현, 실행 미검증** 상태를 기록합니다. 이번 구현에서도 로컬 회귀·합성 테스트·학습은 실행하지 않았습니다. 재개 전에는 테스트 세션이 기존 고정 인계의 revision·소스 ZIP·ready notebook·캐시 식별값과 실행 조건을 다시 확인하며 배포본을 교체하거나 같은 테스트를 반복하지 않습니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
 | M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, API9 bounded archive 준비 구현 | 현재 Serena 목표 pose 미확보, 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
-| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
+| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로컬 lazy RGB 로더 구현은 실행 미검증 | 로더 동작·실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
@@ -41,6 +41,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
 | [M2 body teacher 안내](docs/M2_BODY_TEACHER.md) | Diffusion·camera·loss·streaming 계약과 CPU 합성 실행·한계 |
 | [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
+| [로컬 lazy RGB 로더](docs/LOCAL_RGB_LOADER.md) | 별도 manifest·sample/batch API·선택 의존성. 구현 후 실행 미검증 |
 | [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
 | [압축 원본 준비 도구](docs/ARCHIVE_PREPARATION.md) | Source/예산 계약, 제한된 순차 추출, 완전 파일·CRC·매칭·재사용 검증 범위 |
 
