@@ -123,3 +123,19 @@ images = batch["images"]         # StereoHeatmapNet의 입력 shape; 여기서�
 새 모듈은 M1의 기존 Python 파일 hash 수집 범위에 포함된다. 기존 checkpoint의 정확한 resume/evaluate는 코드 hash 차이로 거부될 수 있으므로 과거 결과는 당시 소스·환경과 함께 보존한다. 현재 warm192 고정 배포본·notebook·캐시는 바꾸지 않는다.
 
 이번 정적 검토는 manifest/파일 검사와 decode 순서, 상한 적용 위치, shape·채널·단위, 기존 학습 guard 분리를 읽어 확인하는 범위다. 실행·메모리·성능과 실제 front-end 연결은 미검증이다.
+
+## 2026-10-28 최소 CPU 검사 인계 준비
+
+사용자가 테스트 세션을 통한 실행을 재개했다. 이번에는 [check_local_rgb.py](../tests/check_local_rgb.py)와 [local_rgb_check.ipynb](../notebooks/local_rgb_check.ipynb)를 고정해 **로컬 RGB 로더만 작은 합성 PNG로 검사**한다. Production 기준은 `7ccf11c1823e6bba7e9f567362eaea3bb3edc597`이며 스크립트가 로더의 LF 정규화 SHA256을 대조한다. 실제 전달 소스 ZIP의 revision/hash는 root 검토·커밋·패키징 후 테스트 세션에 별도로 고정한다. 이 준비에서는 로컬 실행 없이 정적 검토만 했으며 아직 통과 결과는 없다.
+
+CPU Colab의 새 런타임에서 안내1셀+코드4셀을 위→아래로 실행한다. 코드 source ZIP 한 개 업로드 → 환경 확인 → 단일 검사 → 보고서 ZIP 다운로드 순서다. Manifest·이미지·실제 캐시 업로드, GPU·Drive 인증은 필요 없다. 기존 torch/Pillow를 사용하고 Pillow가 없으면 환경 셀의 Pillow 단독 설치 안내를 따른다. 자동 설치하지 않으며 torch가 없으면 중단하고 자료를 회수한다.
+
+노트북이 호출하는 고정 명령은 `python -B tests/check_local_rgb.py --output <새 임시 check 디렉터리>`다. 실제 Python은 `sys.executable`이며 **노트북의 `subprocess.run(..., timeout=120)`가 검사 시작·import·실행을 합쳐120초로 제한**한다. 스크립트를 직접 실행하는 CLI에는 별도 OS timeout이 없으므로 이번 사용자 시험은 고정 notebook으로 진행한다. Source 업로드·환경 준비·Pillow 설치·ZIP 다운로드 시간은 검사120초와 별도다. 같은 notebook 검사 셀을 다시 실행하면 거부하며 새 실행을 자동으로 만들지 않는다.
+
+12개 필수 묶음은 생성자 PNG 미읽기·요청 pair만 읽기, RGB/opaqueRGBA 채널·0~1·CPUfloat32·shape/batch, 누락 view·중복 identity·잘못된 member, 경로 이탈, split 경계, 선언/실제 해상도, 크기/hash 오류, manifest/record/파일/pixel 상한, batch/count/tensor 상한의 읽기 전 차단, 투명 PNG, 잘린 PNG, handle 정리·sample 재읽기다. 실제 I/O를 감싼 추적 외에 로더의 검사·decode를 성공 stub으로 바꾸지 않는다. 잘못된 오류나 예외가 없으면 실패로 기록하며 skip을 통과로 바꾸지 않는다.
+
+각 case의 새 임시 fixture는128KiB 이하, JSON report256KiB, stdout/stderr 각각64KiB, 보관할 보고서/로그 합계512KiB 및 결과 ZIP1MiB로 제한한다. Fixture·보고서 임시 교체본·로그·ZIP의 파일 bytes 예산은2MiB다. 작은8×6 PNG만 생성하고 case 후 fixture를 제거한다. Timeout이면 남은 작은 fixture가 있을 수 있으나 ZIP에는 넣지 않는다. 소스 ZIP64MiB·해제128MiB와 환경 설치 공간은 별도이며 이 수치는 RSS 상한이나 메모리 벤치마크가 아니다.
+
+실행 결과는 새 `rewind_rgb_check_*` 임시 폴더에 저장한다. `check/report.json`에 case 상태·예상 거부 예외·뜻밖의 예외 분류, Python/torch/Pillow·source revision/코드 hash·총결과·경과시간을 기록하고, `supervision.json`에 subprocess 종료 코드·timeout을 남긴다. 실패/timeout/환경 실패에도 마지막 셀에서 `local_rgb_check_result.zip`을 받을 수 있다. 모든12개 case와 worker/supervisor가 통과한 경우만 이번 작은 계약 검사의 성공이다. Worker 보고서 누락·미완료·로그 잘림도 성공으로 해석하지 않는다.
+
+ZIP에는 `source_upload.json`, `environment.json`, `supervision.json`, `stdout.log`, `stderr.log`, `check/report.json`을 넣는다. 테스트 세션에는 이 ZIP과 SHA256, 출력이 저장된 실행 notebook을 전달하고 성공·실패·timeout 모두 종료한다. 실패하면 production 코드를 실행 중 수정하지 않고 취합 자료를 오케스트레이션이 검토한다. 기존 warm192 source ZIP·ready notebook·128MiB 캐시·실제 원본은 이번 시험에서 사용하거나 변경하지 않는다. 이 CPU 검사가 통과하더라도 실제 RGB/pose 정합성·학습 release·front-end 학습·GPU 성능을 검증한 것은 아니다.

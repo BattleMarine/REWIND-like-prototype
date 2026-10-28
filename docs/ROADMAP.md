@@ -32,6 +32,12 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`로 인계했고 실제192MiB 탐색·목표 확보·학습은 미검증이다.
 
+### 2026-10-28 사용자 결정 — 로컬 RGB 최소 CPU 검사만 재개
+
+사용자가 해야 할 테스트를 테스트 세션에 넘기도록 요청했다. 이번에는 production `7ccf11c1823e6bba7e9f567362eaea3bb3edc597`의 로컬 RGB 로더를 수정하지 않고 작은 합성 PNG의 필수 계약만 CPU에서 확인하도록 스크립트·[독립 notebook](../notebooks/local_rgb_check.ipynb)을 준비한다. 12개 묶음·subprocess120초, fixture128KiB/보고서256KiB·로그각64KiB·결과ZIP1MiB의 별도 작은 시험이며 전체 회귀·RSS benchmark·모델/학습·실제 데이터·Drive·GPU 검증은 포함하지 않는다.
+
+로컬에서는 정적 검토까지만 진행한다. 스크립트·소스 ZIP·notebook은 root 검토·커밋·고정 패키징 뒤 테스트 세션에 전달하며 사용자 결과가 오기 전 통과를 주장하지 않는다. 성공/실패/timeout 모두 결과를 보존하고 같은 실행을 자동 반복하지 않는다. 기존 warm192와128MiB 입력 캐시는 별도 대기로 유지하며 이번 시험에 섞지 않는다. 상세 순서와 회수 자료는 [로컬 RGB 안내](LOCAL_RGB_LOADER.md#2026-10-28-최소-cpu-검사-인계-준비)를 따른다. M0~M3 실제 미완료/M4 미착수 상태는 유지한다.
+
 ### 2026-10-27 사용자 결정 — Colab 테스트 일시 보류
 
 사용자는 테스트를 잠시 건너뛰고 다음 독립 작업을 먼저 진행하도록 지시했다. 당시 문서 정리를 먼저 진행했고, 이후 별도 사용자 지시에 따라 아래 로컬 RGB 로더를 구현했다. 이번에도 사용자 재실행·새 Drive 요청·추가 학습과 로컬 회귀·합성 테스트를 시작하지 않는다. 이전에 인계한 warm192 소스 ZIP·ready notebook·v2 입력 캐시와 근거는 기존 경로·hash로 보존한다. 기존 예산·학습 guard·실험 상태는 유지한다.
