@@ -4,6 +4,12 @@
 
 ## 구현 범위
 
+2026-10-28 `LocalRGBSupervision(loader, pose_doc, expected_manifest_sha256=..., joint_names=[...], split="train")`은 검증된 GT `m1_features_v1`과 `LocalStereoRGB`를 연결한다. 모든 record의 sequence/frame key와 split을 일대일 대조한 뒤 선택 split의 pose 순서를 유지한다. 생성 시 이미지를 읽지 않으며 `load_batch([0, 1])`에서 CPU `images[B,2,3,H,W]`, `gt_xy[B,2,J,2]`, bool `annotation_valid[B,2,J]`, 복사된 metadata를 반환한다. 이미지 전처리는 `rgb_0_1_v1`이다.
+
+소형 pose 문서는 최대 256 record/4MiB이며 batch는 최대 4개와 기존 RGBLimits 중 더 작은 상한을 적용한다. RGB와 GT·mask의 합산 tensor bytes를 PNG 읽기 전에 검사한다. 원본 GT3D·시간·motion·split은 metadata에 보존하며 원본과 반환 metadata의 수정은 내부 복사본에 영향을 주지 않는다. 누락 GT2D는 false mask와 0 placeholder로 표현하고 화면 밖 GT2D는 annotation_valid를 유지한다. `heatmap_loss`가 별도 in-frame mask를 계산하며 visibility는 supervision에서 unknown으로 표시한다. 기존 실데이터 여섯 검증 guard를 유지하며 candidate·predicted 문서를 거부한다. 자동 shuffle·resize·학습·optimizer는 제공하지 않는다.
+
+로컬 합성 검사 3개에서 lazy 읽기·키 순서·분할 선택·mask·복사본 격리·상한 거부와 heatmap forward/backward의 유한 gradient를 확인했다. 관련 결합 4개·RGB 예측 5개·M1 19개 회귀도 통과했다. 실제 데이터·GPU·Colab·성능 개선은 이번에 검증하지 않았다.
+
 | 경로 | 현재 구현 |
 | --- | --- |
 | `rewind_m1/data.py` | 명시적 단위·관절·split 계약, stereo 2D 특징과 GT 3D tensor 조립 |
@@ -13,6 +19,7 @@
 | `rewind_m1/frontend.py` | 작은 Conv heatmap 개발 모델, 버전·weights fingerprint가 있는 예측 cache |
 | `rewind_m1/predicted_fixture.py` | Train-only 합성 RGB front-end → 고정 예측 → cache 검증 → regression·평가 |
 | `rewind_m1/prediction_join.py` | GT 특징 문서와 예측 cache의 작은 일대일 결합 API·CLI |
+| `rewind_m1/rgb_supervision.py` | 로컬 RGB와 GT 2D supervision을 키로 결합하는 소형 lazy API |
 | `rewind_m1/local_rgb.py` | 별도 로컬 RGB manifest의 lazy sample/batch 로더. 2026-10-27 구현, 실행 미검증 |
 | [Colab notebook](../notebooks/m1_baseline.ipynb) | 소스 ZIP 업로드, 환경·테스트, 합성 실행·재개, 선택적 결과 export |
 

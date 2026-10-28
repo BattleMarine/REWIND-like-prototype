@@ -30,6 +30,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-28 로컬 RGB와 GT 2D supervision을 sequence/frame으로 일대일 연결하는 소형 API를 추가했다. 명시한 split의 pose 순서를 보존하고 이미지·GT·mask 합산 상한을 읽기 전에 검사한다. 합성 CPU forward/backward로 연결을 검사하며 실제 데이터 학습·성능 및 기존 마일스톤 완료 조건은 별도로 남는다. 상세 계약은 [M1 안내](M1_BASELINE.md)를 따른다.
+
 현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`로 인계했고 실제192MiB 탐색·목표 확보·학습은 미검증이다.
 
 ### 2026-10-28 GT 특징 문서와 예측 cache 결합

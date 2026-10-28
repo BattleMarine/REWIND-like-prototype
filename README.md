@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+로컬 RGB와 GT 2D를 lazy batch로 연결하는 소형 supervision API도 추가했습니다. 계약과 검증 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
+
 2026-10-28 사용자 Colab CPU의 로컬 RGB 로더 검사 12개가 모두 통과했습니다. 실행 notebook은 미제출이며 실제 데이터·학습은 미검증입니다. 이어 로컬 RGB→고정 heatmap weights→예측 2D cache와 GT 특징 문서의 예측 결합 경로를 구현했습니다. 합성 결합 검증과 기존 회귀 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다. 기존 warm192 시험은 별도 대기입니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
