@@ -77,7 +77,9 @@ def _no_link(path):
 
 
 def _signature(info):
-    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    common = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+    # Windows ctime은 생성시각으로, 경로와 handle 조회값의 차이를 변경으로 단정하지 않는다.
+    return common if os.name == "nt" else common + (info.st_ctime_ns,)
 
 
 def _regular_read(path, maximum, expected_size=None):

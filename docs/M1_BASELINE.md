@@ -68,6 +68,12 @@ python -m rewind_m1 evaluate --checkpoint outputs/m1_predicted_chain/last.pt --d
 
 통합 경로는 `features.json`, `predictions.json`, `input_manifest.json`, `frontend_weights.pt`, `frontend_report.json`과 공통 regression의 `last.pt`, `report.json`을 보존합니다. Front-end 진단 보고서는 학습 재개 보고서와 분리합니다. `frontend_weights.pt`에는 모델 설정·관절 순서·영상 크기·전처리/모델 버전·weights fingerprint가 있으며 **weights-only**입니다. Front-end optimizer·scheduler·RNG 재개 기능은 구현하지 않았습니다. `frontend_checkpoint_sha256`는 정렬된 state tensor 이름·dtype·shape·bytes의 SHA-256이며 `.pt` 파일 자체의 hash와 다릅니다. Regression 재개는 고정된 특징 JSON을 사용하므로 front-end를 다시 학습하지 않습니다.
 
+## 2026-10-28 로컬 RGB 예측 cache 연결
+
+사용자 Colab CPU에서 로컬 RGB loader의 합성 검사 12/12가 통과했다(Python 3.13.18, torch 2.11.0+cpu, Pillow 11.3.0, subprocess 3.748초). 결과 ZIP SHA256 `0aef49e4e985212734c56f57c4d56bb65e5429128df6e93775fa0f2e80183697`, source `afe319796ad54d72bbe3042ac4f0ab40aae4736c`이며 실행 notebook은 미제출이다.
+
+후속 `rewind_m1.local_rgb_predictions`는 로컬 RGB와 고정 frontend weights의 계약을 대조하고 split별 작은 batch로 추론해 기존 `predicted_2d_cache_v1`을 생성한다. 합성 연결 검사 4개가 한 차례 통과했지만 수정 전 재검사에서 기존 로더의 `rgb_file_changed`로 4개 모두 실패했다. Windows 파일 상태 비교를 보완한 후 합성 검사 5개와 기존 M1 회귀 19개가 통과했다. 파일 상태 비교의 관측 결과는 [로컬 RGB 안내](LOCAL_RGB_LOADER.md#2026-10-28-사용자-cpu-결과와-예측-cache-연결)에 구분한다. 실제 RGB/pose 검증, 학습 release 및 정확도는 여전히 미완료다.
+
 ## 데이터 입력 계약
 
 CLI는 준비된 `m1_features_v1` JSON만 읽습니다. 원본 pose JSON 디렉터리나 압축 파일은 직접 학습 입력으로 받지 않습니다. 준비 문서는 다음 구조입니다. 아래는 **합성 예시**이며 실제 관절·단위·영상 규격을 확정하지 않습니다.

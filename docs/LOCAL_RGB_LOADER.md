@@ -139,3 +139,19 @@ CPU Colab의 새 런타임에서 안내1셀+코드4셀을 위→아래로 실행
 실행 결과는 새 `rewind_rgb_check_*` 임시 폴더에 저장한다. `check/report.json`에 case 상태·예상 거부 예외·뜻밖의 예외 분류, Python/torch/Pillow·source revision/코드 hash·총결과·경과시간을 기록하고, `supervision.json`에 subprocess 종료 코드·timeout을 남긴다. 실패/timeout/환경 실패에도 마지막 셀에서 `local_rgb_check_result.zip`을 받을 수 있다. 모든12개 case와 worker/supervisor가 통과한 경우만 이번 작은 계약 검사의 성공이다. Worker 보고서 누락·미완료·로그 잘림도 성공으로 해석하지 않는다.
 
 ZIP에는 `source_upload.json`, `environment.json`, `supervision.json`, `stdout.log`, `stderr.log`, `check/report.json`을 넣는다. 테스트 세션에는 이 ZIP과 SHA256, 출력이 저장된 실행 notebook을 전달하고 성공·실패·timeout 모두 종료한다. 실패하면 production 코드를 실행 중 수정하지 않고 취합 자료를 오케스트레이션이 검토한다. 기존 warm192 source ZIP·ready notebook·128MiB 캐시·실제 원본은 이번 시험에서 사용하거나 변경하지 않는다. 이 CPU 검사가 통과하더라도 실제 RGB/pose 정합성·학습 release·front-end 학습·GPU 성능을 검증한 것은 아니다.
+
+## 2026-10-28 사용자 CPU 결과와 예측 cache 연결
+
+사용자 Colab CPU 검사에서 12/12 case가 통과했다. Python 3.13.18, torch 2.11.0+cpu, Pillow 11.3.0, subprocess 3.748초다. 결과 ZIP SHA256 `0aef49e4e985212734c56f57c4d56bb65e5429128df6e93775fa0f2e80183697`, source `afe319796ad54d72bbe3042ac4f0ab40aae4736c`를 대조했다. 실행 notebook은 미제출이며 실제 데이터·학습 검증과 구분한다.
+
+`rewind_m1.local_rgb_predictions`는 고정 `m1_frontend_weights_v1`을 읽고 로더의 data_kind·원래 영상 크기·관절 순서·전처리 버전과 모델 fingerprint를 확인한다. Split 경계에서 batch를 끊어 순서대로 추론하고 `predicted_2d_cache_v1`에 원본 manifest hash, 각 view 출처와 split을 기록한다. `checkpoint_source_manifest_hash`는 weights에 기록된 출처 참조이며 train-only 데이터나 실제 학습 출처의 인증은 아니다. 최대256 record·4MiB이며 기존 출력 파일을 덮지 않는다. 실패나 사용자 중단 시 부분 파일을 제거한다. 학습이나 GT fallback, `verified`/`train_ready` 발급은 하지 않는다.
+
+프로젝트 root에서 입력 manifest·파일·신뢰할 수 있는 weights와 새 출력 경로를 준비한 뒤 다음 CLI를 사용할 수 있다. 이 명령의 경로는 예시이며 실제 데이터 학습 명령이 아니다.
+
+```sh
+python -m rewind_m1.local_rgb_predictions --manifest outputs/local_rgb_input/manifest.json --root data/extracted_rgb --weights outputs/frontend_weights.pt --joints root tip --output outputs/predictions.json --batch-size 2
+```
+
+합성 PNG 및 임의 초기화한 **합성 검사용** 고정 weights의 연결 검사 4개는 일반 로컬 환경에서 한 차례 통과했으나 수정 전 재검사에서는 기존 로더의 `rgb_file_changed`로 4개 모두 실패했다. Sandbox에서도 같은 오류가 발생했고 `lstat`/`fstat`의 `ctime_ns` 차이를 관측했으나 정확한 OS 원인은 미확정이다. Windows에서는 생성시각 `ctime_ns`를 비교에서 제외하고 dev/ino/size/mtime, 동일 handle 전후·최종 경로 비교와 내용 SHA256 검사를 유지한다. POSIX에서는 ctime 검사도 유지한다. 생성시각 차이 자체로 Windows 파일 변경을 감지하지 않는 한계가 있다. 보완 후 플랫폼별 signature와 합성 연결 검사 5개, 기존 M1 회귀 19개가 통과했다. 실제 RGB·예측 정확도·학습·GPU는 검증하지 않았다. 기존 checkpoint는 새로운 Python 모듈이 코드 hash 범위에 추가돼 환경에 따라 재개·평가가 거부될 수 있으므로 해당 checkpoint의 원래 소스와 환경을 보존한다.
+
+기존 `tests/check_local_rgb.py`의 생산 로더 SHA pin은 당시 Colab 검사의 고정 이력이다. Windows 수정 후 현재 로더와 hash가 달라 이 과거 검사를 새 소스에 그대로 사용하면 hash 불일치로 중단한다. 이전 테스트 source ZIP·notebook은 변경하지 않으며, 새 사용자 검사가 필요하면 별도 검토·고정 인계를 해야 한다.

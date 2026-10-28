@@ -32,6 +32,12 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`로 인계했고 실제192MiB 탐색·목표 확보·학습은 미검증이다.
 
+### 2026-10-28 로컬 RGB 검사 결과와 예측 cache 연결
+
+- 사용자 Colab CPU의 고정 source `afe319796ad54d72bbe3042ac4f0ab40aae4736c`에서 로컬 RGB 검사 12/12가 통과했다. Python 3.13.18 / torch 2.11.0+cpu / Pillow 11.3.0, subprocess 3.748초다. 결과 ZIP SHA256 `0aef49e4e985212734c56f57c4d56bb65e5429128df6e93775fa0f2e80183697`을 대조했다. 실행 notebook은 미제출이며 실제 RGB·학습 검증은 아니다.
+- 로컬 RGB manifest와 고정 `m1_frontend_weights_v1`을 작은 split별 batch로 연결해 `predicted_2d_cache_v1`을 생성하는 경로를 추가했다. 순서·source view·manifest hash·관절·전처리·weights 식별값을 유지하고 최대256 record/4MiB로 제한한다. 기존 reader를 사용하며 GT fallback·학습 release를 만들지 않는다.
+- 합성 PNG 연결 검사 4개가 일반 로컬 환경에서 한 차례 통과했지만 수정 전 재검사에서 4개 모두 기존 로더의 `rgb_file_changed`로 실패했다. Sandbox에서도 같은 실패가 발생했다. 경로 `lstat`와 열린 파일 `fstat`의 `ctime_ns` 차이를 관측했고 OS 원인은 미확정이다. Windows에서 `ctime_ns`만 비교에서 제외하고 dev/ino/size/mtime·동일 handle 전후/path·내용 hash를 유지했다. POSIX ctime 검사도 유지한다. 이후 연결 및 플랫폼 비교 5개와 기존 M1 회귀 19개가 통과했다. 실제 데이터·성능·Colab 연결 실험은 미검증이며 M0~M3 전체 완료나 M4 착수가 아니다.
+
 ### 2026-10-28 사용자 결정 — 로컬 RGB 최소 CPU 검사만 재개
 
 사용자가 해야 할 테스트를 테스트 세션에 넘기도록 요청했다. 이번에는 production `7ccf11c1823e6bba7e9f567362eaea3bb3edc597`의 로컬 RGB 로더를 수정하지 않고 작은 합성 PNG의 필수 계약만 CPU에서 확인하도록 스크립트·[독립 notebook](../notebooks/local_rgb_check.ipynb)을 준비한다. 12개 묶음·subprocess120초, fixture128KiB/보고서256KiB·로그각64KiB·결과ZIP1MiB의 별도 작은 시험이며 전체 회귀·RSS benchmark·모델/학습·실제 데이터·Drive·GPU 검증은 포함하지 않는다.

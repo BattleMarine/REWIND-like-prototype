@@ -6,12 +6,12 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-10-28 사용자가 테스트 세션을 통한 실행을 재개했습니다. 이번 범위는 [로컬 RGB 로더 최소 CPU 검사](docs/LOCAL_RGB_LOADER.md#2026-10-28-최소-cpu-검사-인계-준비)뿐이며 **M1 로컬 RGB 로더는 아직 실행 미검증**입니다. 합성 PNG 검사 스크립트·독립 노트북을 준비했고 로컬에서는 정적 검토만 했습니다. 고정 소스 ZIP·revision/hash를 검토 후 인계하며 실제 데이터·학습과 기존 warm192 시험은 별도 대기를 유지합니다. 이전 warm192 배포본·캐시는 교체하거나 반복 실행하지 않습니다.
+2026-10-28 사용자 Colab CPU의 로컬 RGB 로더 검사 12개가 모두 통과했습니다. 실행 notebook은 미제출이며 실제 데이터·학습은 미검증입니다. 이어 로컬 RGB→고정 heatmap weights→예측 2D cache 연결을 구현했습니다. Windows 파일 상태 비교를 보완한 뒤 합성 연결 검사 5개와 기존 M1 회귀 19개가 통과했습니다. 기존 warm192 시험은 별도 대기입니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
 | M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, API9 bounded archive 준비 구현 | 현재 Serena 목표 pose 미확보, 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
-| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로컬 lazy RGB 로더 구현은 실행 미검증 | 로더 동작·실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
+| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로컬 RGB 로더 Colab CPU 12개 검사 통과, 고정 모델·예측 cache 연결 및 Windows 파일 비교 보완의 합성 검사 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
