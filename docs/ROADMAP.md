@@ -32,6 +32,10 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`로 인계했고 실제192MiB 탐색·목표 확보·학습은 미검증이다.
 
+### 2026-10-28 GT 특징 문서와 예측 cache 결합
+
+로컬 RGB 예측 cache를 기존 GT `m1_features_v1`에 sequence/frame으로 일대일 결합하는 bounded API·CLI를 추가했다. 관절·영상 크기·data_kind·명시한 RGB manifest hash 및 가능한 경우 split을 대조하고 기존 실데이터 검증 guard와 GT target을 보존한다. 합성 이미지→cache→결합→기존 로더 검사를 수행했다. 실제 데이터의 RGB/pose 정합성·학습·성능은 검증하지 않았으며 기존 마일스톤 완료 조건은 그대로다. 상세 계약은 [M1 안내](M1_BASELINE.md#2026-10-28-예측-cache와-gt-특징-문서-결합)를 따른다.
+
 ### 2026-10-28 로컬 RGB 검사 결과와 예측 cache 연결
 
 - 사용자 Colab CPU의 고정 source `afe319796ad54d72bbe3042ac4f0ab40aae4736c`에서 로컬 RGB 검사 12/12가 통과했다. Python 3.13.18 / torch 2.11.0+cpu / Pillow 11.3.0, subprocess 3.748초다. 결과 ZIP SHA256 `0aef49e4e985212734c56f57c4d56bb65e5429128df6e93775fa0f2e80183697`을 대조했다. 실행 notebook은 미제출이며 실제 RGB·학습 검증은 아니다.

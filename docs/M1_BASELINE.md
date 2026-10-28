@@ -12,6 +12,7 @@
 | `rewind_m1/training.py`, `__main__.py` | 학습·평가 CLI, 전체 학습 상태 checkpoint, 재개·주기 보고서 |
 | `rewind_m1/frontend.py` | 작은 Conv heatmap 개발 모델, 버전·weights fingerprint가 있는 예측 cache |
 | `rewind_m1/predicted_fixture.py` | Train-only 합성 RGB front-end → 고정 예측 → cache 검증 → regression·평가 |
+| `rewind_m1/prediction_join.py` | GT 특징 문서와 예측 cache의 작은 일대일 결합 API·CLI |
 | `rewind_m1/local_rgb.py` | 별도 로컬 RGB manifest의 lazy sample/batch 로더. 2026-10-27 구현, 실행 미검증 |
 | [Colab notebook](../notebooks/m1_baseline.ipynb) | 소스 ZIP 업로드, 환경·테스트, 합성 실행·재개, 선택적 결과 export |
 
@@ -73,6 +74,16 @@ python -m rewind_m1 evaluate --checkpoint outputs/m1_predicted_chain/last.pt --d
 사용자 Colab CPU에서 로컬 RGB loader의 합성 검사 12/12가 통과했다(Python 3.13.18, torch 2.11.0+cpu, Pillow 11.3.0, subprocess 3.748초). 결과 ZIP SHA256 `0aef49e4e985212734c56f57c4d56bb65e5429128df6e93775fa0f2e80183697`, source `afe319796ad54d72bbe3042ac4f0ab40aae4736c`이며 실행 notebook은 미제출이다.
 
 후속 `rewind_m1.local_rgb_predictions`는 로컬 RGB와 고정 frontend weights의 계약을 대조하고 split별 작은 batch로 추론해 기존 `predicted_2d_cache_v1`을 생성한다. 합성 연결 검사 4개가 한 차례 통과했지만 수정 전 재검사에서 기존 로더의 `rgb_file_changed`로 4개 모두 실패했다. Windows 파일 상태 비교를 보완한 후 합성 검사 5개와 기존 M1 회귀 19개가 통과했다. 파일 상태 비교의 관측 결과는 [로컬 RGB 안내](LOCAL_RGB_LOADER.md#2026-10-28-사용자-cpu-결과와-예측-cache-연결)에 구분한다. 실제 RGB/pose 검증, 학습 release 및 정확도는 여전히 미완료다.
+
+### 2026-10-28 예측 cache와 GT 특징 문서 결합
+
+`join_predictions(pose_doc, cache_doc, expected_manifest_sha256)` 및 아래 CLI는 GT 입력의 `m1_features_v1`을 복사해 예측 입력으로 바꾼다. Sequence/frame의 중복·누락·잉여를 거부하고 기존 record 순서, GT 3D·mask·timestamp·motion·split과 검증 근거를 보존한다. Cache의 `record_splits`가 있으면 키별 split을 대조하며 없으면 그 대조는 불가능하다. 기존 prediction 또는 결합 출처가 있는 문서는 재결합하지 않는다. `real_pose_candidate_v1`과 여섯 검증 근거가 없는 `dataset_sample`은 기존 guard로 거부하며 검증 상태를 생성하지 않는다.
+
+호출자가 지정한 RGB manifest hash, 이미지 크기·관절 순서·data_kind를 대조하고 cache의 frontend 버전·weights fingerprint·전처리를 결과 입력 계약에 기록한다. 버전과 fingerprint는 cache 내부의 일관성을 확인할 뿐 별도 인증은 아니다. 결과 manifest의 `prediction_join_provenance`는 RGB manifest, cache 내용, 원본 문서 hash를 기록한다. API와 CLI 모두 각 JSON 4MiB, 최대 256 record를 제한하고 기존 출력을 덮어쓰지 않는다. 로컬 합성 RGB→cache→결합→기존 로더 등 신규 검사 4개와 기존 연결 검사 5개·M1 검사 19개가 통과했다. 실제 데이터 정합성이나 학습을 검증한 것은 아니다.
+
+```sh
+python -m rewind_m1.prediction_join --features FEATURES.json --cache CACHE.json --manifest-sha256 RGB_MANIFEST_SHA256 --output NEW_OUTPUT.json
+```
 
 ## 데이터 입력 계약
 
