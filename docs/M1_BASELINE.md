@@ -4,7 +4,7 @@
 
 ## 구현 범위
 
-### 독립 합성 fixture와 단일 CPU 통합 진단 준비
+### 독립 합성 fixture와 단일 CPU 통합 진단 결과
 
 `rewind_m1.local_fixture`는 unittest나 테스트 파일 없이 4개 record와 stereo PNG 8개를 생성한다. Train/validation은 별도 sequence/motion이며 각각 연속 2프레임이다. 8×6 영상과 toy 관절 root/tip만 쓰고, 누락 GT2D 1개·화면 밖 GT2D 1개를 포함하되 각 split에는 유효 supervision을 유지한다. `toy_root/toy_tip`은 실제 body/hand 관절 집합이 아니다. Archive metadata는 합성 구조 검사용이며 대응 원본 archive나 실제 추출·좌표/시간 검증의 근거가 아니다. Fixture 전체128KiB, 파일 hash와 manifest 식별을 receipt로 남긴다. Pillow 버전이 다르면 생성 PNG bytes/hash가 달라질 수 있다.
 
@@ -12,9 +12,11 @@
 
 신규 notebook은 안내와 코드4셀(소스/환경/실행/회수)로 구성한다. Source ZIP64MiB·해제128MiB/5000entry, 단일 child180초·각 로그64KiB를 적용한다. CPU 환경변수로 GPU를 숨기고 OMP/MKL thread1을 지정하며 torch/Pillow 자동 설치·Drive 연결·재실행을 하지 않는다. 로그는 실행 중 제한하고 pump/cleanup 오류·살아 있는 thread는 성공으로 처리하지 않는다. 성공·실패·timeout 모두 마지막 회수 셀을 실행할 수 있으며 ZIP은 임시 파일을 닫고 크기 확인 후 최종 이름으로 교체한다. 결과 ZIP/uncompressed80MiB 초과 시 원본을 보존하고 제외 목록·부분/실패 export 사유를 남긴다. 기존 ZIP은 수정 없이 같은 파일만 다시 내려받는다. 전체 런타임 RSS·업로드/다운로드 시간은 이 제약에 포함되지 않는다.
 
-현재는 로컬 개발검증과 고정 인계 준비 범위다. 실제 Colab에서의 새 통합 진단은 미실행이며 테스트 세션 안내가 필요한 지점에서 중단한다. 기존 고정 로더 notebook·warm192 자료는 변경하지 않는다.
+2026-10-28 사용자 시험 `local_m1_cpu_65c4287_001`의 Colab CPU 최종 통과 결과를 수령했다. 고정 source는 `65c42877f32af994ff58eb9f30be6af31bd3a581`이며 Python3.13.18/torch2.11.0+cpu/Pillow11.3.0/CPU thread1에서5단계와 frontend2회·regression2회 update가 완료됐다. 합성4 record 중 validation2 record의 2D pair8/coverage1과3D valid4 및 유한 지표를 확인했다. Coverage1은 유효 GT에 예측이 제공된 비율이며 정확도100%나 성능 개선을 뜻하지 않는다. Child11.1823초와 runner7.0574초는 이 작은 합성 CPU 진단의 서로 다른 측정 범위다.
 
-로컬 신규 검사3개에서 테스트 파일을 포함하지 않은 소스 복사본의 worker CLI 전체 연결, source 실패·fixture 덮어쓰기 거부, notebook 코드 구문·모의 업로드/timeout/로그 오류·정리 오류·부분 export·압축 중단과 동일 ZIP 재다운로드를 확인했다. 기존 runner 회귀4개도 통과했다. Google 업로드·실제 Colab 런타임 실행·브라우저 다운로드는 검증하지 않았다.
+결과 ZIP은39,111bytes, SHA-256 `614edb37edd691d75162ca38170afd23dfd30449bc0a969fa6a9edec987d99f6`이다. [검토 기록](../outputs/test_local_m1_cpu_65c4287_20261028/verification.json)과 [결과 ZIP](../outputs/test_local_m1_cpu_65c4287_20261028/local_m1_diagnostic_result.zip)에 source/code·산출물/fixture hash·실행·export 확인 근거를 보존한다. 실행 notebook은 미제출이고 Drive 영구보관은 미확인이다. 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 기존 warm192 시험은 별도 대기로 유지한다. 같은 시험을 자동 반복하지 않는다.
+
+개발 당시 로컬 신규 검사3개에서 테스트 파일을 포함하지 않은 소스 복사본의 worker CLI 전체 연결, source 실패·fixture 덮어쓰기 거부, notebook 코드 구문·모의 업로드/timeout/로그 오류·정리 오류·부분 export·압축 중단과 동일 ZIP 재다운로드를 확인했다. 기존 runner 회귀4개도 통과했다. 당시 로컬 검사는 Google 업로드·Colab 런타임·브라우저 다운로드의 실제 검증이 아니며, 이후 수령한 위 Colab 결과와 구분한다. 이번 문서 갱신에서는 코드·테스트·학습을 실행하지 않았다.
 
 ### 로컬 M1 소량 end-to-end runner
 

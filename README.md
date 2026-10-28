@@ -6,12 +6,12 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-로컬 RGB·GT 2D의 lazy 입력에서 frontend CPU 진단 학습, 추론용 weights, 예측 cache, 2D 픽셀 오차·coverage 평가, 예측 입력 결합, 3D regression 학습·validation을 연결하는 소량 M1 runner를 추가했습니다. 사용자 Colab의 기존 RGB 로더 검사 12개는 통과했으나 실행 notebook은 미제출이며, 전체 파이프라인의 실제 데이터·GPU 성능은 미검증입니다. 합성 검증과 입력·예산 계약은 [M1 안내](docs/M1_BASELINE.md)를 따릅니다. 기존 warm192 시험은 별도 대기입니다.
+로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 2026-10-28 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`의 최종 통과 결과를 수령했습니다. 합성4 record에서5단계와2+2 update가 완료됐습니다. 실행 notebook은 미제출이고 Drive 영구보관은 미확인이며 실제 데이터·GPU 성능과 M1 전체 완료는 미검증입니다. 근거와 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다. 기존 warm192 시험은 별도 대기입니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
 | M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, API9 bounded archive 준비 구현 | 현재 Serena 목표 pose 미확보, 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
-| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로컬 RGB 로더 Colab CPU 12개 검사 통과, 고정 모델·예측 cache 연결 및 Windows 파일 비교 보완의 합성 검사 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
+| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로더 Colab CPU 12개 검사와 고정 `65c4287`의 합성 전체 연결 Colab CPU 진단 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
@@ -142,7 +142,7 @@ Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 
 python -m rewind_m1.local_fixture --output NEW_FIXTURE
 ```
 
-이를 기존 runner에 한 번 연결하는 [Colab CPU 통합 진단 notebook](notebooks/local_m1_diagnostic.ipynb)은 인계 준비용입니다. 현재 notebook의 고정 source 식별값은 비어 있어 실행을 거부합니다. 로컬 검토·고정 패키징 후 테스트 세션이 단일 실행을 안내하는 경계에서 멈추며, 지금 사용자 실행을 요청하지 않습니다. 기존 warm192·로더 고정 시험과 섞지 않습니다.
+이를 기존 runner에 연결하는 [Colab CPU 통합 진단 notebook](notebooks/local_m1_diagnostic.ipynb)의 고정 source `65c4287` 시험은 최종 통과 결과를 수령했습니다. 저장소의 일반 notebook은 고정 source 식별값이 비어 있으며 실제 시험의 ready 사본과 구분합니다. 같은 사용자 시험을 반복 요청하지 않고, 기존 warm192·로더 고정 시험과도 섞지 않습니다.
 
 준비된 로컬 RGB manifest와 검증된 GT 특징 문서가 있다면 아래 소량 CPU runner로 전체 연결을 실행합니다. `JOINT_A JOINT_B`는 입력 계약의 실제 관절 순서로 바꾸고, 그룹 파일에는 해당 관절 이름을 명시합니다. 새 출력 디렉터리를 지정합니다.
 

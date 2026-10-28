@@ -1,10 +1,12 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
-## 로컬 M1 통합 CPU 진단 — 인계 준비 단계
+## 로컬 M1 통합 CPU 진단 — 최종 통과 결과 수령
 
-2026-10-28 신규 `notebooks/local_m1_diagnostic.ipynb`는 독립 toy RGB·GT fixture와 기존 M1 runner를 CPU에서 한 번 실행하는 별도 진입점이다. 기존 `local_rgb_check.ipynb`와 warm192 notebook/고정 산출물은 교체하지 않는다. 현재 개발 notebook은 expected revision·source ZIP SHA-256이 비어 있어 실행을 거부한다. 실제 Colab 실행은 아직 요청하지 않으며, 검토·커밋 뒤 테스트 세션에 고정 source ZIP·ready notebook/hash와 단일 JOB를 전달하는 경계에서 멈춘다.
+2026-10-28 고정 source `65c42877f32af994ff58eb9f30be6af31bd3a581`의 사용자 시험 `local_m1_cpu_65c4287_001` 최종 통과 결과를 수령했다. Colab CPU Python3.13.18/torch2.11.0+cpu/Pillow11.3.0/thread1에서 합성4 record의5단계와2+2 update가 완료됐고 child11.1823초·runner7.0574초가 기록됐다. Validation의 2D pair8/coverage1·3D valid4는 연결·평가 개수 확인이며 coverage1이 정확도100%를 뜻하지 않는다. 실행 notebook은 미제출, Drive 영구보관은 미확인이고 실제 데이터·GPU 성능·M1 전체 완료는 미검증이다. 결과 ZIP과 hash는 [M1 수령 기록](M1_BASELINE.md#독립-합성-fixture와-단일-cpu-통합-진단-결과)에 있다.
 
-성공 기준은 실제 모델 성능이 아니라 합성4 record의 전체5단계 완료·2+2 update·validation의 유한 지표와 파일 hash/원본 보존이다. CPU child180초, source ZIP64MiB/해제128MiB, fixture128KiB, 실행 중 각 log64KiB, 결과 ZIP80MiB의 제한을 둔다. 환경 준비 실패·timeout·로그 오류도 마지막 회수 셀에서 결과를 내려받는다. 상한 초과 export는 제외 목록과 부분/실패 상태를 표시하며 원본을 보존한다. ZIP 재다운로드는 허용하지만 worker를 자동 반복하지 않는다. 상세 제약은 [M1 안내](M1_BASELINE.md)를 따른다. 이번 준비를 Colab 성공이나 실제 RGB/pose·GPU 검증으로 기록하지 않는다.
+저장소의 일반 `notebooks/local_m1_diagnostic.ipynb`는 expected revision·source ZIP SHA-256이 비어 있으며 실제 시험에 쓴 ready 사본과 구분한다. 이번 결과 수령으로 같은 시험의 재실행을 요청하지 않는다. 기존 `local_rgb_check.ipynb`와 warm192 notebook/고정 산출물·별도 대기 상태는 변경하지 않는다.
+
+이 시험의 성공 기준은 실제 모델 성능이 아니라 합성4 record의 전체5단계 완료·2+2 update·validation의 유한 지표와 파일 hash/원본 보존이다. CPU child180초, source ZIP64MiB/해제128MiB, fixture128KiB, 실행 중 각 log64KiB, 결과 ZIP80MiB의 제한을 뒀다. 환경 준비 실패·timeout·로그 오류도 마지막 회수 셀에서 결과를 내려받도록 구성했지만 이번 사용자 성공 실행에서 해당 실패 경로가 실제 발생한 것은 아니다. ZIP 재다운로드는 허용하지만 worker를 자동 반복하지 않는다. 상세 제약은 [M1 안내](M1_BASELINE.md)를 따른다. 합성 Colab CPU 통과를 실제 RGB/pose·GPU 검증으로 확대 해석하지 않는다.
 
 ## 현재 안내 — API9 / 사용자 테스트 보류
 
