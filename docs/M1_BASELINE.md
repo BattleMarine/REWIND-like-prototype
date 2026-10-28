@@ -4,6 +4,18 @@
 
 ## 구현 범위
 
+### 독립 합성 fixture와 단일 CPU 통합 진단 준비
+
+`rewind_m1.local_fixture`는 unittest나 테스트 파일 없이 4개 record와 stereo PNG 8개를 생성한다. Train/validation은 별도 sequence/motion이며 각각 연속 2프레임이다. 8×6 영상과 toy 관절 root/tip만 쓰고, 누락 GT2D 1개·화면 밖 GT2D 1개를 포함하되 각 split에는 유효 supervision을 유지한다. `toy_root/toy_tip`은 실제 body/hand 관절 집합이 아니다. Archive metadata는 합성 구조 검사용이며 대응 원본 archive나 실제 추출·좌표/시간 검증의 근거가 아니다. Fixture 전체128KiB, 파일 hash와 manifest 식별을 receipt로 남긴다. Pillow 버전이 다르면 생성 PNG bytes/hash가 달라질 수 있다.
+
+`rewind_m1.diagnostic_smoke --output NEW_OUTPUT --expected-revision FULL_REVISION`은 패키징된 `SOURCE_REVISION.txt`를 기대값과 비교하고 CPU thread1 환경에서 fixture→기존 runner를 1회 실행한다. Frontend2회·regression2회 update와 정확한5단계 완료, validation2 record/2D pair8/3D valid4, finite metrics·coverage·원본 보존·파일 hash를 검사한다. 성공/실패 summary와 fixture·runner 근거를 보관한다. Source stamp 비교는 Git 이력의 진위를 인증하는 것이 아니며 ZIP bytes는 notebook receipt의 고정 SHA-256으로 별도 대조한다.
+
+신규 notebook은 안내와 코드4셀(소스/환경/실행/회수)로 구성한다. Source ZIP64MiB·해제128MiB/5000entry, 단일 child180초·각 로그64KiB를 적용한다. CPU 환경변수로 GPU를 숨기고 OMP/MKL thread1을 지정하며 torch/Pillow 자동 설치·Drive 연결·재실행을 하지 않는다. 로그는 실행 중 제한하고 pump/cleanup 오류·살아 있는 thread는 성공으로 처리하지 않는다. 성공·실패·timeout 모두 마지막 회수 셀을 실행할 수 있으며 ZIP은 임시 파일을 닫고 크기 확인 후 최종 이름으로 교체한다. 결과 ZIP/uncompressed80MiB 초과 시 원본을 보존하고 제외 목록·부분/실패 export 사유를 남긴다. 기존 ZIP은 수정 없이 같은 파일만 다시 내려받는다. 전체 런타임 RSS·업로드/다운로드 시간은 이 제약에 포함되지 않는다.
+
+현재는 로컬 개발검증과 고정 인계 준비 범위다. 실제 Colab에서의 새 통합 진단은 미실행이며 테스트 세션 안내가 필요한 지점에서 중단한다. 기존 고정 로더 notebook·warm192 자료는 변경하지 않는다.
+
+로컬 신규 검사3개에서 테스트 파일을 포함하지 않은 소스 복사본의 worker CLI 전체 연결, source 실패·fixture 덮어쓰기 거부, notebook 코드 구문·모의 업로드/timeout/로그 오류·정리 오류·부분 export·압축 중단과 동일 ZIP 재다운로드를 확인했다. 기존 runner 회귀4개도 통과했다. Google 업로드·실제 Colab 런타임 실행·브라우저 다운로드는 검증하지 않았다.
+
 ### 로컬 M1 소량 end-to-end runner
 
 `run_diagnostic` 및 `python -m rewind_m1.local_diagnostic`는 기존 모듈을 frontend 학습→고정 weights 읽기→예측 cache→validation 2D 평가→예측 특징 결합→CPU regression 학습·validation 순서로 호출한다. 새 모델이나 별도 학습 알고리즘은 없다. Train/validation을 사전 확인하며 test를 자동 평가하지 않는다. 입력·관절·출처·실데이터 검증 guard는 기존 API를 따른다. CLI 인자는 [README 실행 안내](../README.md#데이터-없이-m1-학습-기반-실행)에 있다.

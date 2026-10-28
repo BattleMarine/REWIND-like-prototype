@@ -1,5 +1,11 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
+## 로컬 M1 통합 CPU 진단 — 인계 준비 단계
+
+2026-10-28 신규 `notebooks/local_m1_diagnostic.ipynb`는 독립 toy RGB·GT fixture와 기존 M1 runner를 CPU에서 한 번 실행하는 별도 진입점이다. 기존 `local_rgb_check.ipynb`와 warm192 notebook/고정 산출물은 교체하지 않는다. 현재 개발 notebook은 expected revision·source ZIP SHA-256이 비어 있어 실행을 거부한다. 실제 Colab 실행은 아직 요청하지 않으며, 검토·커밋 뒤 테스트 세션에 고정 source ZIP·ready notebook/hash와 단일 JOB를 전달하는 경계에서 멈춘다.
+
+성공 기준은 실제 모델 성능이 아니라 합성4 record의 전체5단계 완료·2+2 update·validation의 유한 지표와 파일 hash/원본 보존이다. CPU child180초, source ZIP64MiB/해제128MiB, fixture128KiB, 실행 중 각 log64KiB, 결과 ZIP80MiB의 제한을 둔다. 환경 준비 실패·timeout·로그 오류도 마지막 회수 셀에서 결과를 내려받는다. 상한 초과 export는 제외 목록과 부분/실패 상태를 표시하며 원본을 보존한다. ZIP 재다운로드는 허용하지만 worker를 자동 반복하지 않는다. 상세 제약은 [M1 안내](M1_BASELINE.md)를 따른다. 이번 준비를 Colab 성공이나 실제 RGB/pose·GPU 검증으로 기록하지 않는다.
+
 ## 현재 안내 — API9 / 사용자 테스트 보류
 
 2026-10-27 사용자 결정으로 Colab 테스트를 일시 보류합니다. 아래 실행법은 재개 시 참고용이며 지금 새 실행을 요구하지 않습니다. 재개 전 테스트 세션이 [고정 인계와 식별값](REAL_DATA_NEXT_RUN.md)을 확인하며, 기존 revision `0f6c5ca`의 소스 ZIP·ready notebook·입력 캐시는 유지합니다. 일반 notebook의 문서 수정으로 고정 배포본을 교체하지 않습니다.

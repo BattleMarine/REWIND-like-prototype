@@ -30,6 +30,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-28 unittest에 의존하지 않는 작은 합성 RGB·GT fixture와 CPU 통합 진단 worker·별도 notebook을 준비했다. 기존 runner 전체 연결을2+2 update로 한 번 확인하고 source/환경·실패/timeout 결과를 회수하는 목적이다. 로컬 검토 후 실제 Colab 검증이 필요한 지점에서 멈추며, 고정 패키징과 테스트 세션 인계 전 사용자 실행을 요청하지 않는다. 실제 데이터 마일스톤 상태와 기존 warm192/고정 로더 시험은 유지한다.
+
 2026-10-28 기존 로컬 RGB frontend 학습·예측 cache·2D 평가·특징 결합·regression 학습/validation을 소량 CPU runner로 연결했다. 새 출력에 단계별 provenance와 완료/실패·부분 산출물을 남기며 runner 재개는 지원하지 않는다. 실제 RGB/pose 정합성·GPU·성능 개선과 M1 전체 완료는 여전히 별도 조건이다. 실행 범위는 [M1 안내](M1_BASELINE.md)를 따른다.
 
 2026-10-28 고정 예측 2D cache와 GT 특징 문서를 평가하는 API·CLI를 추가했다. 명시 split·관절 그룹별 픽셀 거리 합/개수와 coverage를 보고하고 화면 밖 GT는 주지표에 포함한다. 실제 데이터 2D 성능과 M1 전체 완료는 미검증이며 상세 분모·누락 계약은 [M1 안내](M1_BASELINE.md)를 따른다.

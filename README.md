@@ -136,6 +136,14 @@ Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 
 
 ## 데이터 없이 M1 학습 기반 실행
 
+실제 데이터 없이 사용할 독립 RGB·GT 입력은 아래 진입점으로 생성할 수 있습니다. 고정 toy 관절 `root/tip`, 8×6 PNG 8개와 train/validation 각 2개 record를 만듭니다. 생성물은 `synthetic_fixture`이며 실제 관절·카메라 검증을 뜻하지 않습니다.
+
+```sh
+python -m rewind_m1.local_fixture --output NEW_FIXTURE
+```
+
+이를 기존 runner에 한 번 연결하는 [Colab CPU 통합 진단 notebook](notebooks/local_m1_diagnostic.ipynb)은 인계 준비용입니다. 현재 notebook의 고정 source 식별값은 비어 있어 실행을 거부합니다. 로컬 검토·고정 패키징 후 테스트 세션이 단일 실행을 안내하는 경계에서 멈추며, 지금 사용자 실행을 요청하지 않습니다. 기존 warm192·로더 고정 시험과 섞지 않습니다.
+
 준비된 로컬 RGB manifest와 검증된 GT 특징 문서가 있다면 아래 소량 CPU runner로 전체 연결을 실행합니다. `JOINT_A JOINT_B`는 입력 계약의 실제 관절 순서로 바꾸고, 그룹 파일에는 해당 관절 이름을 명시합니다. 새 출력 디렉터리를 지정합니다.
 
 ```sh
