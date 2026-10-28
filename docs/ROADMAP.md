@@ -30,6 +30,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-28 공통 root의 최대4개 RGB 추출본에서 명시 sequence/frame·split 선언으로 `local_stereo_rgb_v1`을 생성하는 bounded builder를 추가했다. 전체 추출 payload 검증과 선택 PNG 디코딩을 구분하고, 출처/코드 변경 허용 옵션·누락/중복·선택 밖 key를 보고한다. 합성 추출본의 로컬 연결 검증 범위이며 실제 RGB–pose 정합성·candidate training release·실제 학습은 미검증이다. 기존 warm192와 고정 시험 산출물은 유지하며 상세 계약은 [로더 안내](LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 따른다.
+
 2026-10-28 고정 source `65c42877f32af994ff58eb9f30be6af31bd3a581`의 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001` 최종 통과 결과를 수령했다. Python3.13.18/torch2.11.0+cpu/Pillow11.3.0/thread1에서 합성4 record·5단계·frontend2/regression2 update가 완료됐다. Child11.1823초·runner7.0574초이며 validation 2D pair8/coverage1·3D valid4다. Coverage는 예측 제공 비율이며 정확도100%가 아니다. 실행 notebook 미제출·Drive 영구보관 미확인, 실제 데이터/GPU 성능·M1 전체 미완료 및 warm192 별도 대기를 유지한다. 결과 ZIP/검토 근거는 [M1 수령 기록](M1_BASELINE.md#독립-합성-fixture와-단일-cpu-통합-진단-결과)을 따른다.
 
 2026-10-28 기존 로컬 RGB frontend 학습·예측 cache·2D 평가·특징 결합·regression 학습/validation을 소량 CPU runner로 연결했다. 새 출력에 단계별 provenance와 완료/실패·부분 산출물을 남기며 runner 재개는 지원하지 않는다. 실제 RGB/pose 정합성·GPU·성능 개선과 M1 전체 완료는 여전히 별도 조건이다. 실행 범위는 [M1 안내](M1_BASELINE.md)를 따른다.

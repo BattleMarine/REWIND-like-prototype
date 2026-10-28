@@ -136,6 +136,8 @@ Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 
 
 ## 데이터 없이 M1 학습 기반 실행
 
+이미 로컬에 있는 PNG 추출본을 기존 RGB 로더에 연결할 때는 [RGB manifest builder](docs/LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 사용합니다. 공통 root 아래 최대4개 추출본의 좌우를 파일 복사 없이 연결하고, 명시한 sequence/frame·split 선언을 대조합니다. 이는 RGB–pose 정합성이나 실제 데이터 학습 승인을 발급하지 않습니다.
+
 실제 데이터 없이 사용할 독립 RGB·GT 입력은 아래 진입점으로 생성할 수 있습니다. 고정 toy 관절 `root/tip`, 8×6 PNG 8개와 train/validation 각 2개 record를 만듭니다. 생성물은 `synthetic_fixture`이며 실제 관절·카메라 검증을 뜻하지 않습니다.
 
 ```sh

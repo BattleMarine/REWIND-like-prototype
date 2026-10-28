@@ -4,6 +4,30 @@
 
 ## API와 입력 경계
 
+### 추출본에서 RGB manifest 생성
+
+`rewind_m1.rgb_manifest.build_manifest(root, extractions, selection, image_size, output, manifest_id=..., allow_code_change=False)`는 공통 root 아래 최대4개 `extraction_manifest.json`과 `files` 추출본을 읽고 새 출력의 `manifest.json`·`report.json`을 만든다. 좌우가 서로 다른 pilot 디렉터리여도 복사하지 않고 root 기준 상대 경로를 보존한다. Sources의 `extraction_manifest_sha256`는 원본 보고서의 `content_sha256`를 그대로 쓴다. 서로 다른 dataset_version 또는 synthetic_fixture/dataset_sample 출처를 섞지 않는다.
+
+Selection은 아래와 같이 명시한다. Frames는 중복 없는 증가 정수 목록이며 sequence/selection 순서를 유지한다. Split과 근거는 호출자의 선언이고 공식 split·원본 motion 독립성의 자동 증명이 아니다. `unknown`도 허용하지만 실제 학습 guard를 통과시키는 값은 아니다.
+
+```json
+[{"sequence_id":"Environment/Day/person/avatar/001/Motion","frames":[0,1],"split":"unknown","split_evidence":"Local declaration; official split not verified."}]
+```
+
+```sh
+python -m rewind_m1.rgb_manifest --root EXTRACTED_COMMON_ROOT --extraction EXTRACTED_COMMON_ROOT/left_pilot --extraction EXTRACTED_COMMON_ROOT/right_pilot --selection SELECTION.json --image-size 1024 1024 --id local_rgb_v1 --output NEW_OUTPUT
+```
+
+Builder는 전체 추출 보고서의 payload를 기존 `verify_extraction`으로 검사하며, 선택한 frame만 읽는 도구가 아니다. 보고서 누적4MiB·파일 총512개/각8MiB·payload 누적32MiB·선택256 frame을 사전 제한하고 schema/content hash·archive kind/version·안전 경로와 image_size의 기존 RGBLimits pixel/단일 tensor 상한을 먼저 확인한다. 이후 선택된 좌우 PNG만 batch1로 디코딩하고 원래 해상도·hash를 검사한다. 파일을 전체 tensor로 선로딩하지 않는다. 출력 JSON은 각각4MiB이며 torch/Pillow가 필요하다.
+
+추출 코드 hash 불일치는 기본 거부한다. 오래된 추출본을 검토해 사용하는 경우에만 `--allow-code-change`를 명시하며 원본/현재 hash·일치 여부·옵션을 report에 기록한다. 이 옵션은 코드 차이만 허용하고 원본 파일 hash·usable/완전 payload 검증은 유지한다. Source 간 같은 key/side 중복은 거부한다. 선택 밖 key·한쪽 누락은 report에 표시하고 선택한 pair의 진행은 허용하지만, 선택한 frame의 누락이나 불완전 파일이 있으면 전체 manifest를 발급하지 않는다. Gap은 선택 run으로 드러내며 전체 sequence의 시작/끝 완전성은 보장하지 않는다.
+
+모든 검사가 통과한 임시 manifest만 최종 이름으로 바꾼다. 실패·중단 시 성공 manifest를 삭제하고 가능한 경우 rejected report를 남긴다. 기존 출력은 거부하고 입력 root와 겹치는 출력 경로를 허용하지 않는다. 30초는 단계/PNG batch 전후의 cooperative 제한이다. 기존 verify 한 번의 호출 도중에는 그 추출본 limits의 deadline을 따르므로 30초 강제 중단은 아니다. 동시 프로세스가 검사 사이에 보고서를 바꾸는 경우 사전 payload 상한의 hard 보장은 아니며, 검증 후 사전 보고서와 변경 여부를 대조한다. 전체 RSS·OS I/O hard cap을 뜻하지 않는다.
+
+`train_ready=false`, `training_release=not_implemented`, `rgb_pose_alignment=not_checked`를 유지한다. 원본 archive의 전체 무결성 flag는 출처로만 기록하고 이 부분 검사를 전체 archive 무결성으로 승격하지 않는다. Pose candidate를 학습 입력으로 바꾸거나 verified 근거를 생성하지 않는다. 현재 builder는 작은 합성 PNG archive 추출본으로 로컬 검사하며 실제 RGB/pose 연결·사용자 시험·학습은 수행하지 않았다.
+
+신규 로컬 검사5개에서 서로 다른 좌우 추출본→builder→기존 로더 연결, CLI 성공/실패, 원본 불변·source hash·split 선언, 중복/선택 누락/선택 밖 한쪽 보고, PNG 크기·코드 변경 옵션·손상 payload 거부와 개별/누적 상한의 사전 거부를 확인했다. 관련 로더 연결5개와 archive 재사용·매칭2개 회귀도 통과했다. 네트워크·모델 학습·새 사용자 notebook 실행은 포함하지 않았다.
+
 `LocalStereoRGB(manifest_path, root, *, limits=None)`는 명시적 로컬 manifest를 읽는다. `root`는 추출 PNG가 있는 공통 디렉터리이며 코드에 개인 절대 경로를 고정하지 않는다. Archive 다운로드·해제·압축 prefix 읽기 기능은 없다.
 
 | API | 동작 |
