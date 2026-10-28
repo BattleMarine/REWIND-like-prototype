@@ -30,20 +30,24 @@ def _outside(point, size):
     return not (0 <= point[0] <= size[0]-1 and 0 <= point[1] <= size[1]-1)
 
 
-def evaluate_cache(pose_doc, cache_doc, expected_manifest_sha256, *, split, groups, train_diagnostic=False):
-    if split not in ("train", "validation", "test") or type(train_diagnostic) is not bool or (split == "train" and not train_diagnostic):
-        raise DataContractError("명시적 split 필요; train은 train_diagnostic=true 필요")
+def validate_groups(groups, names):
     _serialized(groups)
     if not isinstance(groups, dict) or len(groups) > 32:
         raise DataContractError("관절 group 사전 최대 32개 필요")
-    joined = join_predictions(pose_doc, cache_doc, expected_manifest_sha256)
-    names = joined["contract"]["joint_names"]
     for label, members in groups.items():
         if not isinstance(label, str) or not label.strip() or len(label.encode()) > 128 or label == "all":
             raise DataContractError("group 이름 오류; all은 예약됨")
         if not isinstance(members, list) or not members or any(not isinstance(n, str) or n not in names for n in members) or len(set(members)) != len(members):
             raise DataContractError("중복 없는 명시적 group 관절 목록 필요")
-    group_names = {"all": list(names), **copy.deepcopy(groups)}
+    return {"all": list(names), **copy.deepcopy(groups)}
+
+
+def evaluate_cache(pose_doc, cache_doc, expected_manifest_sha256, *, split, groups, train_diagnostic=False):
+    if split not in ("train", "validation", "test") or type(train_diagnostic) is not bool or (split == "train" and not train_diagnostic):
+        raise DataContractError("명시적 split 필요; train은 train_diagnostic=true 필요")
+    joined = join_predictions(pose_doc, cache_doc, expected_manifest_sha256)
+    names = joined["contract"]["joint_names"]
+    group_names = validate_groups(groups, names)
     metrics = {label: {side: _empty() for side in ("left", "right")} for label in group_names}
     selected = [r for r in joined["records"] if r["split"] == split]
     if not selected:

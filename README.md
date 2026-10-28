@@ -6,13 +6,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-고정 예측 2D 캐시의 픽셀 오차·coverage를 좌우와 명시한 관절 그룹별로 평가하는 경로를 추가했습니다. 사용 조건과 분모 정의는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
-
-로컬 RGB·GT 2D의 작은 CPU frontend 진단 학습과 추론용 weights export 경로를 추가했습니다. 재개 미지원·실제 데이터 성능 미검증이며, 실행 조건은 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
-
-로컬 RGB와 GT 2D를 lazy batch로 연결하는 소형 supervision API도 추가했습니다. 계약과 검증 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
-
-2026-10-28 사용자 Colab CPU의 로컬 RGB 로더 검사 12개가 모두 통과했습니다. 실행 notebook은 미제출이며 실제 데이터·학습은 미검증입니다. 이어 로컬 RGB→고정 heatmap weights→예측 2D cache와 GT 특징 문서의 예측 결합 경로를 구현했습니다. 합성 결합 검증과 기존 회귀 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다. 기존 warm192 시험은 별도 대기입니다.
+로컬 RGB·GT 2D의 lazy 입력에서 frontend CPU 진단 학습, 추론용 weights, 예측 cache, 2D 픽셀 오차·coverage 평가, 예측 입력 결합, 3D regression 학습·validation을 연결하는 소량 M1 runner를 추가했습니다. 사용자 Colab의 기존 RGB 로더 검사 12개는 통과했으나 실행 notebook은 미제출이며, 전체 파이프라인의 실제 데이터·GPU 성능은 미검증입니다. 합성 검증과 입력·예산 계약은 [M1 안내](docs/M1_BASELINE.md)를 따릅니다. 기존 warm192 시험은 별도 대기입니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
@@ -141,6 +135,14 @@ python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_
 Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 길이 정의, 명시적 container 경계의 streaming reset, 관절·단위·calibration 미확인 범위와 다음 진입 조건은 [데이터·window 계약](docs/DATA_CONTRACT.md)에 기록합니다. 기존 개발용 skeleton은 미검증 설정으로 유지합니다.
 
 ## 데이터 없이 M1 학습 기반 실행
+
+준비된 로컬 RGB manifest와 검증된 GT 특징 문서가 있다면 아래 소량 CPU runner로 전체 연결을 실행합니다. `JOINT_A JOINT_B`는 입력 계약의 실제 관절 순서로 바꾸고, 그룹 파일에는 해당 관절 이름을 명시합니다. 새 출력 디렉터리를 지정합니다.
+
+```sh
+python -m rewind_m1.local_diagnostic --manifest RGB_MANIFEST.json --root RGB_ROOT --features GT_FEATURES.json --manifest-sha256 RGB_MANIFEST_SHA256 --joints JOINT_A JOINT_B --frontend-config configs/frontend_local_smoke.json --regression-config configs/m1_single_synthetic.json --groups GROUPS.json --regression-steps 2 --output NEW_OUTPUT
+```
+
+Runner는 train/validation을 필수로 요구하고 test를 자동 평가하지 않습니다. 실패한 실행은 최상위 `report.json`의 상태와 완료/부분 산출물로 구분하며, runner 자체 재개는 지원하지 않습니다. 합성 fixture 없이 위 명령에 원본 pose candidate를 넣어 검증 guard를 우회할 수 없습니다.
 
 PyTorch 환경에서 프로젝트 root를 기준으로 실행합니다. 이번 Windows 환경에서는 아래 `python`에 `.venv/Scripts/python.exe`를 사용했습니다. PyTorch가 없으면 M1 테스트는 건너뛰므로 [설치·검증 안내](docs/M1_BASELINE.md#환경과-의존성)를 먼저 확인합니다. 새 실행에는 비어 있는 output을 지정합니다.
 

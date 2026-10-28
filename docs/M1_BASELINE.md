@@ -4,6 +4,20 @@
 
 ## 구현 범위
 
+### 로컬 M1 소량 end-to-end runner
+
+`run_diagnostic` 및 `python -m rewind_m1.local_diagnostic`는 기존 모듈을 frontend 학습→고정 weights 읽기→예측 cache→validation 2D 평가→예측 특징 결합→CPU regression 학습·validation 순서로 호출한다. 새 모델이나 별도 학습 알고리즘은 없다. Train/validation을 사전 확인하며 test를 자동 평가하지 않는다. 입력·관절·출처·실데이터 검증 guard는 기존 API를 따른다. CLI 인자는 [README 실행 안내](../README.md#데이터-없이-m1-학습-기반-실행)에 있다.
+
+새 출력 디렉터리에 `frontend/frontend_weights.pt`, `frontend/report.json`, `predictions.json`, `evaluation_2d.json`, `predicted_features.json`, `regression/last.pt`, `regression/report.json` 및 최상위 `report.json`을 저장한다. Frontend 파일은 추론용 weights이며 regression 파일은 기존 model/optimizer/scheduler/scaler/RNG·step·설정/코드/데이터를 담는 checkpoint다. Runner 자체 재개·부분 실행 재사용·자동 재시도는 지원하지 않는다. Regression checkpoint는 기존 Trainer의 동일 코드·환경 재개 계약을 유지한다.
+
+사전검증 실패는 출력을 만들지 않을 수 있다. 실행이 시작되면 최상위 report는 running/failed/completed와 현재·실패 단계, 단계별 시간, 원본·설정·코드 식별값을 기록한다. `artifacts`는 완료 단계의 파일 SHA-256/크기이며 `partial_artifacts`는 실패 단계의 잔여 파일이다. 보고서 자신의 hash는 포함하지 않는다. 전역 상태 복원과 모든 단계가 성공한 뒤에만 completed를 기록한다. 실패·중단 시 이미 완료된 파일은 보존한다. 디스크 오류 등으로 실패 보고서를 쓸 수 없으면 report 부재나 running 상태와 파일만 남을 수 있으며 completed로 간주하지 않는다.
+
+기존 JSON 각각4MiB/256 record, frontend100 update·1024²원해상도/256관절/32Mi heatmap 요소와 loader 상한을 유지한다. Regression은100 update, window20, hidden128, batch8 이하·AMP false다. Trainer에 넘기기 전에 계산하는 저장 tensor 추정치 `N*T*(69*J+1)`를64MiB 이하로 제한한다. 앞서 수행하는 LocalRGBSupervision 검증도 tensor를 만들며, 이 추정치는 transient tensor·모델/optimizer·전체 RSS 상한이 아니다. Checkpoint32MiB, 기타 파일 각각4MiB, 최상위 report를 제외한 산출물60MiB(최상위4MiB 예약)를 단계 완료 후 검사한다. 저장 중 OS 디스크 hard cap은 아니다.
+
+전체600초는 사전검증 이후 stage/step 전후의 cooperative deadline이다. Frontend 내부120초 제약도 유지한다. 단일 호출 도중 강제 중단이나 전체 wall time/RSS 보장은 없다. 실행 후 성공·실패 모두 Python/CPU RNG, torch thread 수·deterministic/warn_only 및 CUBLAS 환경값을 복원한다. CUDA가 있는 환경에서는 기존 Trainer가 CUDA RNG도 사용하므로 이를 보존·복원하지만 모델은 CPU에서 실행한다. 복원 실패는 완료로 처리하지 않는다.
+
+로컬 합성 신규 검사4개에서 frontend2회·regression2회 업데이트의 전체 연결, GT 불변·단계 provenance/파일 hash, 실패·중단의 완료/부분 산출물 분리, 전역 상태 복원 및 복원 실패 처리와 사전 guard를 확인했다. 관련 2D 평가6개·frontend 학습3개·M1 19개 회귀도 통과했다. 실제 데이터·Colab·GPU 실행은 이번 검증에 포함하지 않았다.
+
 ### 고정 예측 2D cache 평가
 
 `evaluate_cache(pose_doc, cache_doc, expected_manifest_sha256, split=..., groups=...)`와 `python -m rewind_m1.evaluate_2d`는 고정 예측을 GT 2D와 비교한다. 기존 `join_predictions`의 전체 sequence/frame 일대일·출처·관절/영상/버전·실데이터 여섯 검증 guard를 재사용한다. Frame 자체가 cache에서 빠지면 계약 오류이며, frame 내부 관절의 false valid_mask/null 좌표는 예측 누락으로 집계한다. Torch는 필요하지만 평가 중 RGB 읽기와 모델 forward는 수행하지 않는다.
