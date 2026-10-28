@@ -4,6 +4,22 @@
 
 ## 구현 범위
 
+### 고정 예측 2D cache 평가
+
+`evaluate_cache(pose_doc, cache_doc, expected_manifest_sha256, split=..., groups=...)`와 `python -m rewind_m1.evaluate_2d`는 고정 예측을 GT 2D와 비교한다. 기존 `join_predictions`의 전체 sequence/frame 일대일·출처·관절/영상/버전·실데이터 여섯 검증 guard를 재사용한다. Frame 자체가 cache에서 빠지면 계약 오류이며, frame 내부 관절의 false valid_mask/null 좌표는 예측 누락으로 집계한다. Torch는 필요하지만 평가 중 RGB 읽기와 모델 forward는 수행하지 않는다.
+
+Split은 validation/test/train 중 명시하며 train은 `--train-diagnostic`도 필요하다. 그룹 파일은 `{"body": ["root"], "hand": ["tip"]}`처럼 실제 계약의 관절 이름을 명시한다. 해부학적 그룹을 추정하지 않으며 최대 32개 그룹의 중첩을 허용한다. 그룹 결과는 서로 합산하지 않는다. 예약된 `all`은 원래 전체 관절을 각각 한 번 집계한다.
+
+각 그룹의 left/right/combined는 pixel 단위 Euclidean 거리 합과 유효 GT·예측 쌍 개수로 평균을 구한다. Frame/view별 평균을 재평균하지 않는다. GT 누락, 유효 GT에서 예측 누락, GT 화면 밖, 유효 쌍에서 예측 화면 밖을 따로 센다. 화면 밖 GT도 주지표에 포함한다. `coverage=paired_count/gt_valid_count`, `missing_prediction_rate=1-coverage`이며 GT 유효 개수 0이면 둘 다 null이다. Pair가 0이면 mean은 null, sum은 0이다. 평균에는 예측된 쌍만 들어가므로 coverage·count와 함께 해석한다. Visibility는 평가 mask로 사용하지 않는다. GT visibility unknown은 현재 M1 평가 계약에서 의미가 정의되지 않았다는 뜻이며 원본 파일에 다른 정보가 없다는 주장은 아니다. Confidence 임계값·PCK·정렬·스케일 보정은 적용하지 않는다.
+
+```sh
+python -m rewind_m1.evaluate_2d --features GT_FEATURES.json --cache PREDICTIONS.json --manifest-sha256 RGB_MANIFEST_SHA256 --split validation --groups GROUPS.json --output NEW_REPORT.json
+```
+
+입력과 출력은 기존 4MiB/256 record의 작은 문서 범위를 유지하며 strict JSON을 사용하고 기존 출력을 덮어쓰지 않는다. 결과에는 원본 pose/cache/RGB hash, frontend 식별값, 평가 코드 revision/hash, split, 관절·영상·그룹 및 집계를 기록한다. 실제 정확도 검증이나 M1 전체 완료를 의미하지 않는다.
+
+합성 신규 검사 6개에서 손계산 픽셀 오차·불균등 개수 집계·그룹 중첩·coverage·누락·화면 밖·split·guard·출력 보호와 학습 weights→cache→평가 연결을 확인했다. 기존 결합 4개와 frontend 학습 3개 회귀도 통과했다. 실제 데이터·Colab·GPU 평가는 실행하지 않았다.
+
 ### 로컬 frontend CPU 진단 학습
 
 `rewind_m1.frontend_train`은 `LocalRGBSupervision`과 작은 `StereoHeatmapNet`을 연결한다. 명시 train split만 Adam으로 업데이트하고 validation은 최종 고정 weights의 `eval/no_grad` 평가에 사용한다. Validation이 없으면 `not_available`, 유효한 in-frame 관절이 전체 0이면 `not_evaluable`과 null loss를 기록한다. Test는 학습·평가에서 제외한다. Loss는 기존 heatmap 격자의 MSE이며 validation 집계는 in-frame 관절 수로 batch loss를 가중한다. Train batch에 supervise할 관절이 없으면 중단한다.

@@ -30,6 +30,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-28 고정 예측 2D cache와 GT 특징 문서를 평가하는 API·CLI를 추가했다. 명시 split·관절 그룹별 픽셀 거리 합/개수와 coverage를 보고하고 화면 밖 GT는 주지표에 포함한다. 실제 데이터 2D 성능과 M1 전체 완료는 미검증이며 상세 분모·누락 계약은 [M1 안내](M1_BASELINE.md)를 따른다.
+
 2026-10-28 로컬 RGB supervision을 작은 CPU frontend 학습과 추론용 weights export로 연결했다. 최대100회 train-only 순차 업데이트·별도 고정 validation·원본/hash/코드/설정 보고를 제공하며 재개는 지원하지 않는다. 실제 데이터·GPU 학습·정확도 검증 및 M1 전체 완료는 별도로 남는다. 조건·시간/메모리 상한은 [M1 안내](M1_BASELINE.md)를 따른다.
 
 2026-10-28 로컬 RGB와 GT 2D supervision을 sequence/frame으로 일대일 연결하는 소형 API를 추가했다. 명시한 split의 pose 순서를 보존하고 이미지·GT·mask 합산 상한을 읽기 전에 검사한다. 합성 CPU forward/backward로 연결을 검사하며 실제 데이터 학습·성능 및 기존 마일스톤 완료 조건은 별도로 남는다. 상세 계약은 [M1 안내](M1_BASELINE.md)를 따른다.

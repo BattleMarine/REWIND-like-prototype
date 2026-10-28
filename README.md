@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+고정 예측 2D 캐시의 픽셀 오차·coverage를 좌우와 명시한 관절 그룹별로 평가하는 경로를 추가했습니다. 사용 조건과 분모 정의는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
+
 로컬 RGB·GT 2D의 작은 CPU frontend 진단 학습과 추론용 weights export 경로를 추가했습니다. 재개 미지원·실제 데이터 성능 미검증이며, 실행 조건은 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
 
 로컬 RGB와 GT 2D를 lazy batch로 연결하는 소형 supervision API도 추가했습니다. 계약과 검증 범위는 [M1 안내](docs/M1_BASELINE.md)를 따릅니다.
