@@ -41,7 +41,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
 | [M2 body teacher 안내](docs/M2_BODY_TEACHER.md) | Diffusion·camera·loss·streaming 계약과 CPU 합성 실행·한계 |
 | [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
-| [로컬 lazy RGB 로더](docs/LOCAL_RGB_LOADER.md) | 별도 manifest·sample/batch API·선택 의존성. 구현 후 실행 미검증 |
+| [로컬 lazy RGB 로더](docs/LOCAL_RGB_LOADER.md) | Manifest builder·sample/batch API·합성 CPU 검증 범위와 실제 입력 제한 |
 | [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
 | [압축 원본 준비 도구](docs/ARCHIVE_PREPARATION.md) | Source/예산 계약, 제한된 순차 추출, 완전 파일·CRC·매칭·재사용 검증 범위 |
 
@@ -135,6 +135,8 @@ python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_
 Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 길이 정의, 명시적 container 경계의 streaming reset, 관절·단위·calibration 미확인 범위와 다음 진입 조건은 [데이터·window 계약](docs/DATA_CONTRACT.md)에 기록합니다. 기존 개발용 skeleton은 미검증 설정으로 유지합니다.
 
 ## 데이터 없이 M1 학습 기반 실행
+
+실제 입력을 학습 계약으로 바꾸기 전, RGB manifest와 pose candidate의 선택 frame을 대조하고 좌우 GT2D overlay·누락·화면 밖·출처·미확인 조건을 확인하는 [소량 검토 도구](docs/REAL_DATA_PREPARATION.md#rgbpose-candidate-소량-검토)를 사용할 수 있습니다. 출력은 검토 준비 자료이며 학습 승인을 발급하지 않습니다. 실제 동일 frame의 좌우 RGB·pose가 확보되지 않으면 자료 확인이 필요한 경계에서 멈춥니다.
 
 이미 로컬에 있는 PNG 추출본을 기존 RGB 로더에 연결할 때는 [RGB manifest builder](docs/LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 사용합니다. 공통 root 아래 최대4개 추출본의 좌우를 파일 복사 없이 연결하고, 명시한 sequence/frame·split 선언을 대조합니다. 이는 RGB–pose 정합성이나 실제 데이터 학습 승인을 발급하지 않습니다.
 

@@ -24,7 +24,7 @@ Graph는62nodes/61edges의 tree이며 body 부분22/21, wrist를 제외한 finge
 
 ## 코드와 입력
 
-`rewind_prepare`는 Python 표준 라이브러리만 사용하는 새 모듈이다.
+`rewind_prepare`의 기존 pose 변환기는 Python 표준 라이브러리를 사용한다. 후속 `rgb_review` 모듈은 선택 PNG 검증에 기존 RGB 로더의 torch/Pillow 의존성을 사용하며 변환기 자체의 의존성을 바꾸지 않는다.
 
 | 경로 | 역할 |
 | --- | --- |
@@ -82,6 +82,30 @@ Sequence/frame별로 정렬하고 중복 frame은 거부한다. 연속 구간 �
 산출물 schema는 **`real_pose_candidate_v1`**이며 `m1_features_v1`이 아니다. `data_kind=dataset_sample`, `input_source=gt_2d`를 유지하고 `verified`를 채워 넣지 않는다. M1/M2/M3의 기존 로더가 schema 단계에서 거부하는 것을 검사했다. JSON header를 바꿔 우회하거나 실제 데이터를 synthetic으로 표기해서 학습하지 않는다.
 
 `train_ready=false`와 `training_release=not_implemented`는 이 구현 단계의 고정 정책이다. RGB·validation이 나중에 준비되더라도 이 converter가 자동으로 학습 계약을 발급하지 않는다. 자료/근거를 검토하고 별도 training release 연결을 구현해야 한다.
+
+## RGB–pose candidate 소량 검토
+
+`rewind_prepare.rgb_review.create_review(rgb_manifest, rgb_root, candidate_path, selection, output)`는 `validate_candidate`와 `LocalStereoRGB`를 재사용한다. 새 출력의 `report.json`·`review.html`·`images/`는 검토 준비 자료이며 `review_ready`가 정합성 확인 완료를 의미하지 않는다. `train_ready=false`, `training_release=not_implemented`, `rgb_pose_alignment_confirmed=false`와 기존 candidate 차단 사유를 보존한다. 원본을 학습 schema로 바꾸거나 verified 근거를 발급하지 않는다.
+
+```json
+[{"sequence_id":"Environment/Day/person/avatar/001/Motion","frame_index":0}]
+```
+
+```sh
+python -m rewind_prepare.rgb_review --rgb-manifest RGB_MANIFEST.json --rgb-root RGB_ROOT --candidate CANDIDATE.json --selection SELECTION.json --output NEW_REVIEW_OUTPUT
+```
+
+선택은 최대8개 고유 frame이다. 중복·양쪽 선택 key 누락은 거부하고 다른 frame으로 대체하지 않는다. 선택 밖 key는 따로 보고한다. 공통 dataset_version/data_kind와 원해상도를 대조하며 명시된 split 충돌은 거부한다. 어느 쪽 split이 unknown이면 미확인으로 표시하고 공식 split 일치로 승격하지 않는다. RGB manifest에는 관절 정의가 없으므로 candidate 계약의 명시62관절 순서를 overlay 기준으로 사용한다. RGB archive/extraction과 pose archive/extraction은 다른 출처여서 서로의 hash가 같아야 한다고 요구하지 않는다. 각자 출처를 보존하고 candidate record.source가 candidate.manifest.raw_files와 extraction 참조에 일치하는지 확인한다. 이는 외부 원본 pose 파일·출처 진실성의 재검증은 아니다.
+
+좌우 원본 PNG bytes를 로컬 복사하며 다운로드·resize·clipping하지 않는다. 화면 표시는 원해상도 canvas를 CSS로 맞추며 GT2D raw pixel·null·bool mask와 화면 밖 목록을 보존한다. 수치 유효성과 visibility unknown은 별개다. 기존 device 3D viewer는 수정하지 않고 별도2D 패널만 제공한다. 이름·선언·경로는 JSON script escaping과 textContent/canvas text로 표시한다. 선택 PNG를 decode한 뒤 복사 직전 hash를 재확인하고 동일 실제 파일(dev/inode) 중복·root 이탈·symlink/reparse·원본과 겹치는 출력·기존 출력 덮어쓰기를 거부한다. Candidate와 RGB manifest는 시작/끝 raw hash를 비교한다. 외부 프로세스의 모든 동시 변경을 OS 수준에서 막는 기능은 아니다.
+
+보관 목록의 실제32-record candidate는2,409,892bytes이지만 기존 candidate 일반 출력 계약을 축소하지 않도록 입력64MiB/최대256 records를 허용한다. RGB manifest·selection·report는 각각4MiB, 선택 PNG 누적16MiB, HTML/report/복사 이미지를 합친 출력24MiB다. Candidate를 두 번 읽고 기존 로더가 PNG를 decode·복사 전에 다시 읽으므로 선택 이미지 크기가 총 I/O나 RSS의 상한은 아니다. 30초는 단계/선택 batch 전후 확인하는 cooperative 제한이며 단일 JSON 파싱·hash·PNG decode를 강제 중단하지 않는다. 실패 시 HTML을 제거하고 bounded reason을 가진 rejected report를 남긴다. 큰 report는 요약된 rejected fallback으로 보존하며 부분 복사 이미지는 근거로 남을 수 있다. 디스크 쓰기 자체가 실패한 경우 보고서 보관까지 보장하지 않는다.
+
+검토를 준비한 뒤에는 실제 같은 sequence/frame의 좌우 RGB·GT2D overlay를 사람이 확인해야 한다. Split·원본 motion 독립성, timestamp, 단위·camera 의미와 학습 release는 그 확인과도 별개다. 현재 로컬 보관 목록에서는 실제 대응 쌍을 확인하지 못했으므로 실제 자료 검토가 필수인 경계에서 멈춘다. 새 다운로드·Drive·Colab 시험이나 학습을 자동 시작하지 않는다. 개발 preview는 합성 생성 candidate schema를 사용한 것이며 실제 dataset 정합성 결과가 아니다.
+
+로컬 신규 검사4개에서 raw 좌표·null/mask·화면 밖·unknown split 보존, 내부 pose 출처 참조와 명시 split 충돌/누락/영상 크기 거부, 원본 변경·동일 파일 식별·상한·실패 fallback, HTML escaping과 실제 JS의 모의 DOM/canvas 실행, 표준 report/HTML payload 일치 및 CLI 성공을 확인했다. 기존 pose 준비14개와 RGB manifest5개 회귀도 통과했다. 동일 dev/inode 판정은 Windows sandbox의 hardlink 생성 제한 때문에 stat를 모의한 검사다. 실제 hardlink 생성과 브라우저 레이아웃 시각 검사는 미수행이며 file URL에 대한 root 브라우저 보안 정책을 우회하지 않았다.
+
+개발용 미리보기는 Git 제외 `outputs/rgb_pose_review_20261028/developer/preview_cli/`에 실제 CLI로 생성했고 선택/합성 입력은 형제 `preview_inputs/`, 명령·종료 결과는 `preview_cli_execution.json`에 보존한다. 합성임을 강조하는 제목과 report의 developer_preview_scope는 생성 후 미리보기 전용으로 추가한 표시다. 이 preview report의 추가 scope와 HTML payload는 표준 생성물의 동일성 검증과 구분한다. 실제 입력 도구의 schema/data_kind를 바꾸거나 실제 자료를 확인한 것으로 처리하지 않았다.
 
 실제32개 report의 차단 사유는 다음과 같다.
 

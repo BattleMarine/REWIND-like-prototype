@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-검토 초안 v0.2   |   2026년 10월 27일 문서 정리·로컬 RGB 구현(실행 미검증) 반영
+검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
@@ -29,6 +29,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 현재 상태와 실행 결정
+
+2026-10-28 논문 본문·부록과 M0~M3 입력 조건을 다시 대조한 뒤 RGB manifest와 학습 차단 pose candidate의 소량 GT2D 검토 도구를 추가했다. 키·영상 크기·공통 dataset identity·선언 split·각자 출처를 대조하고 원래 pixel/null/mask·화면 밖 좌표를 보존한다. 기존3D viewer를 복제하지 않고 좌우2D overlay와 미확인 조건만 제공한다. 합성 생성 계약의 로컬 검증 범위이며 실제 대응 RGB/pose 자료를 사람이 검토해야 하는 경계에서 중단한다. Candidate training release·실제 정합성·M1~M3 전체는 미완료다. 상세 계약은 [실제 입력 준비 안내](REAL_DATA_PREPARATION.md#rgbpose-candidate-소량-검토)를 따른다.
 
 2026-10-28 공통 root의 최대4개 RGB 추출본에서 명시 sequence/frame·split 선언으로 `local_stereo_rgb_v1`을 생성하는 bounded builder를 추가했다. 전체 추출 payload 검증과 선택 PNG 디코딩을 구분하고, 출처/코드 변경 허용 옵션·누락/중복·선택 밖 key를 보고한다. 합성 추출본의 로컬 연결 검증 범위이며 실제 RGB–pose 정합성·candidate training release·실제 학습은 미검증이다. 기존 warm192와 고정 시험 산출물은 유지하며 상세 계약은 [로더 안내](LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 따른다.
 

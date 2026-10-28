@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><title>RGB–pose GT2D 검토 준비</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font:15px system-ui;background:#101923;color:#e3eaf2;margin:24px}header{max-width:1100px}label{margin-right:16px}select{max-width:80%;padding:6px}.views{display:flex;gap:16px;flex-wrap:wrap}.view{flex:1;min-width:280px;max-width:1024px}canvas{display:block;width:100%;height:auto;background:#000}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}summary{cursor:pointer}strong{color:#ffc46b}
+</style>
+<header><h1>RGB–pose GT2D 검토 준비 자료</h1>
+<p><strong>실제 정합성 미확인 · 학습 차단</strong> — 파일과 선언을 대조한 자료이며, 영상–관절 대응·split·시간·단위의 진실성을 자동 승인하지 않습니다.</p>
+<p>원래 pixel 좌표를 사용합니다. 화면 밖 좌표는 숨겨 유효하게 만들지 않으며 아래 목록에 보존합니다. 누락은 mask=false/null이며 visibility는 unknown입니다.</p>
+<label>Frame <select id="frame"></select></label><label><input id="names" type="checkbox">관절 이름</label><label>강조 <select id="joint"></select></label></header>
+<div class="views"><section class="view"><h2>Left</h2><canvas id="left"></canvas><pre id="leftStats"></pre></section><section class="view"><h2>Right</h2><canvas id="right"></canvas><pre id="rightStats"></pre></section></div>
+<details open><summary>원래 좌표·mask·화면 밖 관절</summary><pre id="coordinates"></pre></details>
+<details><summary>이 frame의 선언·출처·미확인 조건</summary><pre id="metadata"></pre></details>
+<script type="application/json" id="reviewData">__REVIEW_JSON__</script>
+<script>
+"use strict";
+const data=JSON.parse(document.getElementById('reviewData').textContent),el=id=>document.getElementById(id);
+data.frames.forEach((frame,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=`${frame.sequence_id} / ${frame.frame_index}`;el('frame').append(option)});
+const any=document.createElement('option');any.value='-1';any.textContent='전체';el('joint').append(any);
+data.joint_names.forEach((name,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=name;el('joint').append(option)});
+let generation=0;
+function update(){
+  const token=++generation,frame=data.frames[Number(el('frame').value)],highlight=Number(el('joint').value);
+  for(const side of ['left','right']){
+    const view=frame.views[side],canvas=el(side),ctx=canvas.getContext('2d');canvas.width=view.image_size[0];canvas.height=view.image_size[1];
+    ctx.clearRect(0,0,canvas.width,canvas.height);const image=new Image();
+    image.onload=()=>{if(token!==generation)return;ctx.drawImage(image,0,0);
+      view.coordinates.forEach((point,index)=>{if(!view.valid_mask[index]||view.outside_image[index])return;
+        ctx.fillStyle=index===highlight?'#ffcb4c':'#00e5db';ctx.beginPath();ctx.arc(point[0],point[1],index===highlight?6:3,0,Math.PI*2);ctx.fill();
+        if(el('names').checked){ctx.font='12px sans-serif';ctx.fillText(data.joint_names[index],point[0]+5,point[1]-5)}})};
+    image.onerror=()=>{if(token===generation)el(side+'Stats').textContent='이미지 읽기 실패. 이 화면을 정합성 확인 완료로 사용하지 마세요.'};image.src=view.image;
+    el(side+'Stats').textContent=`원해상도 ${view.image_size.join('×')} · 수치 유효 ${view.valid_count} · 누락 ${view.missing_count} · 화면 밖 ${view.outside_count} · visibility unknown`;
+  }
+  el('coordinates').textContent=JSON.stringify(Object.fromEntries(['left','right'].map(side=>[side,data.joint_names.map((name,index)=>({name,xy:frame.views[side].coordinates[index],valid:frame.views[side].valid_mask[index],outside:frame.views[side].outside_image[index]}))])),null,2);
+  const {views,...meta}=frame;el('metadata').textContent=JSON.stringify({frame:meta,provenance:data.provenance,unconfirmed:data.unconfirmed,training_eligibility:data.candidate_training_eligibility},null,2);
+}
+el('frame').onchange=update;el('names').onchange=update;el('joint').onchange=update;update();
+</script></html>
