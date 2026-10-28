@@ -103,9 +103,15 @@ python -m rewind_prepare.rgb_review --rgb-manifest RGB_MANIFEST.json --rgb-root 
 
 검토를 준비한 뒤에는 실제 같은 sequence/frame의 좌우 RGB·GT2D overlay를 사람이 확인해야 한다. Split·원본 motion 독립성, timestamp, 단위·camera 의미와 학습 release는 그 확인과도 별개다. 현재 로컬 보관 목록에서는 실제 대응 쌍을 확인하지 못했으므로 실제 자료 검토가 필수인 경계에서 멈춘다. 새 다운로드·Drive·Colab 시험이나 학습을 자동 시작하지 않는다. 개발 preview는 합성 생성 candidate schema를 사용한 것이며 실제 dataset 정합성 결과가 아니다.
 
-로컬 신규 검사4개에서 raw 좌표·null/mask·화면 밖·unknown split 보존, 내부 pose 출처 참조와 명시 split 충돌/누락/영상 크기 거부, 원본 변경·동일 파일 식별·상한·실패 fallback, HTML escaping과 실제 JS의 모의 DOM/canvas 실행, 표준 report/HTML payload 일치 및 CLI 성공을 확인했다. 기존 pose 준비14개와 RGB manifest5개 회귀도 통과했다. 동일 dev/inode 판정은 Windows sandbox의 hardlink 생성 제한 때문에 stat를 모의한 검사다. 실제 hardlink 생성과 브라우저 레이아웃 시각 검사는 미수행이며 file URL에 대한 root 브라우저 보안 정책을 우회하지 않았다.
+로컬 신규 검사4개에서 raw 좌표·null/mask·화면 밖·unknown split 보존, 내부 pose 출처 참조와 명시 split 충돌/누락/영상 크기 거부, 원본 변경·동일 파일 식별·상한·실패 fallback, HTML escaping과 실제 JS의 모의 DOM/canvas 실행, 표준 report/HTML payload 일치 및 CLI 성공을 확인했다. 기존 pose 준비14개와 RGB manifest5개 회귀도 통과했다. 동일 dev/inode 판정은 Windows sandbox의 hardlink 생성 제한 때문에 stat를 모의한 검사다. 실제 hardlink 생성과 개발 당시 root의 브라우저 레이아웃 시각 검사는 미수행이며 file URL 보안 정책을 우회하지 않았다. 이후 사용자 PDF·resize 진술에 의한 아래 수동 확인과 구분한다.
 
 개발용 미리보기는 Git 제외 `outputs/rgb_pose_review_20261028/developer/preview_cli/`에 실제 CLI로 생성했고 선택/합성 입력은 형제 `preview_inputs/`, 명령·종료 결과는 `preview_cli_execution.json`에 보존한다. 합성임을 강조하는 제목과 report의 developer_preview_scope는 생성 후 미리보기 전용으로 추가한 표시다. 이 preview report의 추가 scope와 HTML payload는 표준 생성물의 동일성 검증과 구분한다. 실제 입력 도구의 schema/data_kind를 바꾸거나 실제 자료를 확인한 것으로 처리하지 않았다.
+
+### 2026-10-28 사용자 합성 UI 수동 확인
+
+`rgb_pose_manual_5340cbe_001`은 사용자 PDF3개에서 합성 제목·영상/관절·Motion_A frame0·좌우 count·이름 off/on·spine_02 강조·원래 좌표/누락·unknown split/학습 차단 표시를 확인했다. Resize 위치 유지는 사용자 직접 진술 근거이며 정적 PDF만으로 동적 동작을 입증한 것은 아니다. 브라우저 이름/버전은 미제공이고 PDF의 조밀한 이름 겹침만으로 원래 브라우저 가독성을 확정하지 않는다. 시험 기준 revision은 `5340cbecbe14c96a56fc1262fb89421117920e49`, preview는 앞선 `64cafb9` dirty 상태에서 생성하고 합성 표시를 후처리한 자료임을 구분한다. 근거는 [최종 수동 검토](../outputs/test_rgb_pose_manual_5340cbe_20261028/final_review.json)에 있다.
+
+[실제 자료 대조 기록](../outputs/test_rgb_pose_manual_5340cbe_20261028/actual_correspondence_review.json)은 보존된 Adanna pose candidate32 record와 이전 검증 RGB 결과를 조사했으나 실제 같은 sequence/frame의 stereo+pose 확인은0개였다. Raw pose 원본 bytes를 이번 대조에서 재검사한 것은 아니며 전체 Drive/archive 검색이나 자료 부재를 증명하지 않는다. 오른쪽 성공 원본 ZIP은 미수령이다. 합성 UI 확인을 실제 alignment나 학습 release로 승격하지 않으며 다음은 [수동 자료 준비 경계](REAL_DATA_NEXT_RUN.md#2026-10-28-합성-ui-수동-확인-이후의-실제-자료-경계)에서 멈춘다.
 
 실제32개 report의 차단 사유는 다음과 같다.
 

@@ -30,6 +30,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-28 `rgb_pose_manual_5340cbe_001`의 합성 UI 수동 결과를 수령했다. 사용자 PDF3개에서 frame·좌우 count·이름 off/on·관절 강조·raw 좌표/누락·학습 차단 표시를 확인했고 resize 위치 유지는 사용자 진술 근거다. Root의 과거 file URL 브라우저 확인 불가와 후속 사용자 증거를 구분하며 브라우저 버전·원래 화면 가독성은 미확인이다. 보존 candidate와 검증 RGB 결과의 실제 같은 sequence/frame stereo+pose 확인은0개이며 전체 Drive/archive 부재 결론은 아니다. 고정 warm192 source/ready/128MiB cache의 로컬 hash·JOB·예산을 재대조했으나 새 실행은 하지 않았다. 오른쪽 성공 원본 ZIP 회수와 실제 자료 시험이 필요한 경계에서 멈추며 [수동 결과와 다음 준비 상태](REAL_DATA_NEXT_RUN.md#2026-10-28-합성-ui-수동-확인-이후의-실제-자료-경계)를 따른다.
+
 2026-10-28 논문 본문·부록과 M0~M3 입력 조건을 다시 대조한 뒤 RGB manifest와 학습 차단 pose candidate의 소량 GT2D 검토 도구를 추가했다. 키·영상 크기·공통 dataset identity·선언 split·각자 출처를 대조하고 원래 pixel/null/mask·화면 밖 좌표를 보존한다. 기존3D viewer를 복제하지 않고 좌우2D overlay와 미확인 조건만 제공한다. 합성 생성 계약의 로컬 검증 범위이며 실제 대응 RGB/pose 자료를 사람이 검토해야 하는 경계에서 중단한다. Candidate training release·실제 정합성·M1~M3 전체는 미완료다. 상세 계약은 [실제 입력 준비 안내](REAL_DATA_PREPARATION.md#rgbpose-candidate-소량-검토)를 따른다.
 
 2026-10-28 공통 root의 최대4개 RGB 추출본에서 명시 sequence/frame·split 선언으로 `local_stereo_rgb_v1`을 생성하는 bounded builder를 추가했다. 전체 추출 payload 검증과 선택 PNG 디코딩을 구분하고, 출처/코드 변경 허용 옵션·누락/중복·선택 밖 key를 보고한다. 합성 추출본의 로컬 연결 검증 범위이며 실제 RGB–pose 정합성·candidate training release·실제 학습은 미검증이다. 기존 warm192와 고정 시험 산출물은 유지하며 상세 계약은 [로더 안내](LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 따른다.
