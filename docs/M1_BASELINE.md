@@ -4,6 +4,22 @@
 
 ## 구현 범위
 
+### 로컬 frontend CPU 진단 학습
+
+`rewind_m1.frontend_train`은 `LocalRGBSupervision`과 작은 `StereoHeatmapNet`을 연결한다. 명시 train split만 Adam으로 업데이트하고 validation은 최종 고정 weights의 `eval/no_grad` 평가에 사용한다. Validation이 없으면 `not_available`, 유효한 in-frame 관절이 전체 0이면 `not_evaluable`과 null loss를 기록한다. Test는 학습·평가에서 제외한다. Loss는 기존 heatmap 격자의 MSE이며 validation 집계는 in-frame 관절 수로 batch loss를 가중한다. Train batch에 supervise할 관절이 없으면 중단한다.
+
+설정은 seed, steps(1~100), batch_size(1~4), learning_rate(0 초과~0.1), frontend_version을 요구한다. Pose 순서의 순차 batch이며 마지막 짧은 batch 후 처음부터 반복한다. Shuffle·resize 없이 원해상도 최대 1024×1024, 관절 256개 및 stride2 heatmap 최대 32Mi 요소를 모델 실행 전에 검사한다. 기존 RGB·GT 합산 byte 상한도 적용한다. 120초 제한은 준비·코드 식별 이후 학습·평가·export의 검사 지점에서 확인하는 cooperative deadline이다. 단일 연산 강제 중단·준비 시간을 포함한 전체 실행 시간·성공 report 작성 후 시간이나 전체 RSS를 보장하지 않는다.
+
+완료한 새 출력 디렉터리에는 `frontend_weights.pt`와 `report.json`이 생긴다. Weights는 기존 `m1_frontend_weights_v1` 추론 형식으로 예측 cache 생성에 사용할 수 있다. 학습 재개는 지원하지 않으며 중단한 실행은 처음부터 seed로 다시 시작한다. Scheduler/scaler는 사용하지 않아 report에 null로 기록한다. Report는 설정·학습 key/loss·validation 집계·원본 hash·코드 식별·환경·초기/최종 fingerprint를 남긴다. 전체 RGB manifest hash와 실제 train key 집합을 구분한다. CPU RNG는 실행 전후 복원하고 전역 thread/default 설정은 바꾸지 않는다. 실패 시 이번 실행의 산출물만 정리하며 기존 출력은 거부한다.
+
+```sh
+python -m rewind_m1.frontend_train --manifest RGB_MANIFEST.json --root RGB_ROOT --features GT_FEATURES.json --manifest-sha256 RGB_MANIFEST_SHA256 --joints root tip --config configs/frontend_local_smoke.json --output NEW_OUTPUT
+```
+
+위 관절 이름은 합성 예시이며 입력 문서의 명시 순서를 사용한다. 실제 데이터의 기존 여섯 검증 근거를 갖춘 GT 특징 문서가 필요하며 자동으로 검증 상태를 발급하지 않는다. 이 실행기는 진단용 학습 경로이며 실제 정확도나 장기 학습의 검증을 뜻하지 않는다.
+
+로컬 합성 검사 3개에서 소량 train 업데이트, validation GT 변경에 대한 최종 weights 불변, 학습 모델과 export 일치, weights→cache reader 연결, CLI·진입 guard·실패 cleanup을 확인했다. 기존 supervision 3개·RGB 예측 5개·M1 19개 회귀가 통과했다. 실제 데이터·GPU·Colab 학습은 실행하지 않았다.
+
 2026-10-28 `LocalRGBSupervision(loader, pose_doc, expected_manifest_sha256=..., joint_names=[...], split="train")`은 검증된 GT `m1_features_v1`과 `LocalStereoRGB`를 연결한다. 모든 record의 sequence/frame key와 split을 일대일 대조한 뒤 선택 split의 pose 순서를 유지한다. 생성 시 이미지를 읽지 않으며 `load_batch([0, 1])`에서 CPU `images[B,2,3,H,W]`, `gt_xy[B,2,J,2]`, bool `annotation_valid[B,2,J]`, 복사된 metadata를 반환한다. 이미지 전처리는 `rgb_0_1_v1`이다.
 
 소형 pose 문서는 최대 256 record/4MiB이며 batch는 최대 4개와 기존 RGBLimits 중 더 작은 상한을 적용한다. RGB와 GT·mask의 합산 tensor bytes를 PNG 읽기 전에 검사한다. 원본 GT3D·시간·motion·split은 metadata에 보존하며 원본과 반환 metadata의 수정은 내부 복사본에 영향을 주지 않는다. 누락 GT2D는 false mask와 0 placeholder로 표현하고 화면 밖 GT2D는 annotation_valid를 유지한다. `heatmap_loss`가 별도 in-frame mask를 계산하며 visibility는 supervision에서 unknown으로 표시한다. 기존 실데이터 여섯 검증 guard를 유지하며 candidate·predicted 문서를 거부한다. 자동 shuffle·resize·학습·optimizer는 제공하지 않는다.
