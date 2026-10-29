@@ -1,5 +1,9 @@
 # 다음 실제 데이터 준비 실행
 
+## 2026-10-29 API10 실제 목표 확보 — 시험 종료
+
+`archvis_pose_1_10_tail352_001`에서 두 JSON 완전 저장·hash·object 파싱을 확인했다. 기존192MiB cache 재사용 후 신규42MiB를 읽었고 준비158.097초/506HTTP, prefix234MiB에서 조기 종료했다. 전체 EOF/CRC·좌우 영상/좌표/시간·학습은 미검증이다. 같은 JOB를 재실행하지 않는다. [실제 결과와 캐시 상한 계산](POSE_CACHE_BOUNDS.md)을 따르며 아래 인계 준비는 종료된 시험의 이력이다.
+
 ## 2026-10-29 현재 상태 — warm192 종료 및 pose 후속 시험 준비
 
 `rgb_pose_manual_5340cbe_001`은 합성 UI의 PDF 상태와 사용자 resize 진술을 확인한 결과다. 브라우저 버전·원래 화면 이름 가독성은 미확인이고, 개발 당시 root의 브라우저 접근 불가를 소급해 성공으로 바꾸지 않는다. [수동 검토](../outputs/test_rgb_pose_manual_5340cbe_20261028/final_review.json)와 [실제 자료 대조](../outputs/test_rgb_pose_manual_5340cbe_20261028/actual_correspondence_review.json)에서 조사 범위의 동일 sequence/frame stereo+pose 확인은0개였다. 전체 보관본·Drive·archive의 부재를 의미하지 않는다. 오른쪽 성공 원본 ZIP 회수는 사용자 자료 확인이 필요한 항목으로 남는다.

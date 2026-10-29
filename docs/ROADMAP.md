@@ -2,7 +2,7 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
-2026-10-29 현재 결정: 실제 warm192는192MiB 정상 탐색·목표0개로 종료했다. 작은 non-RGB 첫 시험으로 ArchVis pose 한 장면의 남은159.09MiB를 고정v3 cache에서 순차 탐색하는 API10 시험을 준비한다. RGB는 전략 검토만 하며 실제 실행은 root 검토·커밋·고정 인계 후 테스트 세션에서 진행한다. [설계·상한](POSE_TAIL352_PLAN.md)을 따른다.
+2026-10-29 현재 결정: API10 실제 시험에서 목표 pose2개를 확보했다. 후속 사용자 요청으로 JSON 캐시 상한 계산과 RGB 소량 인덱싱 가능성 조사를 진행한다. 전체 RGB 인덱싱이나 실제 학습 착수는 아니다.
 
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
@@ -32,6 +32,10 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 현재 상태와 실행 결정
+
+2026-10-29 [RGB 부분 인덱싱 조사](RGB_INDEX_PROBE.md): 공식 RGB 소량 prefix로 tar 경로 목록과 gzip restart 인덱스의 저장·재사용을 조사했다. 대형 실제 입력은 전송 시간 상한에 걸렸으며 전체 RGB/Drive/Colab 연결 검증이 아니다. [JSON 캐시 상한](POSE_CACHE_BOUNDS.md)은 현재 ArchVis351.091MiB와 확인한 pose15장면 중 최대3.139GiB를 구분한다. 범용4GiB 예산은 제안으로 기존 구현에 적용하지 않았다.
+
+2026-10-29 후속 실제 API10 시험은 Serena pose2개 확보로 종료했다. 기존192MiB cache 재사용·신규42MiB·준비158.097초·234MiB prefix에서 목표 완료했으며 전체 archive CRC·좌우 영상 정합성·학습은 미검증이다. [JSON 캐시 상한](POSE_CACHE_BOUNDS.md)에 장면별 원본 크기 기반 상한과 현 구현/범용 제안을 구분한다. 이전의 시험 준비·미확보 기록은 당시 이력이다.
 
 2026-10-28 `rgb_pose_manual_5340cbe_001`의 합성 UI 수동 결과를 수령했다. 사용자 PDF3개에서 frame·좌우 count·이름 off/on·관절 강조·raw 좌표/누락·학습 차단 표시를 확인했고 resize 위치 유지는 사용자 진술 근거다. Root의 과거 file URL 브라우저 확인 불가와 후속 사용자 증거를 구분하며 브라우저 버전·원래 화면 가독성은 미확인이다. 보존 candidate와 검증 RGB 결과의 실제 같은 sequence/frame stereo+pose 확인은0개이며 전체 Drive/archive 부재 결론은 아니다. 고정 warm192 source/ready/128MiB cache의 로컬 hash·JOB·예산을 재대조했으나 새 실행은 하지 않았다. 오른쪽 성공 원본 ZIP 회수와 실제 자료 시험이 필요한 경계에서 멈추며 [수동 결과와 다음 준비 상태](REAL_DATA_NEXT_RUN.md#2026-10-29-현재-상태--warm192-종료-및-pose-후속-시험-준비)를 따른다.
 
