@@ -14,11 +14,26 @@ from .source import (SCHEMA,MIB,CHUNK,IndexFailure,IndexLimits,Budget,SplitSourc
     make_source,_validate_source,_gzip,_read,_pack_index,canonical,digest,safe_path,pax_fields)
 
 class ArchiveIndex:
-    def __init__(self, path, limits=None):
+    def __init__(self, path, limits=None, runtime=None):
         self.path = Path(path).absolute()
         self.limits = limits or IndexLimits()
+        self.runtime=runtime
         if self.path.is_symlink() or any(p.is_symlink() or getattr(p, 'is_junction', lambda: False)() for p in self.path.parents):
             raise IndexFailure('index_path_link')
+
+    def _source(self,spec,budget):
+        if spec['schema']=='ordered_drive_gzip_source_v1':
+            if self.runtime is None:raise IndexFailure('drive_runtime_required')
+            return self.runtime.source(spec,budget)
+        return SplitSource(spec,budget)
+
+    def _finish_source(self,spec,budget):
+        _validate_source(spec)
+        if spec['schema']=='ordered_drive_gzip_source_v1':self.runtime.finish(budget)
+
+    def _result(self,budget,**values):
+        stats=budget.stats()
+        return {**self.status(),**values,'stats':stats,'network_requested':stats['network_requested']}
 
     def _connect(self):
         if not self.path.is_file() or self.path.stat().st_size > self.limits.max_disk_bytes:
@@ -146,11 +161,12 @@ class ArchiveIndex:
         state, blob = self._snapshot(); previous = state['generation']
         if expected_generation is not None and expected_generation != previous: raise IndexFailure('stale_generation')
         budget = Budget(self.limits)
+        if state['source']['schema']=='ordered_drive_gzip_source_v1':verify_end=False
         # source budget 종료 뒤에도 마지막 완전 boundary의 index를 확정할 여유를 예약한다.
         budget.active_read_limit=self.limits.max_read_bytes-min(4*state['spacing'],self.limits.max_read_bytes//2)
         if state['catalog_complete']:
-            return self.verify() if verify_end and not state['complete'] else {**self.status(), 'stats': budget.stats()}
-        source = SplitSource(state['source'], budget); gz = _gzip(source, state['spacing'])
+            return self.verify() if verify_end and not state['complete'] else self._result(budget)
+        source = self._source(state['source'], budget); gz = _gzip(source, state['spacing'])
         reason = 'member_batch_limit'; pending_name = None; pending_pax = {}; new = 0; chain_metadata = False
         try:
             self._restore(gz,blob,state)
@@ -201,33 +217,37 @@ class ArchiveIndex:
                 names.add(name.casefold()); state['boundary'] = gz.tell(); new += 1
         except Exception as exc:
             stop=exc.reason if isinstance(exc,IndexFailure) else budget.last_source_failure
-            if stop not in ('read_bytes_limit','decoded_bytes_limit','elapsed_limit','incomplete_tar','catalog_members_limit'):
+            if stop not in ('read_bytes_limit','decoded_bytes_limit','elapsed_limit','incomplete_tar','catalog_members_limit','transfer_bytes_limit','ranges_limit'):
                 raise
             reason = stop
         finally:
             try: new_blob, points = _pack_index(gz,self.limits)
             finally: gz.close(); source.close()
+        if state['source']['schema']=='ordered_drive_gzip_source_v1' and self.runtime.failed:
+            return self._result(budget,stop_reason=reason,checkpoint_deferred=True,new_members=0)
+        if state['source']['schema']=='ordered_drive_gzip_source_v1' and new==0 and reason in ('ranges_limit','transfer_bytes_limit','elapsed_limit','read_bytes_limit'):
+            return self._result(budget,stop_reason=reason,checkpoint_deferred=True,new_members=0)
         budget.active_read_limit=self.limits.max_read_bytes
         budget.last_source_failure=None
         # 새 handle의 seek로 lazy buffer 안에 머물렀던 범위도 restart index로 확정한다.
-        checkpoint_source=SplitSource(state['source'],budget);checkpoint_gz=_gzip(checkpoint_source,state['spacing'])
+        checkpoint_source=self._source(state['source'],budget);checkpoint_gz=_gzip(checkpoint_source,state['spacing'])
         try:
             self._restore(checkpoint_gz,new_blob,{**state,'engine_version':self._engine_version()})
             checkpoint_gz.seek(state['boundary'])
             new_blob,points=_pack_index(checkpoint_gz,self.limits)
         except Exception as exc:
             stop=exc.reason if isinstance(exc,IndexFailure) else budget.last_source_failure
-            if stop not in ('read_bytes_limit','decoded_bytes_limit','elapsed_limit'):raise
-            return {**self.status(),'stop_reason':stop,'checkpoint_deferred':True,'new_members':0,'stats':budget.stats()}
+            if stop not in ('read_bytes_limit','decoded_bytes_limit','elapsed_limit','transfer_bytes_limit','ranges_limit'):raise
+            return self._result(budget,stop_reason=stop,checkpoint_deferred=True,new_members=0)
         finally:checkpoint_gz.close();checkpoint_source.close()
-        _validate_source(state['source'])
+        self._finish_source(state['source'],budget)
         import indexed_gzip
         state['engine_version'] = indexed_gzip.__version__
         coverage=max([0]+[u for u,c in points if c < state['source']['total_bytes']])
         if coverage<state['index_coverage']:raise IndexFailure('index_progress_regression')
         state['index_coverage'] = coverage
         state = self._commit(previous,state,new_blob)
-        result = {**self.status(),'stop_reason':reason,'new_members':new,'stats':budget.stats()}
+        result = self._result(budget,stop_reason=reason,new_members=new)
         if state['catalog_complete'] and verify_end:
             try: result['verification'] = self._verify(state,new_blob,budget)
             except IndexFailure as exc:
@@ -274,6 +294,7 @@ class ArchiveIndex:
 
     def verify(self):
         state, blob = self._snapshot()
+        if state['source']['schema']=='ordered_drive_gzip_source_v1':raise IndexFailure('drive_full_crc_deferred')
         return self._verify(state,blob,Budget(self.limits))
 
     def lookup(self, name):
@@ -294,7 +315,7 @@ class ArchiveIndex:
         if output.exists(): raise IndexFailure('new_output_required')
         if any(p.is_symlink() or getattr(p,'is_junction',lambda:False)() for p in output.parents): raise IndexFailure('output_link')
         output.mkdir(parents=True)
-        budget = Budget(self.limits); source = SplitSource(state['source'],budget); gz = _gzip(source,state['spacing'],auto_build=False)
+        budget = Budget(self.limits); source = self._source(state['source'],budget); gz = _gzip(source,state['spacing'],auto_build=False)
         files = []
         try:
             self._restore(gz,blob,state)
@@ -307,17 +328,20 @@ class ArchiveIndex:
                 if h.hexdigest() != row['sha256']: raise IndexFailure('member_hash_changed')
                 files.append({**row,'relative_path':str(target.relative_to(output).as_posix())})
         finally: gz.close(); source.close()
-        _validate_source(state['source'])
+        self._finish_source(state['source'],budget)
         report = {'schema':'persistent_index_extraction_v1','source_sha256':state['source_sha256'],
             'generation':state['generation'],'files':files,'stats':budget.stats(),'train_ready':False,
             'whole_archive_integrity_verified':state['complete'],'existing_archive_verify_compatible':False}
+        report['network_requested']=report['stats']['network_requested']
         report['content_sha256'] = digest(report)
         if len(canonical(report))>self.limits.max_state_bytes:raise IndexFailure('extraction_report_limit')
         (output/'extraction.json').write_bytes(canonical(report)+b'\n')
         return report
 
     def audit_source_sha(self):
-        state, _ = self._snapshot(); budget = Budget(self.limits); source = SplitSource(state['source'],budget)
+        state, _ = self._snapshot()
+        if state['source']['schema']=='ordered_drive_gzip_source_v1':raise IndexFailure('drive_full_sha_deferred')
+        budget = Budget(self.limits); source = SplitSource(state['source'],budget)
         results = []
         try:
             for i,p in enumerate(state['source']['parts']):

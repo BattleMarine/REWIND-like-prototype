@@ -50,4 +50,4 @@ Pose는 `--kind pose`로 별도 DB를 만들고 JSON의 정확한 member 경로�
 
 근거는 [개발 검사](../outputs/persistent_index_development_20261029/tests.json), [기존 회귀](../outputs/persistent_index_development_20261029/existing_core_regression.json), [실제 구간](../outputs/persistent_index_development_20261029/real_prefix/result.json), [독립 검사](../outputs/persistent_index_review_20261029/root_final_tests.txt)에 보존한다. 최종 방어 조건과 EOF 빈 줄 정리 후 root가13개 검사를 다시 통과했으며 최종 코드 hash를 함께 보존했다.
 
-Drive Range reader·영구 snapshot 업로드/복원·학습 준비 자동 hook은 미연결이다. DB에는 로컬 경로와 파일 identity가 들어가므로 다른 런타임으로 복사만 해서 바로 재사용할 수 없다. Drive 동기화 폴더의 live DB에 로컬 atomic 보장을 적용하지 않는다. 후속 구현은 원본 metadata를 고정한 reader, 대규모 행 단위 catalog, 닫힌 DB snapshot의 영구 보관·충돌 관리와 런타임 경로 재연결을 다룬다. 이 단계에서 전체 인덱싱이나 추가 사용자 테스트를 시작하지 않는다.
+기존 local source DB에는 경로와 파일 identity가 있으므로 다른 런타임에 복사만 해서 바로 재사용할 수 없다. 후속 [Drive 고정 source·닫힌 snapshot 연결](DRIVE_PERSISTENT_INDEX.md)은 runtime 경로 없는 원본 metadata와 명시 receipt로 저장·복원하는 adapter를 추가했으며 현재 모의 검증 단계다. 실제 Colab/Drive 지속 보관·처리량은 미검증이고 학습 hook·대규모 행 catalog도 미구현이다. Live DB는 로컬에서만 실행하며 Drive 동기화 원자성을 가정하지 않는다. 전체 데이터 인덱싱·실제 사용자 pilot은 root의 별도 고정 인계 후 진행한다.

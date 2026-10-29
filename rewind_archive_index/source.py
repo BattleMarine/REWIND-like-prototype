@@ -78,7 +78,7 @@ class Budget:
     def stats(self):
         return {'source_read_bytes': self.read_bytes, 'returned_decoded_bytes': self.decoded_bytes,
                 'seconds': time.monotonic()-self.start, 'observed_peak_rss': self.peak_rss,
-                'source_read_trace': self.trace, 'network_requested': False}
+                'source_read_trace': self.trace, 'network_requested': False} | (self.remote_stats() if hasattr(self,'remote_stats') else {})
 
 
 def _stat(path):
@@ -121,6 +121,9 @@ def make_source(paths, archive_id, kind, dataset_version='local_unverified', exp
 
 
 def _validate_source(spec):
+    if isinstance(spec,dict) and spec.get('schema')=='ordered_drive_gzip_source_v1':
+        from .drive import validate_drive_spec
+        return validate_drive_spec(spec)
     if not isinstance(spec, dict) or set(spec) != {'schema', 'archive_id', 'kind', 'dataset_version', 'parts', 'total_bytes'}:
         raise IndexFailure('source_fields')
     if spec['schema'] != 'ordered_local_gzip_source_v1' or spec['kind'] not in ('rgb', 'pose', 'mixed'):
@@ -231,7 +234,10 @@ def _read(gz, size, budget, exact=True):
         if budget.decoded_bytes >= budget.limits.max_decoded_bytes:
             raise IndexFailure('decoded_bytes_limit')
         take = min(size, CHUNK, budget.limits.max_decoded_bytes-budget.decoded_bytes)
-        data = gz.read(take)
+        try:data = gz.read(take)
+        except Exception:
+            if budget.last_source_failure:raise IndexFailure(budget.last_source_failure) from None
+            raise
         budget.decoded_bytes += len(data)
         if not data:
             if exact: raise IndexFailure('incomplete_tar')
