@@ -21,6 +21,12 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 최신 진입점은 [ArchVis pose 후속 시험 설계](docs/POSE_TAIL352_PLAN.md), [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
 
+### RGB·pose 인덱스 저장과 재개
+
+[지속형 archive 인덱스](docs/PERSISTENT_ARCHIVE_INDEX.md)의 로컬 코어와 `python -m rewind_archive_index` CLI를 추가했습니다. 원본별 파일 목록·gzip restart 인덱스·완전 파일 경계를 SQLite 트랜잭션으로 함께 저장하고, 다음 실행에서 복원해 확장합니다. 조각 순서와 원본 identity를 고정하며 학습 shuffle과 archive 순서를 구분합니다. RGB·pose 모두 지원하고, 자동 인덱스 생성을 끈 선택 파일 추출과 프로세스 재시작을 포함한 로컬13개 검사를 통과했습니다.
+
+현재는 제한된 크기의 로컬 분할 gzip/tar용입니다. Drive 자동 저장·복원, 기존 archive_prepare/학습 epoch 연결, 대규모 행 단위 catalog는 미구현입니다. 기존 API10과 캐시는 변경하지 않았고, 기존 추출 검증 도구와 새 출력 형식은 아직 연결하지 않았습니다. 학습1epoch 완료를 전체 인덱싱 완료로 표시하지 않습니다. 관측 목록 완료와 전체 gzip CRC 검증을 별도로 기록하며 두 조건을 만족해야 전체 완료입니다.
+
 ## 문서 안내
 
 이전 실행 자료는 Git에서 제외되는 `.local-archive/20261023/`에 정리했습니다. 현재 테스트 파일은 기존 `outputs/` 경로를 유지합니다. 과거 `outputs/` 링크의 자료가 보이지 않으면 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)와 아카이브의 `INDEX.json`에서 원래 경로를 확인하세요.

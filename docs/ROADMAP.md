@@ -2,7 +2,7 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
-2026-10-29 현재 결정: API10 실제 시험에서 목표 pose2개를 확보했다. 후속 사용자 요청으로 JSON 캐시 상한 계산과 RGB 소량 인덱싱 가능성 조사를 진행한다. 전체 RGB 인덱싱이나 실제 학습 착수는 아니다.
+2026-10-29 현재 결정: RGB·pose의 인덱스를 원본 archive별로 영구 보존하고 재개·확장하는 구조를 구현한다. 원본 순서와 identity를 고정하고, 학습 epoch와 인덱스 coverage를 독립 관리한다. 전체 RGB 스캔이나 실제 학습 착수는 아니다.
 
 
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
@@ -32,6 +32,11 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 | M6 통합 | 최종 모델과 재현 가이드 | 새 실행 환경에서 평가 재현 |
 
 ## 현재 상태와 실행 결정
+
+2026-10-29 지속형 인덱스의 첫 구현: `rewind_archive_index`에 RGB·pose 공통 로컬 split reader와 SQLite 누적 checkpoint, 원본 identity/순서 검증, CAS 세대 충돌 거부, tar 완전 파일 경계 재개, 저장된 gzip 인덱스를 이용한 선택 추출을 추가했다. 로컬13개 검사에서 재프로세스 복원·순서·부분 예산·PAX/longname·실제 SQL rollback·원본/저장본 변경·완료 판정을 확인했다. [전용 문서](PERSISTENT_ARCHIVE_INDEX.md)를 따른다. 기본20,000member/16MiB state의 제한된 코어이며 SQLite 안에 전체 목록 snapshot을 저장하므로 수TB 전체 장면의 대규모 지원 완료는 아니다.
+
+사용자 결정의 후속 연결은 (1) 행 단위 대규모 catalog, (2) 고정 원본 identity/전체 길이의 Drive Range reader와 범위 캐시, (3) 닫힌 DB snapshot의 Drive 영구 보관·복원과 writer 충돌 관리, (4) 실제 데이터 준비 시 자동 저장·재개 hook이다. 기존 학습 로더의 epoch는 추출본만 읽을 수 있으므로 이를 전체 archive coverage와 동일시하지 않는다. Train/validation/test와 사용하지 않은 modality도 구분한다. Drive 동기화 폴더의 live SQLite를 로컬 atomic DB처럼 취급하지 않는다. 현재는 로컬 재현 검증이며 전체 데이터셋 인덱싱·실제 학습·M0~M3 완료를 선언하지 않는다.
+
 
 2026-10-29 RGB 추가 조사: 기존8MiB 뒤의 검증된 수신분을 보존해 실제19.68MiB·PNG31개를 확인했다. 1/4/16MiB 간격의 인덱스 크기·조회 비용을 비교했고, 동일 최종 원본 길이에서 부분 인덱스 import·확장이 성공했다. 목표32MiB 전송은360초 제한으로 미완료이며 전체 RGB·Drive/Colab·실제 분할 경계는 미검증이다. 상세는 [후속 조사](RGB_INDEX_PROBE.md)를 따른다. 제품화·전체 인덱싱 착수나 마일스톤 완료를 의미하지 않는다.
 
