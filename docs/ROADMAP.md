@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-29 RGB 추가 조사: 기존8MiB 뒤의 검증된 수신분을 보존해 실제19.68MiB·PNG31개를 확인했다. 1/4/16MiB 간격의 인덱스 크기·조회 비용을 비교했고, 동일 최종 원본 길이에서 부분 인덱스 import·확장이 성공했다. 목표32MiB 전송은360초 제한으로 미완료이며 전체 RGB·Drive/Colab·실제 분할 경계는 미검증이다. 상세는 [후속 조사](RGB_INDEX_PROBE.md)를 따른다. 제품화·전체 인덱싱 착수나 마일스톤 완료를 의미하지 않는다.
+
 2026-10-29 [RGB 부분 인덱싱 조사](RGB_INDEX_PROBE.md): 공식 RGB 소량 prefix로 tar 경로 목록과 gzip restart 인덱스의 저장·재사용을 조사했다. 대형 실제 입력은 전송 시간 상한에 걸렸으며 전체 RGB/Drive/Colab 연결 검증이 아니다. [JSON 캐시 상한](POSE_CACHE_BOUNDS.md)은 현재 ArchVis351.091MiB와 확인한 pose15장면 중 최대3.139GiB를 구분한다. 범용4GiB 예산은 제안으로 기존 구현에 적용하지 않았다.
 
 2026-10-29 후속 실제 API10 시험은 Serena pose2개 확보로 종료했다. 기존192MiB cache 재사용·신규42MiB·준비158.097초·234MiB prefix에서 목표 완료했으며 전체 archive CRC·좌우 영상 정합성·학습은 미검증이다. [JSON 캐시 상한](POSE_CACHE_BOUNDS.md)에 장면별 원본 크기 기반 상한과 현 구현/범용 제안을 구분한다. 이전의 시험 준비·미확보 기록은 당시 이력이다.

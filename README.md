@@ -17,7 +17,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
 | M5~M6 개선·통합 | 미착수 | Ablation·failure 평가·최종 재현 |
 
-최신 실제 API10(`33adef1`)은 목표 JSON2개 완전 저장·hash·파싱에 성공했습니다. 현재 압축 캐시는234MiB이며 ArchVis 전체 본체 상한은351.091MiB입니다. 다른 장면의 최대 크기와 범용 운영 제안은 [JSON 캐시 상한 계산](docs/POSE_CACHE_BOUNDS.md)을 따릅니다. 실제 학습·전체 archive 무결성은 미검증입니다. [RGB 부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)에서는 실제 소량 prefix의 저장 인덱스 재사용을 확인했으며, 전체 RGB·Drive 연결은 미검증입니다.
+최신 실제 API10(`33adef1`)은 목표 JSON2개 완전 저장·hash·파싱에 성공했습니다. 현재 압축 캐시는234MiB이며 ArchVis 전체 본체 상한은351.091MiB입니다. 다른 장면의 최대 크기와 범용 운영 제안은 [JSON 캐시 상한 계산](docs/POSE_CACHE_BOUNDS.md)을 따릅니다. 실제 학습·전체 archive 무결성은 미검증입니다. [RGB 부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)에서는 실제19.68MiB·PNG31개와1/4/16MiB 간격을 비교하고, 원본 길이를 고정한 부분 인덱스 재개를 확인했습니다. 전체 RGB·Drive 연결은 미검증입니다.
 
 최신 진입점은 [ArchVis pose 후속 시험 설계](docs/POSE_TAIL352_PLAN.md), [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
 

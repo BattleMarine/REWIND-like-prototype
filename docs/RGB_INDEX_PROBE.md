@@ -48,3 +48,34 @@
 ## 근거 보존
 
 [전송 기록](../outputs/rgb_index_probe_20261029/fetch_report.json), [실제 파일 목록·생성 측정](../outputs/rgb_index_probe_20261029/Lab_Scene.prefix.catalog.buffer64KiB.json), [새 프로세스 재추출](../outputs/rgb_index_probe_20261029/Lab_Scene.prefix.catalog.reopen.buffer64KiB.json), [고정 입력 부분 인덱스 확장](../outputs/rgb_index_probe_20261029/Lab_Scene.prefix.catalog.resume.buffer64KiB.json), [오케스트레이션 독립 대조](../outputs/rgb_index_probe_20261029/root_review.json)를 보존한다. 이 경로의 바이너리·실험 의존성은 Git에 올리지 않는다. 다른 checkout에서는 로컬 산출물이 없을 수 있다.
+
+
+## 2026-10-29 후속 조사 — 실제19.68MiB와 부분 인덱스 재개
+
+사용자의 추가 조사 요청에 따라 기준 revision `31c9704`에서 별도 연구를 수행했다. 기존8MiB를 재다운로드하지 않고 공식 서버의 동일 ETag·Last-Modified·10GiB 조각 크기를 HEAD로 확인했다. `If-Range`와 `If-Match`를 붙인 단일 suffix 요청의206·Content-Range·Content-Length·encoding·원본 identity를 확인한 뒤 바이트를 보존했다.
+
+목표는 총32MiB였으나 HEAD+GET360초 제한에서 `ReadTimeoutError`로 종료했다. 신규12,247,732bytes(약11.68MiB)를 기존8MiB와 연결한 실험 prefix는20,636,340bytes(약19.68MiB)이며 SHA256은 `46bff8311c9e211c5dcda9d494b190849ce8d9e2aa0cd9643a1fabe16b168dcb`다. 응답 전체24MiB 수신 성공은 아니며, 검증된 응답의 연속 수신 구간만 보존했다. 기존8MiB hash는 유지됐다. 전체 archive 결합이나 합성 데이터 증량은 하지 않았다.
+
+### 동일 입력의 간격 비교
+
+Python3.12/Windows·indexed_gzip1.10.3, 간격별 별도 프로세스, 해제 버퍼는 간격의4배다. 시간은 guard·파일 통계·hash 등 계측을 포함한 로컬 시간이며 다운로드·사전 bounded zlib 감사는 제외한다. 순수 decoder 성능이나 Colab 처리량으로 해석하지 않는다.
+
+| 간격 | gzip 인덱스 | 생성 / tar 검사 | 관측 peak working set | 앞 / 중간 / 끝 PNG 조회 읽기량 |
+| --- | --- | --- | --- | --- |
+| 1MiB | 655,773bytes | 0.925 / 1.207초 | 약52.34MiB | 4.00 / 4.50 / 1.56MiB |
+| 4MiB | 163,983bytes | 1.349 / 2.974초 | 약63.43MiB | 16.00 / 11.69 / 3.70MiB |
+| 16MiB | 65,625bytes | 2.269 / 3.709초 | 약67.25MiB | 19.68 / 19.68 / 3.73MiB |
+
+조회 읽기량은 import 후 계측된 압축 입력 읽기이며 constructor/import trace는 각 보고서에 별도 보존한다. 세 목록 모두 동일한 완전 PNG31개였고 잘린 다음 파일은 제외했다. 새 프로세스에서 `auto_build=False`로 저장 인덱스만 불러와 앞·중간·끝9개 조회의 hash·PNG 내부 CRC가 모두 일치했다. 끝 PNG의 압축 읽기 시작 위치는 각각18,997,101 /16,754,330 /16,721,024bytes였다. 16MiB 간격의 앞·중간은 시작 위치10에서 읽었으므로 모든 파일이 항상 뒤쪽 restart를 이용한 것은 아니다.
+
+오케스트레이션은 독립적인 표준 라이브러리 gzip+tar 순차 reader로31개 전체의 hash·size·tar offset, 세 간격의 목록 동일성, 연결본과 기존8MiB hash를 대조했다. native index 내부의 반복 해제 총량은 계측하지 않았다. 신규 디스크/RSS512MiB, 논리 해제량256MiB, 파일8MiB/4096member 제한을 적용했다. 사전 zlib 감사와 Python I/O 시점의 협력적 자원 검사이며 OS/native 메모리 hard cap은 아니다.
+
+### 재개 결과와 적용 조건
+
+- 기존 **8MiB 길이로 생성한 인덱스**를19.68MiB 길이에 import하는 방식은 여전히 `ZRAN_IMPORT_INCONSISTENT`로 거부됐다.
+- **처음부터19.68MiB로 길이가 고정된 소스**에서 앞부분만 인덱싱하고 저장한 뒤, 새 handle로 import해 마지막 PNG까지 확장하는 방식은 성공했다. 최초 실제 읽기 끝은7,455,812bytes로 기존8MiB 이내였다. 인덱스 점8→21개, 확장 시 압축 읽기 시작7,390,275bytes, 마지막 PNG hash·CRC 일치를 확인했다. 인덱스 header 수정·zero padding은 없었다.
+- 따라서 원본 identity와 전체 길이를 고정한 가상 원본 reader에 부분 인덱스를 저장하는 설계는 가능성이 있다. 이번 시험은 이미 로컬에 확보된 고정 입력에서 수행했으며 원격 요청 실패 후 복원·Drive 재인증·원본 조각 누락·실제10GiB 경계는 미검증이다. 커지는 캐시 파일의 길이를 원본 길이처럼 사용하는 구현은 피해야 한다.
+
+이번 작은 표본에서는 작은 파일 임의 조회에1MiB 간격이 읽기량을 줄였다. 전체 인덱스 저장 비용과 긴 시퀀스 추출 비용까지 포함한 최적값은 확정하지 않는다. 다음 개발 후보는 고정 원본 길이/identity, 부분 인덱스 checkpoint, 압축 Range 캐시를 함께 관리하는 reader다. 전체 RGB 인덱싱·사용자 Colab 테스트·모델 학습은 시작하지 않았고 M0~M3 상태는 유지한다.
+
+근거: [전송](../outputs/rgb_index_probe_followup_20261029/fetch_report.json), [1MiB](../outputs/rgb_index_probe_followup_20261029/spacing_1MiB/catalog.json), [4MiB](../outputs/rgb_index_probe_followup_20261029/spacing_4MiB/catalog.json), [16MiB](../outputs/rgb_index_probe_followup_20261029/spacing_16MiB/catalog.json), [부분 재개](../outputs/rgb_index_probe_followup_20261029/partial_resume.json), [독립 검토](../outputs/rgb_index_probe_followup_20261029/root_review.json). 스크립트·의존성·바이너리는 기존과 별도인 Git 제외 폴더에 보존한다. 전체 gzip CRC·archive 무결성과 사용자 Drive 복사본 일치는 확인하지 않았다.
