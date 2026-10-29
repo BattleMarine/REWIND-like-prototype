@@ -24,13 +24,16 @@ WARM128_POLICY=CachePolicy("pose_prefix_warm128_v2","bounded_prefix_cache_v2",12
     260*MIB,640,512*MIB,256,1024,383*256*1024)
 WARM192_POLICY=CachePolicy("pose_prefix_warm192_v3","bounded_prefix_cache_v3",192*MIB,224*MIB,
     388*MIB,896,640*MIB,256,897,128*MIB)
-WARM_POLICIES=(WARM128_POLICY,WARM192_POLICY)
+TAIL352_POLICY=CachePolicy("pose_prefix_tail352_v4","bounded_prefix_cache_v4",352*MIB,384*MIB,
+    708*MIB,1536,1152*MIB,256,1537,192*MIB)
+WARM_POLICIES=(WARM128_POLICY,WARM192_POLICY,TAIL352_POLICY)
 
 
 def for_profile(profile):
     if not isinstance(profile,str):return None
-    from .profiles import WARM128_PROFILE,WARM192_PROFILE
-    return {WARM128_PROFILE:WARM128_POLICY,WARM192_PROFILE:WARM192_POLICY}.get(profile)
+    from .profiles import WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE
+    return {WARM128_PROFILE:WARM128_POLICY,WARM192_PROFILE:WARM192_POLICY,
+        TAIL352_PROFILE:TAIL352_POLICY}.get(profile)
 
 
 def validate_expectation(value,required=False,policy=WARM128_POLICY):

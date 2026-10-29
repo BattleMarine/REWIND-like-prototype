@@ -1,12 +1,14 @@
 # 다음 실제 데이터 준비 실행
 
-## 2026-10-28 합성 UI 수동 확인 이후의 실제 자료 경계
+## 2026-10-29 현재 상태 — warm192 종료 및 pose 후속 시험 준비
 
 `rgb_pose_manual_5340cbe_001`은 합성 UI의 PDF 상태와 사용자 resize 진술을 확인한 결과다. 브라우저 버전·원래 화면 이름 가독성은 미확인이고, 개발 당시 root의 브라우저 접근 불가를 소급해 성공으로 바꾸지 않는다. [수동 검토](../outputs/test_rgb_pose_manual_5340cbe_20261028/final_review.json)와 [실제 자료 대조](../outputs/test_rgb_pose_manual_5340cbe_20261028/actual_correspondence_review.json)에서 조사 범위의 동일 sequence/frame stereo+pose 확인은0개였다. 전체 보관본·Drive·archive의 부재를 의미하지 않는다. 오른쪽 성공 원본 ZIP 회수는 사용자 자료 확인이 필요한 항목으로 남는다.
 
-다음 고정 후보는 기존 API9/warm192 `0f6c5ca` 자료를 사용하는 한 번의 실제 시험이다. 2026-10-28 로컬 읽기 대조에서 source ZIP·ready notebook·128MiB v2 cache ZIP의 bytes/SHA-256, 소스 stamp/17모듈 hash와 ready JOB·목표·예산은 기존 인계 기록과 일치했다. Cache ZIP 외부 bytes만 재확인했고 이번에는 내부 cache import·해제·원본 metadata/네트워크·Colab 실행을 하지 않았다. 로컬의 지정 결과 폴더와 동일 JOB JSON 참조에서는 handoff 기록만 확인했으며, 사용자 런타임이나 Drive의 미제출 결과 유무까지 확정하지 않는다.
+최신 실제 API9 `archvis_pose_1_10_cache_warm192_001` 결과를 수령했다. 논리192MiB까지 정상 bounded stop,기존128MiB cache 재사용·추가64MiB,준비395.879초·770HTTP·목표0개다. 카탈로그는180sequence/12,642entry·잘림없음이지만 전체목록/seek index가 아니다. 마지막 Nathan Sitting_Idle frame66은 payload 미완료다. 전체 archive의 Serena 부재를 뜻하지 않는다. 결과는 [verification.json](../outputs/test_archvis_pose_cache_warm192_20261023/verification.json)과 [catalog_summary.json](../outputs/test_archvis_pose_cache_warm192_20261023/catalog_summary.json)에 보존한다.
 
-구체 식별값과 수동 준비안은 Git 제외 [artifact 검증 보고서](../outputs/next_real_data_20261028/artifact_verification.json)와 [다음 수동 준비안](../outputs/next_real_data_20261028/manual_preparation.md)에 보존한다. 새 코드를 추가하거나 고정 source/ready/cache를 수정하지 않았다. 실제 시험 전에 테스트 세션에서 오른쪽 원본 ZIP·같은 warm192 JOB의 과거 실행 여부·파일 식별·운영 여유를 사용자와 확인해야 하며, 여기서 자동 실행하지 않는다. 같은 JOB가 이미 실행됐다면 결과를 먼저 회수하고 반복하지 않는다. 목표 확보는 보장하지 않으며 결과·캐시 재사용·실제 정합성·학습 준비를 별개로 판정한다.
+다음은 [API10 ArchVis pose 후속 시험](POSE_TAIL352_PLAN.md)을 준비한다. 검증된 v3 192MiB cache를 고정하고 남은159.09MiB를 순차 탐색해 기존 Serena frame1/10의 정확한 내부 파일명 두 개만 선택 저장한다. 원본/기존 cache·API9 고정배포본은 불변이다. 준비1200초·응답body192MiB·1916요청 상한이며 자동 재실행·RGB/다른장면/전체pose 다운로드는 없다. Root 검토·커밋 뒤 새 revision의 source ZIP/ready notebook/hash를 고정하고 테스트 세션이 사용자에게 안내한다. 실제 Drive·Colab 실행·선택파일확보는 아직 미검증이다.
+
+기존 `outputs/next_real_data_20261028/`의 warm192 미실행 가정은 결과 수령 전 기록이다. 같은 JOB를 반복하지 않으며 현재 v3 cache는 `outputs/test_archvis_pose_cache_warm192_20261023/prefix_cache.zip`을 사용한다. 성공은 두 파일의 완전 저장·hash·JSON object 파싱까지이며 관절/좌표/RGB/시간 대조와 학습 준비는 별도다.
 
 ## 2026-10-27 사용자 결정 — 테스트 일시 보류
 
@@ -15,7 +17,9 @@
 이전에 인계한 warm192 revision `0f6c5ca`의 소스 ZIP·ready notebook과 실제 128MiB v2 입력 캐시를 기존 경로·hash로 보존합니다. 사용자가 재개를 지시하면 테스트 세션에서 revision, 세 파일의 경로·SHA256, cache expectation, 단일 JOB·환경·예산·중단 조건·과거 실행 이력을 대조한 뒤 안내합니다. 문서 갱신으로 고정 배포본을 교체하거나 같은 JOB를 반복하지 않습니다. 코드 수정이 필요하면 개발·검토 후 별도 revision으로 다시 인계합니다. 보호 대상은 [보관 안내](LOCAL_STORAGE.md#보존-범위), 현재 결정은 [로드맵](ROADMAP.md#현재-상태와-실행-결정)을 따릅니다.
 
 
-## API9 bounded warm192 인계 준비
+## API9 bounded warm192 인계 준비 — 종료된 준비 기록
+
+아래는 실제 warm192 실행 전의 준비 기록이다. 실행은 위 최신 결과로 종료됐으며 현재 실행 안내는 API10 후속 계획을 따른다.
 
 실제 API8 warm128은 112.094초에 cache 재사용/128MiB 확장을 완료했으나 목표 pose는 0개였습니다. 같은 128MiB 반복은 새 검색이 없으므로 `posePrefixWarm192MiB_v3`로 한 번의 후속 탐색을 준비합니다. 실제 192MiB 원본 실행은 아직 하지 않았습니다. [계획/실측 가정](PREFIX_CACHE_192_PLAN.md)과 [실행 계약](PREFIX_CACHE.md)을 따릅니다.
 

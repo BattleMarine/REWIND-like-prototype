@@ -11,7 +11,8 @@ POSE_COUNTERPART_PROFILE = "poseCounterpart64MiB_v1"
 CACHE_PROFILE = "posePrefixCache96MiB_v1"
 WARM128_PROFILE = "posePrefixWarm128MiB_v2"
 WARM192_PROFILE = "posePrefixWarm192MiB_v3"
-CACHE_PROFILES = (CACHE_PROFILE,WARM128_PROFILE,WARM192_PROFILE)
+TAIL352_PROFILE = "posePrefixTail352MiB_v4"
+CACHE_PROFILES = (CACHE_PROFILE,WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE)
 POSE_PROFILES = (POSE_COUNTERPART_PROFILE,*CACHE_PROFILES)
 TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, *POSE_PROFILES)
 PROFILES = MappingProxyType({
@@ -30,6 +31,9 @@ PROFILES = MappingProxyType({
     WARM192_PROFILE:Limits(max_transfer_bytes=80*1024**2,max_elapsed_seconds=420.0,
         max_ranges=773,max_decompressed_bytes=1200*1024**2,max_files=2,
         max_members=30000,max_metadata_bytes=2*1024**2),
+    TAIL352_PROFILE:Limits(max_transfer_bytes=192*1024**2,max_elapsed_seconds=1200.0,
+        max_ranges=1916,max_decompressed_bytes=2400*1024**2,max_files=2,
+        max_members=60000,max_metadata_bytes=4*1024**2,max_disk_bytes=32*1024**2),
 })
 
 

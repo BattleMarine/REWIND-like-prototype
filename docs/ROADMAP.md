@@ -2,6 +2,9 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
+2026-10-29 현재 결정: 실제 warm192는192MiB 정상 탐색·목표0개로 종료했다. 작은 non-RGB 첫 시험으로 ArchVis pose 한 장면의 남은159.09MiB를 고정v3 cache에서 순차 탐색하는 API10 시험을 준비한다. RGB는 전략 검토만 하며 실제 실행은 root 검토·커밋·고정 인계 후 테스트 세션에서 진행한다. [설계·상한](POSE_TAIL352_PLAN.md)을 따른다.
+
+
 REWIND의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정해 정확도·강건성·실시간성을 개선한다. 첫 목표는 비교 가능한 기준 모델과 재현 가능한 평가 체계를 확보하는 것이다.
 
 ### 프로젝트의 성공 기준
@@ -30,7 +33,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
-2026-10-28 `rgb_pose_manual_5340cbe_001`의 합성 UI 수동 결과를 수령했다. 사용자 PDF3개에서 frame·좌우 count·이름 off/on·관절 강조·raw 좌표/누락·학습 차단 표시를 확인했고 resize 위치 유지는 사용자 진술 근거다. Root의 과거 file URL 브라우저 확인 불가와 후속 사용자 증거를 구분하며 브라우저 버전·원래 화면 가독성은 미확인이다. 보존 candidate와 검증 RGB 결과의 실제 같은 sequence/frame stereo+pose 확인은0개이며 전체 Drive/archive 부재 결론은 아니다. 고정 warm192 source/ready/128MiB cache의 로컬 hash·JOB·예산을 재대조했으나 새 실행은 하지 않았다. 오른쪽 성공 원본 ZIP 회수와 실제 자료 시험이 필요한 경계에서 멈추며 [수동 결과와 다음 준비 상태](REAL_DATA_NEXT_RUN.md#2026-10-28-합성-ui-수동-확인-이후의-실제-자료-경계)를 따른다.
+2026-10-28 `rgb_pose_manual_5340cbe_001`의 합성 UI 수동 결과를 수령했다. 사용자 PDF3개에서 frame·좌우 count·이름 off/on·관절 강조·raw 좌표/누락·학습 차단 표시를 확인했고 resize 위치 유지는 사용자 진술 근거다. Root의 과거 file URL 브라우저 확인 불가와 후속 사용자 증거를 구분하며 브라우저 버전·원래 화면 가독성은 미확인이다. 보존 candidate와 검증 RGB 결과의 실제 같은 sequence/frame stereo+pose 확인은0개이며 전체 Drive/archive 부재 결론은 아니다. 고정 warm192 source/ready/128MiB cache의 로컬 hash·JOB·예산을 재대조했으나 새 실행은 하지 않았다. 오른쪽 성공 원본 ZIP 회수와 실제 자료 시험이 필요한 경계에서 멈추며 [수동 결과와 다음 준비 상태](REAL_DATA_NEXT_RUN.md#2026-10-29-현재-상태--warm192-종료-및-pose-후속-시험-준비)를 따른다.
 
 2026-10-28 논문 본문·부록과 M0~M3 입력 조건을 다시 대조한 뒤 RGB manifest와 학습 차단 pose candidate의 소량 GT2D 검토 도구를 추가했다. 키·영상 크기·공통 dataset identity·선언 split·각자 출처를 대조하고 원래 pixel/null/mask·화면 밖 좌표를 보존한다. 기존3D viewer를 복제하지 않고 좌우2D overlay와 미확인 조건만 제공한다. 합성 생성 계약의 로컬 검증 범위이며 실제 대응 RGB/pose 자료를 사람이 검토해야 하는 경계에서 중단한다. Candidate training release·실제 정합성·M1~M3 전체는 미완료다. 상세 계약은 [실제 입력 준비 안내](REAL_DATA_PREPARATION.md#rgbpose-candidate-소량-검토)를 따른다.
 
@@ -46,7 +49,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 2026-10-28 로컬 RGB와 GT 2D supervision을 sequence/frame으로 일대일 연결하는 소형 API를 추가했다. 명시한 split의 pose 순서를 보존하고 이미지·GT·mask 합산 상한을 읽기 전에 검사한다. 합성 CPU forward/backward로 연결을 검사하며 실제 데이터 학습·성능 및 기존 마일스톤 완료 조건은 별도로 남는다. 상세 계약은 [M1 안내](M1_BASELINE.md)를 따른다.
 
-현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`로 인계했고 실제192MiB 탐색·목표 확보·학습은 미검증이다.
+현재 M0~M3는 도구·합성 모델의 구현 묶음과 검증 이력이 있으며, 실제 데이터 마일스톤 전체는 미완료다. M4 one-step student는 미착수이며 M5~M6도 착수하지 않았다. 실제 API8 warm128은 캐시 재사용·128MiB 확장에 성공했으나 목표 pose 0개다. API9 warm192는 고정 revision `0f6c5ca`의 실제 실행에서192MiB 정상 bounded stop·목표0개였다. API10 후속 시험은 준비 단계이며 목표 확보·실제 학습은 미검증이다.
+
+### 2026-10-29 non-RGB 파일명 선택 추출 시험 준비
+
+사용자 요청으로 RGB를 제외한 작은 자료의 선택 추출 가능성을 확인한다. 모든 non-RGB가 작다는 뜻은 아니며 첫 시험은 ArchVis pose 단일368,145,316bytes로 제한한다. 실제 API9 warm192는 논리201,326,592bytes·추가64MiB·395.879초·목표0개,관측180sequence/12,642entry다. 기존 결과·cache를 보존하고 API10의 별도 job/profile로 남은159.09MiB를 한 번 순차 탐색하는 시험을 준비한다. 내부 파일명을 즉시 랜덤 접근하는 방식이 아니다.
+
+[후속 시험 설계·인계](POSE_TAIL352_PLAN.md)의 준비1200초/응답body192MiB/1916요청·고정 v3 cache와두목표,정상미발견/실패보존 조건을 따른다. Root 검토·로컬 커밋 뒤 고정 artifact를 만들며 실제 실행은 테스트 세션이 담당한다. RGB는 필요한 sequence 추출 재사용과 tar/gzip 이중 인덱스의 비용·한계만 검토하며 구현·원본 실행은 하지 않는다. 실제 좌표·영상 대응과 M0~M3 완료 조건은 유지한다.
 
 ### 2026-10-28 GT 특징 문서와 예측 cache 결합
 

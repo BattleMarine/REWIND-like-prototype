@@ -6,7 +6,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 조사한 실제 자료의 stereo+pose 대응 확인은0개입니다(전체 자료 부재를 뜻하지 않음). 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 다음은 실제 자료 확인·시험이 필요한 수동 경계입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 기존 warm192 고정 파일의 식별값은 로컬 재대조했으며 실제 실행은 별도 대기입니다.
+로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 조사한 실제 자료의 stereo+pose 대응 확인은0개입니다(전체 자료 부재를 뜻하지 않음). 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 다음은 실제 자료 확인·시험이 필요한 수동 경계입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 실제 warm192는 정상 bounded stop으로192MiB까지 탐색했으나 목표 pose0개였습니다. 다음은 검증된192MiB cache를 재사용한 [ArchVis pose 후속 시험 준비](docs/POSE_TAIL352_PLAN.md)이며 실제 실행은 테스트 세션에 별도 인계합니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
@@ -17,9 +17,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
 | M5~M6 개선·통합 | 미착수 | Ablation·failure 평가·최종 재현 |
 
-최신 실제 API8 warm128은 보관 캐시를 재사용해 **128MiB 확장에 성공했지만 목표 pose는 0개**였습니다. API9 warm192는 구현·로컬 검토 후 revision `0f6c5ca`로 인계했으며 실제 192MiB 탐색은 미검증입니다. 전체 248개 회귀·153개 notebook 사전검사는 이전 구현의 검증 이력이며 이번 문서 작업에서 재실행하지 않았습니다.
+최신 실제 API9 warm192(`0f6c5ca`)는 **192MiB 탐색에 성공했지만 목표 pose는0개**였습니다. 준비395.879초·신규media64MiB이며 전체 archive 부재를 뜻하지 않습니다. API10의 별도 `posePrefixTail352MiB_v4` 시험을 준비하며 실제 Drive·Colab 실행은 아직 하지 않았습니다. 전체 248개 회귀·153개 notebook 사전검사는 이전 구현의 검증 이력이며 이번 문서 작업에서 재실행하지 않았습니다.
 
-최신 진입점은 [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
+최신 진입점은 [ArchVis pose 후속 시험 설계](docs/POSE_TAIL352_PLAN.md), [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
 
 ## 문서 안내
 

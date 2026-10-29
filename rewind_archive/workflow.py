@@ -1,6 +1,7 @@
 """Notebook의 단일 설정·사전 요약·1회 실행. 이 모듈은 인증을 시작하지 않는다."""
 
 import copy
+import hashlib
 import re
 from dataclasses import asdict
 from pathlib import Path
@@ -19,7 +20,7 @@ from .prefix_cache import validate_input_spec, export_cache
 from .cache_policy import for_profile,validate_expectation,summary as policy_summary
 
 
-NOTEBOOK_API_VERSION = 9
+NOTEBOOK_API_VERSION = 10
 LEGACY_CONFIG_FIELDS = {"job_id","reason","mode","purpose","selection","includes","limits","metadata_limits","previous_result"}
 PREVIOUS_CONFIG_FIELDS = LEGACY_CONFIG_FIELDS | {"profile","exact_targets"}
 POLICY_CONFIG_FIELDS = PREVIOUS_CONFIG_FIELDS | {"request_policy"}
@@ -281,6 +282,25 @@ def review_run(path):
             result["file_verification"]="passed_current_code"
         except (PreparationError,OSError,ValueError,KeyError):
             result["file_verification"]="not_verified_current_code_or_unusable"
+        if (report.get("cache_policy") or {}).get("name")=="pose_prefix_tail352_v4":
+            # 선택 파일 내용의 JSON 구문만 검사한다. 관절/좌표/영상 정합성 검증과 구분한다.
+            parsed=[];invalid=[]
+            for entry in report["files"] if result["file_verification"]=="passed_current_code" else []:
+                try:
+                    path=extraction_root/entry["relative_path"]
+                    if path.stat().st_size>4*1024**2:raise ValueError("json_size")
+                    with path.open("rb") as stream:raw=stream.read(4*1024**2+1)
+                    if len(raw)>4*1024**2 or hashlib.sha256(raw).hexdigest()!=entry["sha256"]:
+                        raise ValueError("json_changed")
+                    value=read_json(raw)
+                    if not isinstance(value,dict):raise ValueError("json_object")
+                    parsed.append(entry["member"])
+                except (OSError,ValueError,KeyError):
+                    invalid.append(entry["member"])
+            result["selected_json_verification"]={"parsed_members":parsed,"invalid_members":invalid,
+                "selected_pair_passed":bool(report.get("targets_complete")) and len(parsed)==2 and not invalid
+                    and result["file_verification"]=="passed_current_code",
+                "scope":"JSON object syntax and stored-file hashes only; pose semantics unverified"}
     if (extraction_root/"pilot_report.json").is_file():
         pilot=read_report(extraction_root/"pilot_report.json")
         result["sample_acquired"]=pilot.get("sample_acquired",False)
@@ -307,7 +327,9 @@ def save_result_zip(path):
         if i>=4096 or p.relative_to(root).parts[0] not in allowed:
             raise PreparationError("workflow_result_paths")
         if p.is_file():paths.append(p)
-    if len(paths)>256 or sum(p.stat().st_size for p in paths)>17*1024**2:
+    report=read_report(extraction_root/"extraction_manifest.json") if (extraction_root/"extraction_manifest.json").is_file() else {}
+    bundle_limit=(33 if (report.get("cache_policy") or {}).get("name")=="pose_prefix_tail352_v4" else 17)*1024**2
+    if len(paths)>256 or sum(p.stat().st_size for p in paths)>bundle_limit:
         raise PreparationError("workflow_result_bundle_limit")
     target=root.with_suffix(".zip")
     if target.is_symlink():raise PreparationError("workflow_result_paths")
