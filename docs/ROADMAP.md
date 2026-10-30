@@ -33,11 +33,13 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-10-30 `pose_persistent_86d322c_001` 실제 Colab CPU 시험 통과: A16member/generation1 저장 후 새 런타임 B가 같은 snapshot을 복원해32member/generation2로 진행했다. 선택 JSON2개 실제 hash, anchor hash, 부모 snapshot과 lineage를 독립 대조했다. 각 phase 응답body1,049,656bytes/16HTTP, A5.924초·B3.890초로 한도 이내다(인증·snapshot·mount·flush 별도). gzip index coverage3,791,957과 blob98,411bytes는 A/B에서 같으므로 기존 범위 밖 restart point 추가나 비용 절감 검증은 아니다. [실제 결과·근거](DRIVE_PERSISTENT_INDEX.md#2026-10-30-실제-pose-ab-시험-결과)를 따른다.
+
 2026-10-29 지속형 인덱스의 첫 구현: `rewind_archive_index`에 RGB·pose 공통 로컬 split reader와 SQLite 누적 checkpoint, 원본 identity/순서 검증, CAS 세대 충돌 거부, tar 완전 파일 경계 재개, 저장된 gzip 인덱스를 이용한 선택 추출을 추가했다. 로컬13개 검사에서 재프로세스 복원·순서·부분 예산·PAX/longname·실제 SQL rollback·원본/저장본 변경·완료 판정을 확인했다. [전용 문서](PERSISTENT_ARCHIVE_INDEX.md)를 따른다. 기본20,000member/16MiB state의 제한된 코어이며 SQLite 안에 전체 목록 snapshot을 저장하므로 수TB 전체 장면의 대규모 지원 완료는 아니다.
 
-2026-10-29 Drive 연결 구현: 고정 원본 identity/전체 길이의 Range reader·작은 RAM cache와 닫힌 SQLite snapshot의 저장·복원을 추가했다. Snapshot·receipt의 hash, 원본 fingerprint, 세대와 알려진 부모를 대조하고 파일 순서는 기존 물리 offset 순서를 유지한다. Drive mount에는 live DB를 두지 않는다. 전역 최신 writer나 아직 보지 못한 분기는 자동 판정하지 않는다. [Drive 지속형 인덱스 시험](DRIVE_PERSISTENT_INDEX.md)은 CPU 런타임 A/B에서 각각16member 진행·선택 JSON hash 재대조를 목표로 하며, 각 phase 합계8MiB 응답 body·120HTTP·300초 상한이다. 실제 Drive·Colab 저장 지속성·비용은 사용자 테스트 전이므로 미검증이다.
+2026-10-29 Drive 연결 구현: 고정 원본 identity/전체 길이의 Range reader·작은 RAM cache와 닫힌 SQLite snapshot의 저장·복원을 추가했다. Snapshot·receipt의 hash, 원본 fingerprint, 세대와 알려진 부모를 대조하고 파일 순서는 기존 물리 offset 순서를 유지한다. Drive mount에는 live DB를 두지 않는다. 전역 최신 writer나 아직 보지 못한 분기는 자동 판정하지 않는다. [Drive 지속형 인덱스 시험](DRIVE_PERSISTENT_INDEX.md)은 CPU 런타임 A/B에서 각각16member 진행·선택 JSON hash 재대조를 목표로 하며, 각 phase 합계8MiB 응답 body·120HTTP·300초 상한이다. 당시 실제 시험 전 상태였으며 아래2026-10-30 결과로 pose 소량 A→B 저장·복원을 확인했다.
 
-남은 후속 연결은 (1) 행 단위 대규모 catalog, (2) 실제 Drive·새 Colab 런타임 복원 검증, (3) 실제 데이터 준비 시 자동 저장·재개 hook이다. 기존 학습 로더의 epoch는 추출본만 읽을 수 있으므로 이를 전체 archive coverage와 동일시하지 않는다. Train/validation/test와 사용하지 않은 modality도 구분한다. Drive 동기화 폴더의 live SQLite를 로컬 atomic DB처럼 취급하지 않는다. 현재는 로컬 재현 검증이며 전체 데이터셋 인덱싱·실제 학습·M0~M3 완료를 선언하지 않는다.
+남은 후속 연결은 (1) 행 단위 대규모 catalog, (2) 기존 gzip coverage 밖 확장과 실제 RGB·분할 경계 검증, (3) 실제 데이터 준비 시 자동 저장·재개 hook이다. 기존 학습 로더의 epoch는 추출본만 읽을 수 있으므로 이를 전체 archive coverage와 동일시하지 않는다. Train/validation/test와 사용하지 않은 modality도 구분한다. Drive 동기화 폴더의 live SQLite를 로컬 atomic DB처럼 취급하지 않는다. 로컬 재현과 소량 pose의 실제 A→B 복원을 확인했으며 전체 데이터셋 인덱싱·실제 학습·M0~M3 완료를 선언하지 않는다.
 
 
 2026-10-29 RGB 추가 조사: 기존8MiB 뒤의 검증된 수신분을 보존해 실제19.68MiB·PNG31개를 확인했다. 1/4/16MiB 간격의 인덱스 크기·조회 비용을 비교했고, 동일 최종 원본 길이에서 부분 인덱스 import·확장이 성공했다. 목표32MiB 전송은360초 제한으로 미완료이며 전체 RGB·Drive/Colab·실제 분할 경계는 미검증이다. 상세는 [후속 조사](RGB_INDEX_PROBE.md)를 따른다. 제품화·전체 인덱싱 착수나 마일스톤 완료를 의미하지 않는다.

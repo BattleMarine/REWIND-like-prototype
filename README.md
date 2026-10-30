@@ -25,7 +25,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 [지속형 archive 인덱스](docs/PERSISTENT_ARCHIVE_INDEX.md)의 로컬 코어와 `python -m rewind_archive_index` CLI를 추가했습니다. 원본별 파일 목록·gzip restart 인덱스·완전 파일 경계를 SQLite 트랜잭션으로 함께 저장하고, 다음 실행에서 복원해 확장합니다. 조각 순서와 원본 identity를 고정하며 학습 shuffle과 archive 순서를 구분합니다. RGB·pose 모두 지원하고, 자동 인덱스 생성을 끈 선택 파일 추출과 프로세스 재시작을 포함한 로컬13개 검사를 통과했습니다.
 
-고정 Drive 원본 명세의 Range reader와 닫힌 snapshot 저장·복원 연결을 추가했습니다. [Drive 지속형 인덱스 시험](docs/DRIVE_PERSISTENT_INDEX.md)은 작은 pose archive에서 새 Colab 런타임으로 복원·확장하는 검증용이며 실제 Drive·Colab 결과는 아직 미확인입니다. 기존 archive_prepare/학습 epoch 자동 연결과 대규모 행 단위 catalog는 미구현입니다. 기존 API10과 캐시는 변경하지 않았고, 기존 추출 검증 도구와 새 출력 형식은 아직 연결하지 않았습니다. 학습1epoch 완료를 전체 인덱싱 완료로 표시하지 않습니다. 관측 목록 완료와 전체 gzip CRC 검증을 별도로 기록하며 두 조건을 만족해야 전체 완료입니다.
+고정 Drive 원본 명세의 Range reader와 닫힌 snapshot 저장·복원 연결을 추가했습니다. [Drive 지속형 인덱스 시험](docs/DRIVE_PERSISTENT_INDEX.md)에서 2026-10-30 실제 pose의 Drive 저장본을 새 Colab CPU 런타임으로 복원하고 목록을16→32개로 이어 가는 시험을 통과했습니다. 선택 JSON2개의 실제 해시도 일치했습니다. 기존 gzip coverage 밖 확장과 RGB 원격 검증은 남아 있습니다. 기존 archive_prepare/학습 epoch 자동 연결과 대규모 행 단위 catalog는 미구현입니다. 기존 API10과 캐시는 변경하지 않았고, 기존 추출 검증 도구와 새 출력 형식은 아직 연결하지 않았습니다. 학습1epoch 완료를 전체 인덱싱 완료로 표시하지 않습니다. 관측 목록 완료와 전체 gzip CRC 검증을 별도로 기록하며 두 조건을 만족해야 전체 완료입니다.
 
 ## 문서 안내
 
