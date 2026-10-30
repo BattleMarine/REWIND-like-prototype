@@ -43,9 +43,9 @@ Auth와 최초 B 복원은 전체 ledger 시작 전이다. C snapshot 복사·�
 
 소스 업로드/설치·manifest/anchor 입력·실제 mount 검사·명시 실행·보고서 ZIP·선택 flush 흐름을 재사용했다. Engine은1.10.3으로 고정하고 모든 실행 gate는 기본False다. B anchor는 Drive 폴더의 최신 파일명에서 자동으로 고르지 않고 외부 전달된 SHA로 대조한다.
 
-회수 ZIP은 C marker 보고서, C anchor, 새 DB 검증으로 얻은 기존/새 JSON이다. 보고서에는 revision/source ZIP/manifest pin·환경, before/after coverage·boundary·blob hash/size·point 목록, 새 JSON의 exact member/offset/end/hash, 각 scan·추출 read trace, cold 새 point 대조, 전체 자원/전송 합계, C 부모/lineage를 남긴다. 실패 시 게시본 경로도 보존한다.
+회수 ZIP은 아래 중단 기록 보완부터 허용된 보고서 필드·provenance·단계, 유효한 C anchor와 새 DB 검증으로 얻은 기존/새 JSON을 포함한다. before/after coverage·boundary·blob hash/size·point 목록, 새 JSON의 exact member/offset/end/hash, 각 scan·추출 read trace, cold 새 point 대조, 전체 자원/전송 합계, B/C receipt·부모/lineage를 보존한다. 원본 marker는 로컬에 유지하며 ZIP에 DB나 원시 예외 문자열을 넣지 않는다.
 
-다운로드는 `DOWNLOAD_REPORT=True`, flush는False로 먼저 실행한다. 파일을 보관한 뒤 다운로드를False로 되돌리고 선택 flush를True로 설정한다. Flush timeout은60초이며 결과 JSON도 보관한다. 실패/partial에서 runtime을 삭제하거나 같은 작업을 반복하지 않는다. C 성공 뒤 추가 VM 교체를 요구하지 않는다.
+다운로드와 flush는 별도 셀이다. 회수 셀의 `DOWNLOAD_REPORT=True`로 먼저 보관하고, 이후 별도 flush 셀의 gate만 켠다. Flush timeout은60초이며 결과 JSON도 보관한다. 실패/partial/중단에서 runtime을 삭제하거나 같은 작업을 반복하지 않는다. C 성공 뒤 추가 VM 교체를 요구하지 않는다.
 
 ## 로컬 검증과 실제 원본 prefix 모의 재생
 
@@ -80,3 +80,21 @@ Auth와 최초 B 복원은 전체 ledger 시작 전이다. C snapshot 복사·�
 개발자가 실제 인증·Google 요청 없이 합성 snapshot으로6개 예외 주입 경로를 조사했다. Session factory의 KeyboardInterrupt/SystemExit/GeneratorExit와 Runtime/ArchiveIndex 생성자의 KeyboardInterrupt는 `except Exception`을 통과해 밖으로 전파되고 finally가 started/restore_b/scans[]를 남겼다. 수령 JSON과 필드 집합이 같다. 일반 RuntimeError는 failed/error로 기록돼 형태가 달랐다. 이 재현은 진단 누락 경로의 증거이며 실제 예외 종류·발생 위치나 사용자의 중단 조작을 증명하지 않는다. 근거는 `outputs/persistent_extension_diagnostics_20261030/reproduction.json`이다.
 
 다음 보완 후보는 마지막 단계·중단 종류의 안전한 기록과, notebook의 REPORT 변수 할당이 끝나지 않아도 디스크 marker에서 결과를 회수하는 기능이다. 이 진단 단계에서는 실행 코드를 수정하거나 새 배포본을 만들지 않았다. 기존 marker·DB·B snapshot은 유지하며 사용자 재실행과 예산 확대는 보류한다. 전체 인덱싱·학습 완료 상태는 변경하지 않는다.
+
+## 2026-10-30 중단 기록과 독립 회수 보완
+
+이 절은 위 진단 이후의 보완 구현이다. 기존 `580953d` 실행의 원인 확정이나 성공 판정은 아니다. 기존 수령 marker·DB·B snapshot과 A/B helper는 변경하지 않는다. 새 고정 C 실행 ID와 pin은 오케스트레이션이 검토 후 인계한다.
+
+`run_extension(..., provenance=...)`은 호출 전 검증한 source revision/ZIP·manifest·B anchor SHA와 Python/indexed_gzip/psutil 버전을 최초 marker부터 저장한다. Helper는 필수 필드·hex 길이·환경 allowlist를 검사하며, 업로드 바이트 SHA와 source revision의 실제 대조는 notebook에서 실행 전에 수행한다. 합성 로컬 검사의 pin은 테스트 식별값이며 실제 배포 hash가 아니다.
+
+`initial`, `restore_b`, `b_summary`, `session_factory`, `runtime_init`, `index_init`, 각 `scan_batch`, `preview`, `snapshot`, `restore_c`, `cold_verify`, `cleanup`의 pre/post와 UTC 시각을 기록한다. 원본을 읽지 않는 B checkpoint 요약은 session factory 전에 저장한다. JSON 한도는2MiB, 단계는64개 이내이며 완성된 임시 파일의 원자적 게시로 갱신한다. 최초 marker는 기존 소비 기록을 덮지 않는다. Windows의 일시 공유 잠금에는 로컬 교체만 최대30ms 기다리고, 원본·HTTP 재시도는 추가하지 않는다.
+
+KeyboardInterrupt/SystemExit/GeneratorExit 등 BaseException은 `interrupted`와 안전한 종류·발생 단계를 남긴 뒤 같은 예외를 다시 전파한다. 원시 message, SystemExit code, URL과 token은 기록하지 않고 사용자 취소 의도도 추정하지 않는다. 일반 오류는 기존 failed/partial 분류를 유지한다. Cleanup 중 새 중단이 발생해도 최초 중단을 대체하지 않고 가능한 기록을 남긴다. 아직 확보하지 못한 전송량은 `transport_recording=not_recorded`, `transport.status=unknown`이며0요청으로 해석하지 않는다. Hard kill/디스크 손실의 기록 보장은 없으며 마지막 pre 단계에 대응하는 post가 없다면 그 단계의 완료 여부는 미확인이다.
+
+`extension_records.recover_report(workspace=..., run_id=..., phase="C", provenance=...)`는 REPORT 변수 없이 디스크에서 제한된 ZIP을 만든다. 인증·mount·원본 archive 읽기·DB 열기·marker 갱신을 하지 않는다. 새 요청의 run/phase/pin을 대조하고, mismatch는 거부한다. 누락·JSON 파싱 실패·pin 누락/손상·중첩구조 손상은 `offline_diagnostic`으로만 보존하며 해당 실행의 provenance를 검증했다고 표시하지 않는다. 과거 pin 없는 marker를 새 실행으로 복구하거나 신뢰하지 않는다.
+
+회수 ZIP은8항목/총20MiB 이내, 선택 JSON은 각각8MiB 이내이며3개까지다. 경로 탈출·symlink·파일 hash 불일치·잘못된 JSON을 거부한다. 검증된 선택 JSON과 anchor만 추가하고, 원본 데이터·전체 DB·임의 확장 필드는 자동 포함하지 않는다. 같은 run/pin의 기존 ZIP은 내부 목록·크기·hash를 검사해 재다운로드하며 덮어쓰지 않는다. 자료 회수는 성공 판정이나 원본 읽기 재시작이 아니다.
+
+수동 시험은 새 고정 C 한 번이며 중단 시 **실행 셀을 다시 돌리지 않고 회수 셀만 실행**한다. 강제 중단 경로 검증은 로컬 예외 주입으로 제한한다. 모든 실행 gate는 기본False이고 실제 mount 검사·기존 예산·coverage/cold/lineage 성공 기준은 유지한다. 다운로드와 flush는 별도 셀로 나누며 flush는 검증된 성공 ZIP 보관 뒤에만 선택한다.
+
+최종 개발 검증43개(기존33+중단·회수10)가 실패·오류·건너뜀 없이 통과했다. 오케스트레이션은 기존33개와 초기 회수8개의41개 검사 후, 최종 회수10개를 다시 확인했다. 별도로 합성 성공 C에서 기존·신규 JSON3개의 실제 ZIP hash와 coverage·cold read·복원 근거, notebook8cell 구문·기본False gate·미mount 거부를 확인했다. 개발 결과는 `outputs/extension_recovery_development_20261030/`, 독립 검토는 `outputs/persistent_recovery_review_20261030/`에 보존한다. 실제 Google 인증·원본 요청은 없었고 수정본 C의 실제 Colab 검증은 테스트 세션에 인계할 항목이다.

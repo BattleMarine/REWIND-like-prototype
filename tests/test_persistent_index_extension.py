@@ -17,6 +17,11 @@ from test_drive_metadata import FakeDrive
 from test_persistent_archive_index import fixture
 
 
+SYNTHETIC_PROVENANCE={'source_revision':'a'*40,'source_zip_sha256':'b'*64,
+    'manifest_sha256':'c'*64,'anchor_sha256':'d'*64,
+    'environment':{'python':'3.12.0','indexed_gzip':'1.10.3','psutil':'7.0.0'}}
+
+
 @unittest.skipUnless(importlib.util.find_spec('indexed_gzip') and importlib.util.find_spec('psutil'),'install requirements-index.txt')
 class ExtensionTests(unittest.TestCase):
     @classmethod
@@ -46,7 +51,8 @@ class ExtensionTests(unittest.TestCase):
 
     def execute(self,folder,anchor,run_id='extend'):
         return run_extension(run_id=run_id,workspace=folder/'C-work',input_snapshot_directory=folder/'B-input',
-            output_snapshot_directory=folder/'C-output',manifest=self.manifest,anchor=anchor,session_factory=lambda:self.session)
+            output_snapshot_directory=folder/'C-output',manifest=self.manifest,anchor=anchor,session_factory=lambda:self.session,
+            provenance=SYNTHETIC_PROVENANCE)
 
     def test_multiple_restart_spacings_extend_and_cold_snapshot_read(self):
         for spacing in (65536,262144,1048576):
