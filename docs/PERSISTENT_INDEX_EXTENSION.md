@@ -98,3 +98,8 @@ KeyboardInterrupt/SystemExit/GeneratorExit 등 BaseException은 `interrupted`와
 수동 시험은 새 고정 C 한 번이며 중단 시 **실행 셀을 다시 돌리지 않고 회수 셀만 실행**한다. 강제 중단 경로 검증은 로컬 예외 주입으로 제한한다. 모든 실행 gate는 기본False이고 실제 mount 검사·기존 예산·coverage/cold/lineage 성공 기준은 유지한다. 다운로드와 flush는 별도 셀로 나누며 flush는 검증된 성공 ZIP 보관 뒤에만 선택한다.
 
 최종 개발 검증43개(기존33+중단·회수10)가 실패·오류·건너뜀 없이 통과했다. 오케스트레이션은 기존33개와 초기 회수8개의41개 검사 후, 최종 회수10개를 다시 확인했다. 별도로 합성 성공 C에서 기존·신규 JSON3개의 실제 ZIP hash와 coverage·cold read·복원 근거, notebook8cell 구문·기본False gate·미mount 거부를 확인했다. 개발 결과는 `outputs/extension_recovery_development_20261030/`, 독립 검토는 `outputs/persistent_recovery_review_20261030/`에 보존한다. 실제 Google 인증·원본 요청은 없었고 수정본 C의 실제 Colab 검증은 테스트 세션에 인계할 항목이다.
+
+
+## 2026-10-30 수정본 실제 C 시험 결과
+
+2026-10-30 수정본 `pose_extension_1c31a73_001` 실제 Colab CPU C 시험을 통과했다. B32member/gen2/coverage3,791,957에서3batch 후80member/gen5/coverage6,324,814로 확장했고 기존 catalog prefix를 보존했다. 새 restart point(5,056,401,920,448) 뒤 JSON을 저장한 C에서 재복원해 자동 인덱스 생성 없이 cold 추출했다. 첫 source read920,447은 옛 최대 point690,130보다 뒤이며 새 point와1byte 차이다. 기존2개·새1개 JSON의 실제 ZIP SHA/파싱, recovery 목록의 크기·hash·ZIP CRC, B→C 부모/lineage와 입력 pin을 독립 대조했다. 응답body3,673,616bytes/54HTTP/12.206초, read6,488,071bytes/decoded4,694,814bytes/ledger12.277초/RSS158,539,776bytes로 한도 이내였다. 인증·최초B복원·flush는 별도이며 flush는returned다. C 재복원은 동일 런타임의 새 로컬DB이며 후속 새VM 지속성·전체CRC·RGB·학습 준비는 미검증이다. 이전580953d 최초 중단 원인의 해결을 입증하지 않는다. 근거는 `outputs/test_persistent_extension_1c31a73_20261030/`의 원본 ZIP·flush와 `root_review.json`이다.
