@@ -1,6 +1,6 @@
 # 저장된 coverage 밖 확장 C pilot
 
-2026-10-30 · 구현·로컬 모의 검증 단계. 기존 A/B 고정 배포물은 그대로 보존한다. 실제 C의 Google 요청·사용자 시험은 아직 실행하지 않았다. 실행 안내는 root의 고정 revision/소스 ZIP/ready notebook 검토 후 테스트 세션이 담당한다.
+2026-10-30 · 구현·로컬 모의 검증 단계. 기존 A/B 고정 배포물은 그대로 보존한다. 실제 C 첫 사용자 시험은 미완료로 접수했으며 상세 상태와 진단은 마지막 절을 따른다. 실제 원본 요청 여부는 회수 보고서로 확정하지 못했다. 실행 안내는 root의 고정 revision/소스 ZIP/ready notebook 검토 후 테스트 세션이 담당한다.
 
 ## 목적과 범위
 
@@ -70,3 +70,13 @@ Auth와 최초 B 복원은 전체 ledger 시작 전이다. C snapshot 복사·�
 ## 최종 독립 검토
 
 오케스트레이션의 최종 검사에서 기존27개와 신규6개, 총33개가 실패·오류·건너뜀 없이 통과했다. 최종 코드 hash도 검사 시점과 동일함을 대조했다. 별도 C notebook7개 code cell 구문·기본False gate의 무실행·미mount 시 인증/marker 전 거부도 독립 확인했다. 근거는 `outputs/persistent_extension_review_20261030/final_tests.json`, `final_tests.txt`, `notebook_review.json`에 보존한다. 이 검사는 실제 Google/Colab C 실행을 포함하지 않는다. 기존 source/index/snapshot core와 A/B 고정 배포물은 수정하지 않았다.
+
+## 2026-10-30 실제 C 첫 실행 미완료와 진단
+
+`pose_extension_580953d_001`은 미완료로 접수했다. 사용자에게 표시된 예외는 `pilot_run_already_consumed`이고 최초 실행의 추가 출력은 회수하지 못했다. 보존 JSON은 `status=started`, `scans=[]`, `restore_b`만 포함한다. 재실행 가드는 이미 존재하는 marker를 거부한 결과이며 최초 중단 원인으로 간주하지 않는다. 원본 읽기 여부와 최초 예외는 보고서만으로 확정할 수 없다.
+
+회수 SQLite를 읽기 전용으로 검사했다. `integrity_check=ok`, state/gzidx SHA 정상, snapshot anchor는 실제 B receipt와 일치한다.32member/generation2/boundary1,927,680/coverage3,791,957/blob98,411bytes로 확장 저장은 없다. 이는 B 복원 자료가 보존됐다는 근거이며 확장 시도나 원본 읽기가 전혀 없었다는 증거는 아니다. JSON SHA는 `6ab5a72f2cbde521a19c9a6d367805a435ba62ae6c68af2486695b3925278505`, DB SHA는 `1806991f885599707d95ab172a9b60b60196daa9a5b291b5958f8f5ac88590e1`이다. 수령 파일과 독립검토 `root_review.json`은 `outputs/test_persistent_extension_580953d_20261030/`에 보존한다.
+
+개발자가 실제 인증·Google 요청 없이 합성 snapshot으로6개 예외 주입 경로를 조사했다. Session factory의 KeyboardInterrupt/SystemExit/GeneratorExit와 Runtime/ArchiveIndex 생성자의 KeyboardInterrupt는 `except Exception`을 통과해 밖으로 전파되고 finally가 started/restore_b/scans[]를 남겼다. 수령 JSON과 필드 집합이 같다. 일반 RuntimeError는 failed/error로 기록돼 형태가 달랐다. 이 재현은 진단 누락 경로의 증거이며 실제 예외 종류·발생 위치나 사용자의 중단 조작을 증명하지 않는다. 근거는 `outputs/persistent_extension_diagnostics_20261030/reproduction.json`이다.
+
+다음 보완 후보는 마지막 단계·중단 종류의 안전한 기록과, notebook의 REPORT 변수 할당이 끝나지 않아도 디스크 marker에서 결과를 회수하는 기능이다. 이 진단 단계에서는 실행 코드를 수정하거나 새 배포본을 만들지 않았다. 기존 marker·DB·B snapshot은 유지하며 사용자 재실행과 예산 확대는 보류한다. 전체 인덱싱·학습 완료 상태는 변경하지 않는다.
