@@ -93,3 +93,8 @@ Phase당 **합산 응답 body8MiB/120HTTP/300초**이고 두 phase 합최대16Mi
 이번 성공 범위는 A 저장본의 새 B 복원, 기존 파일 재추출, 물리 순서에 따른 목록 누적이다. A/B의 gzip `index_coverage=3791957`, `index_bytes=98411`은 동일하다. 기존 coverage 밖으로 restart point를 추가한 원격 검증은 아니며 B도 앞부분을 읽었으므로 다운로드 절감 효과를 주장하지 않는다. `complete=false`, `train_ready=false`를 유지한다. 원본 전체 EOF/CRC·RGB·실제10GiB 분할 경계·학습·B 저장본의 또 다른 런타임 복원은 미검증이다. Snapshot 원본 ZIP 자체는 로컬로 회수하지 않았으며 snapshot 복원 판정은 고정 코드의 B 실행 보고서에 근거한다.
 
 근거는 Git 제외 `outputs/test_persistent_drive_86d322c_20261029/`의 A/B report ZIP·flush JSON과 `root_review.json`이다. A report ZIP SHA256은 `35a7435d796a21c1b6c405f4b8b1da4f9f7c799ffaf0c71e918fb12540f6171a`, B는 `3313345fff95429625638cb2868d8eafaecaf3307bb4a1816d923f9ad1012d44`다. 기존 고정 배포물과 Drive snapshot/receipt는 보존한다. 같은 시험의 반복은 필요하지 않으며 후속 구현·별도 검증 범위는 다음 작업에서 결정한다.
+
+
+## 기존 coverage 밖 후속 검증
+
+실제 A/B의 index coverage가 같았던 한계를 확인하기 위해 [C 범위 밖 확장 pilot](PERSISTENT_INDEX_EXTENSION.md)을 별도로 구현했다. 새 point 뒤 JSON과 C snapshot의 새 local DB/cold handle 읽기를 검증하며, 기존 A/B 배포물은 유지한다. 현재 합성·유한 실제 prefix 모의 검증 단계이고 실제 C 사용자 실행은 별도 고정 인계 후 테스트 세션에서 진행한다.
