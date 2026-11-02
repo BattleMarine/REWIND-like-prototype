@@ -158,6 +158,34 @@ def _documents(base, row, limits, contract, identity):
     return pose
 
 
+def open_rgb(catalog, base, index):
+    """pose 없이 고정 RGB shard만 연다. Cache 추론도 선언 byte/record/key/한도를 유지한다."""
+    catalog=validate_catalog(catalog); base=_base(base)
+    _require(_integer(index,0,len(catalog['shards'])-1),'rgb_shard_index_split')
+    row=catalog['shards'][index]; limits=catalog['limits']
+    rgb=_payload(_read(_resolve(base,row['rgb']['path']),limits['max_rgb_manifest_bytes']),row['rgb'],'rgb_shard_rgb_file_hash')
+    _require(isinstance(rgb,dict) and rgb.get('dataset_version')==catalog['dataset_identity']['dataset_version'] and
+             rgb.get('data_kind')==catalog['contract']['data_kind'] and
+             rgb.get('content_sha256')==row['rgb']['content_sha256'] and
+             rgb.get('image_size')==catalog['contract']['image_sizes'][0], 'rgb_shard_rgb_dataset_identity')
+    records=rgb.get('records')
+    _require(isinstance(records,list) and len(records)==row['records'],'rgb_shard_rgb_record_count')
+    _require(_payload_bytes(records,limits['max_payload_bytes'])==row['payload_bytes'],'rgb_shard_payload_declaration_mismatch')
+    expected={g['sequence_id']:g for g in row['sequences']}; frames={}
+    for record in records:
+        seq,frame=record.get('sequence_id'),record.get('frame_index')
+        _require(isinstance(seq,str) and seq in expected and _integer(frame,0,10**12-1) and
+                 record.get('split')==expected[seq]['split'],'rgb_shard_rgb_key_split')
+        _require(frame not in frames.setdefault(seq,set()),'rgb_shard_rgb_duplicate_key')
+        frames[seq].add(frame)
+    _require(set(frames)==set(expected) and all(len(frames[s])==g['records'] and
+             min(frames[s])==g['first_frame'] and max(frames[s])==g['last_frame'] for s,g in expected.items()),
+             'rgb_shard_rgb_chunk_bounds')
+    return LocalStereoRGB(_resolve(base,row['rgb']['path']),_resolve(base,row['rgb']['root']),
+        limits=RGBLimits(max_manifest_bytes=limits['max_rgb_manifest_bytes'],max_records=limits['max_records'],
+                         max_batch_tensor_bytes=limits['max_batch_tensor_bytes']))
+
+
 class RGBShardDataset:
     """한 shard/선택 split의 기존 supervision만 cache. 반환값의 외부 참조는 호출자 책임."""
     def __init__(self, catalog, base):

@@ -45,10 +45,11 @@ def export_checkpoint(checkpoint, checkpoint_sha256, output):
                           checkpoint['source'], checkpoint['step'], output, checkpoint_sha256=checkpoint_sha256)
 
 
-def train(args):
+def train(args, *, trainer_class=ShardTrainer, catalog_reader=read_catalog,
+          checkpoint_reader=read_checkpoint, exporter=export_checkpoint, run_schema='m1_shard_run_v1'):
     output = args.output
     config = json.loads(_read(args.config, 65536))
-    catalog = read_catalog(args.catalog)
+    catalog = catalog_reader(args.catalog)
     for key in ('max_attempts', 'checkpoint_every', 'evaluate_every', 'log_limit'):
         _require(_integer(getattr(args, key), 1, 10**9 if key == 'max_attempts' else 10000), 'shard_cli_'+key)
     _require(type(args.max_seconds) in (int,float) and 0 < args.max_seconds <= 86400, 'shard_cli_max_seconds')
@@ -69,7 +70,7 @@ def train(args):
     initial_attempts = 0
     durable = None
     can_write_report = not report_path.exists()
-    report = {'schema_version':'m1_shard_run_v1', 'status':'started', 'full_training_ready':False,
+    report = {'schema_version':run_schema, 'status':'started', 'full_training_ready':False,
               'training_scope':'synthetic_fixture_only', 'limits':{'max_attempts':args.max_attempts,
               'max_seconds':args.max_seconds, 'log_limit':args.log_limit},
               'target':{'steps':args.steps, 'epochs':args.epochs}, 'log':[]}
@@ -96,9 +97,9 @@ def train(args):
         record()
 
     try:
-        trainer = ShardTrainer(config, catalog, args.catalog.parent, args.device, check_budget=check_budget)
+        trainer = trainer_class(config, catalog, args.catalog.parent, args.device, check_budget=check_budget)
         if args.resume:
-            checkpoint, checkpoint_sha256 = read_checkpoint(args.resume)
+            checkpoint, checkpoint_sha256 = checkpoint_reader(args.resume)
             durable = {'path':str(args.resume), 'sha256':checkpoint_sha256, 'step':checkpoint['step'],
                        'samples_seen':checkpoint['samples_seen'], 'cursor':checkpoint['cursor']}
             trainer.resume(checkpoint)
@@ -127,9 +128,9 @@ def train(args):
         persist()
         if args.export_weights:
             check_budget()
-            checkpoint, identity = read_checkpoint(last)
+            checkpoint, identity = checkpoint_reader(last)
             report['weights'] = {'path':str(args.export_weights),
-                'state_sha256':export_checkpoint(checkpoint, identity, args.export_weights),
+                'state_sha256':exporter(checkpoint, identity, args.export_weights),
                 'checkpoint_sha256':identity}
             if can_write_report:
                 record()

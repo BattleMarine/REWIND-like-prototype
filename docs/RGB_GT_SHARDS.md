@@ -69,4 +69,4 @@ Root도 고정 신규11개를 별도 실행해 failure/error/skip0으로 확인�
 
 근거는 `outputs/full_training_readiness_20261102/developer/rgb_shards/`의 `verify.py`, `tests.json/txt`, `code_hashes.json`, `verification_loading.json`, `commands.json`, `cli_0~3.txt`, `fixture/`에 보존한다. 선언/metadata/full PNG 범위, 기존/native hash 대조와 sampler key를 구분해 기록한다.
 
-다음3b2는 작은 `StereoHeatmapNet` 구조를 유지하고 명시 훈련 해상도·bilinear `align_corners=True`·GT 각축 좌표 변환·예측 원좌표 복원과 preprocessing version을 연결한다. full resolution heatmap 상한을 숫자만 늘리지 않는다. UI 독립 CPU/CUDA/AMP trainer의 epoch·optimizer/scheduler/scaler/RNG·cursor 재개, 독립 validation sum/count, 기존 cache/weights 호환 경계는 별도 검토·구현한다. 실제 release와 GPU/Drive/새VM pilot도 남아 있다. [전체 학습 준비 상태](FULL_TRAINING_READINESS.md)를 따른다.
+후속3b2에서 작은 `StereoHeatmapNet` 구조를 유지하고 명시 훈련 해상도·bilinear `align_corners=True`·GT 각축 좌표 변환·예측 원좌표 복원과 preprocessing version을 연결했다. full resolution heatmap 상한을 숫자만 늘리지 않는다. 별도 UI 독립 trainer의 합성 CPU 재개·validation·cache/join 검증은 [2D 학습 경계](RGB_SHARD_TRAINING.md)를 따른다. 실제 release와 GPU/AMP·Drive/새VM pilot은 남아 있다. [전체 학습 준비 상태](FULL_TRAINING_READINESS.md)를 따른다.

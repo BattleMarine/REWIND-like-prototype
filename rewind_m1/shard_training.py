@@ -17,6 +17,11 @@ FORMAT = 'm1_shard_checkpoint_v1'
 
 
 class ShardTrainer:
+    CHECKPOINT_FORMAT = FORMAT
+
+    def _new_sampler(self):
+        return EpochSampler(self.catalog, 'train', self.config['seed'])
+
     def __init__(self, config, catalog, base, device='cpu', check_budget=None):
         require_torch_api()
         self.config = validate_config(config)
@@ -164,7 +169,7 @@ class ShardTrainer:
     def checkpoint(self):
         _require(not self.poisoned, 'shard_failed_state_cannot_checkpoint')
         _require(self._position_counts() == (self.step, self.samples_seen), 'shard_checkpoint_position')
-        return {'format_version':FORMAT, 'config':copy.deepcopy(self.config), 'catalog':copy.deepcopy(self.catalog),
+        return {'format_version':self.CHECKPOINT_FORMAT, 'config':copy.deepcopy(self.config), 'catalog':copy.deepcopy(self.catalog),
                 'source':copy.deepcopy(self.source), 'environment':copy.deepcopy(self.environment),
                 'model':self.model.state_dict(), 'optimizer':self.optimizer.state_dict(),
                 'scheduler':self.scheduler.state_dict(), 'scaler':self.scaler.state_dict(), 'rng':rng_state(),
@@ -173,14 +178,14 @@ class ShardTrainer:
                 'training_scope':'synthetic_fixture_only', 'full_training_ready':False}
 
     def resume(self, checkpoint):
-        _require(isinstance(checkpoint, dict) and checkpoint.get('format_version') == FORMAT and
+        _require(isinstance(checkpoint, dict) and checkpoint.get('format_version') == self.CHECKPOINT_FORMAT and
                  checkpoint.get('training_scope') == 'synthetic_fixture_only' and
                  checkpoint.get('full_training_ready') is False, 'shard_checkpoint_format')
         _require(checkpoint['config'] == self.config and checkpoint['catalog'] == self.catalog,
                  'shard_resume_config_catalog')
         _require(checkpoint['source']['code_sha256'] == self.source['code_sha256'] and
                  checkpoint['environment'] == self.environment, 'shard_resume_code_environment')
-        sampler = EpochSampler(self.catalog, 'train', self.config['seed'])
+        sampler = self._new_sampler()
         sampler.load_state_dict(checkpoint['cursor'])
         for key in ('step', 'samples_seen', 'attempts', 'skipped_updates'):
             _require(_integer(checkpoint[key], 0, 2**63-1), 'shard_checkpoint_counters')

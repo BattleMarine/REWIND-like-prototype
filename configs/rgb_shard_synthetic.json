@@ -1,0 +1,12 @@
+{
+  "seed": 43,
+  "batch_size": 3,
+  "learning_rate": 0.005,
+  "scheduler_step": 2,
+  "scheduler_gamma": 0.8,
+  "amp": false,
+  "training_image_size": [4, 4],
+  "frontend_version": "small_cnn_rgb_shards_synthetic_v1",
+  "max_native_tensor_bytes": 33554432,
+  "max_heatmap_elements": 33554432
+}
