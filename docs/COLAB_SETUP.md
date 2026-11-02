@@ -1,5 +1,9 @@
 # Colab 환경 준비·부분 추출·합성 모델 실행 가이드
 
+## 최신 준비 — 합성 RGB→T1 GPU 통합 pilot
+
+2026-11-02 [고정 GPU pilot 실행 준비](SYNTHETIC_GPU_PILOT.md)와 [일반 notebook](../notebooks/synthetic_gpu_pilot.ipynb)을 추가했다. 현재는 로컬 CPU smoke·오류/회수 경로 검증 단계이며 실제 Colab GPU 실행 결과는 없다. 오케스트레이션이 커밋/source ZIP/ready notebook의 pins를 고정해 테스트 세션에 인계하고, 테스트 세션이 한 번의 합성 FP32/AMP·재개·자원 측정을 안내한다. 자동 설치/Drive mount/실데이터 release는 없고 Drive 새VM·실제 검증 근거는 별도다. 아래 API9 보류·과거 CPU 결과는 당시 고정 실행의 이력이며 이번 pilot의 최신 실행 지시로 해석하지 않는다.
+
 ## 로컬 M1 통합 CPU 진단 — 최종 통과 결과 수령
 
 2026-10-28 고정 source `65c42877f32af994ff58eb9f30be6af31bd3a581`의 사용자 시험 `local_m1_cpu_65c4287_001` 최종 통과 결과를 수령했다. Colab CPU Python3.13.18/torch2.11.0+cpu/Pillow11.3.0/thread1에서 합성4 record의5단계와2+2 update가 완료됐고 child11.1823초·runner7.0574초가 기록됐다. Validation의 2D pair8/coverage1·3D valid4는 연결·평가 개수 확인이며 coverage1이 정확도100%를 뜻하지 않는다. 실행 notebook은 미제출, Drive 영구보관은 미확인이고 실제 데이터·GPU 성능·M1 전체 완료는 미검증이다. 결과 ZIP과 hash는 [M1 수령 기록](M1_BASELINE.md#독립-합성-fixture와-단일-cpu-통합-진단-결과)에 있다.

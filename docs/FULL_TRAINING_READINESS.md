@@ -162,3 +162,9 @@ Root의 별도 신규13+기존14, 총27개도 failure/error/skip0으로 통과�
 고정52개가 failure/error/skip0으로 통과했고 기존 temporal causality/streaming도 유지했다. 이전 checkpoint source 검사를 우회하지 않고 현재 코드로 합성 RGB4update→native cache/join3개→T1catalog→3D split/full각4update를 보존했다. 3D sample8/2epoch의 전체 학습 state와 export 예측이 동일하고 GT3D·mask·원본 key/출처를 보존했다. 실제 데이터 학습/원격/설치는0이며 실제release/Colab Drive·GPU·AMP·비용 검증은 남아 있다. Temporal chunk/context 공급을 완료했다고 표시하지 않는다.
 
 Root도 신규T1 8+기존M1 trainer14, 총22개를 독립 실행해 failure/error/skip0으로 확인했다(`root/stage_t1_tests.txt`). 다음 인계는 합성 RGB→2D→cache→T1→3D의 제한된 Colab GPU FP32/AMP·재개·자원 측정 pilot을 준비하는 범위다. 이 합성 GPU 시험이 Drive 새VM 지속성이나 실제 독립 validation/원본 motion·단위/시간 근거를 해결하지는 않는다. 실제 데이터 release 차단은 유지한다.
+
+## Colab 합성 GPU pilot 실행 준비
+
+[Runner·notebook·회수 가이드](SYNTHETIC_GPU_PILOT.md)를 추가했다. 고정 GPU profile은 native1024×1024·합성62관절/train256×256/B2이며 FP32/AMP 각각 RGB·T1 3D의 full4 대 prefix1+resume3 전체state를 비교하도록 준비했다. 전역96attempt/600초·worker RSS4GiB·Torch allocator2GiB·결과256MiB 상한과 오류/중단/lastdurable·독립 회수를 적용한다. source 업로드/해제 공간과 다른 프로세스/driver 메모리는 별도다.
+
+개발 최종12개와 root 독립12개, 별도 작은 CPU16update/정확재개·실패/ZIP 회수만 통과했다. 최초 개발검사 기록과 미확정 원인은 가이드·근거에 구분 보존한다. 실제 GPU·AMP·Colab supervisor/자원 시험은 실행하지 않았다. 오케스트레이션이 커밋 후 source ZIP/ready notebook pins를 고정해 테스트 세션에 인계하고 이 개발 세션은 준비·검증 후 멈춘다. Drive 새VM 지속성과 실제 data release/독립 validation·원본 motion·시간/좌표 근거는 여전히 미해결이며 학습 차단을 해제하지 않는다.

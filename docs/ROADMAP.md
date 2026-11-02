@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 Colab 합성 GPU 통합 pilot 준비: 고정 sourceZIP/40자리stamp·환경·1회worker·독립ZIP회수의4셀 notebook과 runner를 구현했다. GPU는native1024²/합성62관절/train256²/B2로 FP32·AMP 각RGB/3D full4 대 prefix1+resume3의전체state를검사하도록준비했다. global96attempt/600초/RSS4GiB/Torch CUDA allocated·reserved2GiB, worker120MiB+로그/보고여유8MiB+회수ZIP128MiB로결과256MiB예산을둔다. source업로드/해제공간은별도다. 로컬최종12개와root독립12개검사및CPU16update/정확재개·오류/ZIP회수만확인했고실제GPU는미실행이다. 초기검사기록과최종성공근거를분리보존한다. root가커밋후소스/ready notebook pins를고정해테스트세션에인계하며개발세션은실제실행하지않는다. 이시험으로Drive새VM/실데이터release·검증근거가해결되지는않는다. [실행준비와계측범위](SYNTHETIC_GPU_PILOT.md)를따른다.
+
 2026-11-02 T1 특징 chunk 연결: 명시 m1_t1_feature_shards_v1/window1과 별도 sampler policy를 추가해 동일 원seq의 disjoint chunk를 single_frame 3D 학습에 연결했다. 기존 m1_feature_shards_v1/temporal 정책·기본checkpoint API는 유지하고 원motion/split 고정·범위 겹침·예측계약/GTmask/fileSHA·byte상한을 검사한다. trainer/export 모두 T1에서는 single_frame/window1만 허용한다. 고정52개 검사와 현재코드 합성 RGB4update→native cache/join3개→T1catalog→3D split/full각4update(sample8)의 전체state·export예측 동일성을 확인했다. 원격/실제훈련/설치0이며 실제release와Colab통합pilot·GPU/AMP/비용확인은 남아 있다. [명시계약과 검증](T1_FEATURE_CHUNKS.md)을 따른다.
 
 2026-11-02 전체 학습 준비 3b2: 작은 StereoHeatmapNet을 유지한 별도 UI 독립 RGB trainer/CLI를 구현했다. native 한 sample씩 명시 해상도로 bilinear align_corners=True resize 후 batch를 만들고 FP32 heatmap loss, 감독0 명시 중단, 성공 update만 cursor/sample 진행, Adam/StepLR/scaler/Python·Torch RNG/source/Pillow/resize환경 정확 재개를 연결했다. 기존 M1의 checkpoint/durable/예산 보호를 최소 확장해 재사용했고 기존14개를 포함한38개 검사가 통과했다. 보존한 합성 CPU 실행은 1step→2epoch 재개로 step4/sample8이며 checkpoint만 export하고 3chunk native cache→기존 join에서 GT3D/mask 보존을 확인했다. 실제 데이터 release/GPU·AMP 실측은 미완료이며 2D chunk를 기존3D catalog에 자동 결합하지 않는다. [지원 범위와 검증](RGB_SHARD_TRAINING.md)을 따른다.
