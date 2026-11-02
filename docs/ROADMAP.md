@@ -33,6 +33,11 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+### 2026-11-02 이미지·동영상 입력과 프론트 방향
+
+사용자는 최종 프로토타입의 이미지 및 동영상 처리를 요청했다. REWIND 본문 §3/Fig.2와 보충 S.3을 재검토하고 [영상 입력 계획](VIDEO_INPUT_PLAN.md)에 논문 구조와 프로젝트 추가 기능을 구분했다. M0에서는 timestamp·stereo/camera 정합성 계약과 짧은 연속 clip을, M1에서는 공통 frontend/cache를, M2~M3에서는 실제 causal 시퀀스 처리를, M4에서는 decode 포함 비용을 검증한다. M6 통합에는 파일 동영상 입력·재생·타임라인·3D 결과·내보내기를 계획한다. 이는 설계 반영이며 decoder/UI 구현·동영상 성능 검증 완료가 아니다. 비연속 Serena 두 sample 진단으로 temporal 완료를 선언하지 않는다. D4는 이미지·동영상 지원 방향만 확정하고 실시간 카메라·UI framework·배포 범위는 미결정으로 유지한다.
+
+
 2026-11-02 실제 RGB 입력 진단: 확보한 Serena 두 train sample로 RGB→2D frontend→예측 cache→3D regression을 연결했다. 원본1024영상을64로 bilinear align_corners=True 축소하고 예측을 원좌표로 복원했다. Frontend100+regression100update의 CPU 실행과 저장weights 재추론·cache 좌표/특징 hash 대조를 통과했다. Heatmap MSE3.38376e-5→3.32889e-5, 같은 sample의2D 화면안 평균오차315.452px로 예측정확도는 낮다. 예측2D입력3D train-fit MSE0.150696→0.015842, MPJPE623.06→187.98mm였다. GT2D 입력대체 없이3D mask124개를 유지하며 두 stage50시점 재로드상태 일치를 확인했다. 중단없는 학습과의 완전동등성·일반화·실시간성·M1 전체 완료를 주장하지 않는다. 일반학습 차단은 유지한다. 상세는 [실제 RGB 진단](REAL_RGB_DIAGNOSTIC.md)을 따른다.
 
 2026-11-02 실제 단일 프레임 진단: Serena train frame1·10의62관절을 이용해 GT2D→3D CPU regression을 연결했다. 입력은(2,1,868), target은(2,1,62,3)mm이며 프레임을 독립 처리한다. 고정100update와50시점 재개50update의 전체 checkpoint 상태가 일치했고 같은2sample train-fit normalized MSE0.146078→0.015887, MPJPE618.13→188.49mm로 감소했다. 이는 RGB 예측·일반화·temporal 성능이 아닌 실제 GT입력 진단이며 좋은 정확도나 M1 전체 완료를 뜻하지 않는다. 일반 loader와 candidate 학습 차단은 유지하고 별도 diagnostic-only 진입점만 사용한다. 상세는 [실제 GT2D 진단](REAL_GT2D_DIAGNOSTIC.md)을 따른다.
@@ -446,7 +451,7 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 데이터 보관·추출 방식은 아래의 2026-10-13 운영 결정에 따른다. Drive 압축 원본과 영구 저장할 manifest·설정·checkpoint·결과를 런타임 추출본과 분리한다. 문서 반영으로 현재 다운로드 작업을 중단하거나 변경하지 않는다.
 
-장시간 학습 전에 D2의 실제 GPU·세션 길이·영구 저장 공간·총 예산을 정하고, pilot의 step 시간·VRAM·입출력 시간을 측정한다. 일정은 고정 날짜 대신 위 완료 조건으로 관리한다. D1·D3·D4·D5는 미결정으로 유지하며, JSON 개발에 UnrealEgo2를 활용하는 것과 최종 baseline 데이터셋을 확정하는 것을 구분한다.
+장시간 학습 전에 D2의 실제 GPU·세션 길이·영구 저장 공간·총 예산을 정하고, pilot의 step 시간·VRAM·입출력 시간을 측정한다. 일정은 고정 날짜 대신 위 완료 조건으로 관리한다. D1·D3·D5는 미결정으로 유지하고 D4는 아래 2026-11-02 결정 범위만 확정하며, JSON 개발에 UnrealEgo2를 활용하는 것과 최종 baseline 데이터셋을 확정하는 것을 구분한다.
 
 ### M0 데이터 확보와 공통 규격
 
@@ -652,7 +657,7 @@ M0–M4는 제안하는 순차 개발 경로이며, M4까지를 필수 완료 �
 - [ ] **D1** 최소 완료 범위: M4까지를 필수로 하고 개선 실험은 E1–E3부터 진행할지.
 - [ ] **D2** 실행 자원: 실제 GPU 종류, 1회 세션 길이, 저장 공간과 총 학습 예산.
 - [ ] **D3** 성능 우선순위: 정확도, 실시간성, failure recovery 중 가장 중요한 항목.
-- [ ] **D4** 결과물 범위: 모델·평가 코드까지 또는 실시간 시각화 demo까지.
+- [ ] **D4** 결과물 범위: 2026-11-02 이미지·동영상 지원 방향 확정. 파일 영상 UI·타임라인·3D 결과 확인을 계획하며, 실시간 카메라 연결·UI framework·배포 범위는 미결정. [설계와 완료 기준](VIDEO_INPUT_PLAN.md)을 따른다.
 - [ ] **D5** 후속 범위: identity conditioning과 다른 데이터셋 확장을 언제 포함할지.
 
 ### 근거 자료
