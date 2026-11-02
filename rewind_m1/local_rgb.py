@@ -238,11 +238,14 @@ class LocalStereoRGB:
 
     def metadata(self, index):
         row = self._records[self._index(index)]
-        return {"record": copy.deepcopy(row), "manifest_sha256": self.manifest_sha256,
+        metadata = {"record": copy.deepcopy(row), "manifest_sha256": self.manifest_sha256,
                 "data_kind": self._manifest["data_kind"],
                 "dataset_version": self._manifest["dataset_version"],
                 "sources": {key: copy.deepcopy(self._manifest["sources"][key])
                             for key in {v["source_id"] for v in row["views"].values()}}}
+        from .frame_input import from_image_metadata
+        metadata["frame_input"] = from_image_metadata(metadata)
+        return metadata
 
     @staticmethod
     def _dependencies():

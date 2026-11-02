@@ -2,6 +2,8 @@
 
 2026-11-02 사용자 결정: 최종 프로토타입은 개별 이미지뿐 아니라 동영상도 처리한다. 아래는 설계 방향이며 동영상 decoder·UI·실제 temporal 학습의 구현 완료 기록이 아니다. 웹 framework, codec 지원 목록, 실시간 카메라 연결은 후속 결정이다.
 
+현재 구현(2026-11-02)은 공통 프레임 선언과 기존 local RGB 이미지 경로 연결까지다. 원본·좌우·미확인 시간/geometry를 보존하며 실제 이미지 tensor/mask 동일성을 확인했다. [구현 계약과 검증](FRAME_INPUT.md)을 따르고, 아래 decoder·UI·실제 temporal 경로는 계속 후속 계획으로 유지한다.
+
 ## 논문 재검토
 
 [REWIND 본문](https://jyunlee.github.io/projects/rewind/static/paper.pdf)의 §3, Fig.2, §3.1–3.3은 stereo egocentric 이미지 시퀀스와 카메라 자세를 조건으로 body를 먼저 추정하고, 예측 상체를 조건으로 hand를 추정한다. 현재·과거 window를 쓰는 relative-temporal attention과 one-step 증류가 시간 처리·속도의 핵심이다. 따라서 동영상 지원은 논문의 시간적 입력 구조에 맞는 방향이다. 임의의 외부 시점 단안 동영상을 같은 모델에 넣는 지원으로 확대 해석하지 않는다.

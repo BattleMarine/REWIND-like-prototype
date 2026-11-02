@@ -54,6 +54,7 @@ def load_images(prepared,data):
     manifest={'schema_version':'real_rgb_diagnostic_input_v1','diagnostic_only':True,'train_ready':False,'data_kind':'dataset_sample',
         'native_rgb_manifest_file_sha256':data.identity['rgb_manifest_file_sha256'],
         'native_rgb_manifest_content_sha256':loader.manifest_sha256,'source_views':source_views,
+        'frame_inputs':[item['frame_input'] for item in batch['metadata']],
         'resize':RESIZE,'image_tensor_sha256':tensor_sha(images),'gt2d_tensor_sha256':tensor_sha(gt),
         'annotation_mask_sha256':tensor_sha(valid),'joint_names':data.identity['joint_names']}
     return images,gt,valid,manifest

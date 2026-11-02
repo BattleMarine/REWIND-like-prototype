@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 공통 프레임 입력 1~2단계 구현: stereo_frame_input_v1 선언/validator와 기존 LocalStereoRGB 이미지 경로를 연결했다. 기존 manifest/metadata record/tensor API를 유지하고 RGB 진단 input manifest가 공통 record를 실제 출처로 사용한다. 원본 identity·좌우 뷰·시간/geometry 선언과 미확인 이유를 보존하며 제공된 PTS/timebase/clock/시간차의 일관성을 검사한다. 현재 Serena1·10의 이미지·GT/mask 전후 tensor hash가 같고 독립 T1/temporal_ready=false를 유지한다. 관련41개 회귀 통과, decoder/UI/네트워크/추가학습은 수행하지 않았다. 기존 candidate geometry를 RGB에 암묵 결합하지 않으며 실제 영상/시간 시퀀스 검증은 후속이다. [공통 프레임 입력](FRAME_INPUT.md)에 범위·근거·한계를 기록했다.
+
 ### 2026-11-02 이미지·동영상 입력과 프론트 방향
 
 사용자는 최종 프로토타입의 이미지 및 동영상 처리를 요청했다. REWIND 본문 §3/Fig.2와 보충 S.3을 재검토하고 [영상 입력 계획](VIDEO_INPUT_PLAN.md)에 논문 구조와 프로젝트 추가 기능을 구분했다. M0에서는 timestamp·stereo/camera 정합성 계약과 짧은 연속 clip을, M1에서는 공통 frontend/cache를, M2~M3에서는 실제 causal 시퀀스 처리를, M4에서는 decode 포함 비용을 검증한다. M6 통합에는 파일 동영상 입력·재생·타임라인·3D 결과·내보내기를 계획한다. 이는 설계 반영이며 decoder/UI 구현·동영상 성능 검증 완료가 아니다. 비연속 Serena 두 sample 진단으로 temporal 완료를 선언하지 않는다. D4는 이미지·동영상 지원 방향만 확정하고 실시간 카메라·UI framework·배포 범위는 미결정으로 유지한다.
