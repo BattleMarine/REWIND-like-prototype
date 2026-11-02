@@ -1,5 +1,13 @@
 # 실제 샘플 확대를 위한 발견 인덱싱
 
+## 2026-11-02 session retry 설정 실패 보완
+
+job archvis_rgb_discovery_677bc7f_001의 회수 ZIP SHA b3191fbcd96ce756014683093a30dcfa938db5040d0e10d0866e188ade3c246c에서 CRC와 보고서를 대조했다. 초기 metadata5건/1,483bytes 이후 scan 진입의 session_retry_policy로 중단됐고 read/decode0·정상 receipt 없음이다. 외부 AuthorizedSession adapter만 retry0으로 설정하고 기본 내부 인증 session의 retry를 남긴 것이 원인이다.
+
+notebook factory만 requests.Session의 인증 transport를 retry0으로 고정해 Request(session=auth_http)로 주입하고, 외부 session도 retry0/max_refresh_attempts0으로 설정하도록 보완했다. 초기 metadata 전 validate_no_hidden_retries를 적용하며 정상/실패 시 외부·인증 session을 정리한다. 보존 transport_deps의 실제 requests2.34.2/google-auth2.62.0/urllib3 2.8.0으로 구형 factory 거부·수정 factory 통과·close 수명4개와 현재 업로드7개, 총11개 검사를 네트워크0으로 통과했다. root 독립11개도1.219초 failure/error/skip0으로 통과했다. 새 의존성 설치와 실제 Google 호출은 없으며 실제 Colab 연결 성공을 입증한 것은 아니다.
+
+runner·계약·예산 변경이 없어 실행 source677bc7f와 고정 ZIP은 유지할 수 있다. job001은 이미 소비됐으므로 재실행하지 않는다. root가 수정 notebook revision을 별도로 기록하고 job002의 새 경로와 동일 예산을 고정해 인계한다. 기존 결과/고정 자료는 보존한다. 개발 근거는 outputs/discovery_retry_fix_20261102/developer/final_tests.txt와 summary.json이다.
+
 ## 2026-11-02 준비 업로드 실패 보완
 
 고정677bc7f 실행에서 source ZIP만 선택해 source 추출 후 input SHA 검사에 실패했다. auth/원본 읽기/scan 전에 중단됐으므로 인덱싱 실행 결과로 취급하지 않는다. source/input ZIP을 한 개씩 받되 양쪽 SHA·안전 경로·CRC·크기와 기존 추출본의 정확한 파일/폴더 집합·byte를 모두 검사한 뒤에만 추출하도록 template을 보완했다. 동일한 기존 추출본만 읽기 재사용하며 불완전/변조·추가 파일은 거부한다. 삭제·덮어쓰기 안내는 하지 않는다. WORKSPACE가 있으면 소비된 job이므로 준비 재실행은 계속 금지한다.
