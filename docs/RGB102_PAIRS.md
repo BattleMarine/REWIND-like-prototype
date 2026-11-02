@@ -54,3 +54,13 @@ RGB job003 g9는270개 저장 항목에서 stereo102개/5sequence를 제공한�
 한 번의 실행 셀이102개 전체 목표를 수행한다. 실패·중단 후에는 독립 회수 셀만 실행한다. 회수는 원본 요청·인증·추출을 반복하지 않고 현재 partial/완료chunk·raw pose·감사·보고서를 ZIP으로 묶어 SHA를 출력한다. Source/input 준비 자체가 실패한 경우에도 작은 준비 실패 ZIP을 받을 수 있다. 탐색 세션은 결과 ZIP/SHA·완료/미완료 key·종료 이유·비용·대표 overlay를 root에 전달하고 원본·결과를 런타임 밖에 영구 보관한다.
 
 합성102페어의7묶음 전체 완료, 무scan/원본 index 불변, decode·HTTP 누적 cap, identity/hash/PNG 실패, 중단·cleanup 실패 및 원격 없는 partial ZIP 회수를 검사했다. 실제 notebook 준비·누락·재사용·구모듈 차단·준비 실패 회수와 검토된 RGB 인증 factory의 AST 동등성·실제 requests/google-auth 타입도 검사했다. 개발16개/168.828초·root 독립16개가 모두 통과했고 skip0이다. 최종 로그는 `outputs/rgb102_pair_prepare_20261102/developer/final_tests.txt`, root 실제 입력·g9 독립 대조는 같은 상위 폴더 `root/input_review.json`이다. 실제 RGB Drive 추출·Colab 시간/RAM/disk·사람의 overlay 검토는 미실행이다.
+
+## 2026-11-03 실제 Colab 결과와 독립 검토
+
+고정14d94d42ab85487de03cd501c723d373a2fd7080/job rgb102_pairs_001은 completed, complete_pairs=target_pairs=102, files204, 7chunks content_audited로 성공했다. 선택 RGB payload247611434bytes를 확보했다. 실제 비용은 응답body266392949bytes/837HTTP/271.006914초, source read309657612bytes, 반환decoded247611434bytes, 관측RSS212058112bytes다. 고정 전송·요청·시간·read/decode/RSS 상한 이내였다. 이 한 번의 고정102개 실측이며 다른 archive·장거리 seek·전체 데이터 비용으로 일반화하지 않는다.
+
+결과는 `outputs/test_rgb102_pairs_001_20261103/rgb102_pairs_001_result.zip`,274628517bytes/SHA `ec11b7eb5c4a69f76acb2e5f5045d8c7c560096a6dd33b2249e5d3a6a3e1dcae`다. Root는 ZIP 전체CRC,204PNG 각각의 g9 catalog SHA/크기·native1024 RGB decode, 회수된 pose/candidate/audit/config 등 모든 비snapshot 입력의 고정본 byte일치,7chunk 상태와read/decode 합계를 독립 확인했다. `root_review/verification.json`에 근거를 남겼다. 실행 보고서의 복원 전후 DB SHA는 동일하고 index_unchanged=true/scan_performed=false다. 회수 ZIP에는 DB를 넣지 않으므로 이 사후DB 불변은 실행 보고서 근거이며 root가 회수DB를 직접 검사한 것은 아니다.
+
+대표 overlay10장(5sequence×2view)을 root가 시각 점검했다. 보이는 손·팔다리는 대체로 GT와 대응하며 뚜렷한 전체 좌표 밀림은 발견하지 못했다. 가림·영상 밖 GT는 유지한다. 각 view의 첫 확보 frame이 달라 Football 외의 좌우 대표는 같은 frame 비교가 아니며, timestamp/stereo 시간 검증으로 간주하지 않는다. 이는 AI의 제한 시각 점검이고204장 전수 시각 승인·사람 승인·모델 정확도 검증은 아니다. 원본 report의 human_visual_alignment_confirmed=false를 변경하지 않았다.
+
+현재102개는 모두train/validation0이며 원motion·timestamp 미검증과train_ready=false를 유지한다. 다음은 보존 payload를 학습 준비 bundle로 연결하고 독립 validation·release 근거를 확보하는 단계다. 추가 원격 실행·학습·전체 인덱싱은 이번 검토에서 수행하지 않았다. Drive 영구 보관 여부는 이 로컬 검토로 확인하지 않았다.
