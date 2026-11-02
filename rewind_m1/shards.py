@@ -185,10 +185,12 @@ class ShardDataset:
             self._index = index
         return self._cached
 
-    def verify_all(self):
+    def verify_all(self, check_budget=None):
         counts = {}
         try:
             for index in range(len(self.catalog['shards'])):
+                if check_budget is not None:
+                    check_budget()
                 loaded = self.load(index)
                 for split, data in loaded[1].items():
                     counts[split] = counts.get(split, 0) + len(data.anchors)

@@ -6,7 +6,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-11-02 전체 데이터 학습 준비를 우선하며 Colab 기준으로 진행합니다. UI와 학습 모델을 분리한 상태에서 로컬 M1 특징 shard·제한 로딩·epoch cursor·readiness 검사·추론 가중치 경계를 추가했습니다. 신규17개와 관련13개 검사 통과, 실제 candidate의 기존 학습 차단은 유지합니다. 아직 shard trainer·persistent 준비 공급·실제 release·GPU pilot은 연결하지 않았습니다. [전체 학습 준비와 단계별 완료 기준](docs/FULL_TRAINING_READINESS.md)을 따릅니다.
+2026-11-02 전체 데이터 학습 준비를 우선하며 Colab 기준으로 진행합니다. UI와 분리된 로컬 M1 특징 shard·제한 로딩·epoch cursor·readiness·추론 가중치에 이어 별도 headless shard trainer/CLI를 구현했습니다. 두 M1 regression 모델의 합성 CPU 학습·정확 재개·독립 validation과 31개 검사, root 별도14개가 통과했습니다. 실제 dataset_sample 학습은 release 미구현으로 거부하며 persistent 준비 공급·실제 release·GPU/AMP pilot은 후속입니다. [전체 학습 준비와 단계별 완료 기준](docs/FULL_TRAINING_READINESS.md)을 따릅니다.
 
 2026-11-02 공통 프레임 입력의 선언과 기존 이미지 로더 연결을 구현했습니다. Local RGB 로더와 RGB 진단 입력이 원본 출처·좌우 뷰·미확인 시간/geometry 이유를 보존하며, 기존 이미지 tensor·정답 mask는 유지합니다. 현재 Serena1·10은 독립 T=1 입력이고 동영상 decoder·UI·temporal 처리는 후속 범위입니다. [공통 프레임 입력](docs/FRAME_INPUT.md)을 따릅니다.
 

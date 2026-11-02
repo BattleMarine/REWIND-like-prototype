@@ -18,9 +18,9 @@ def inspect_catalog(path, full_read=False):
               'catalog_sha256': catalog['content_sha256'], 'declaration_records': declared,
               'full_payload_read': False, 'verified_records': None, 'full_training_ready': False,
               'supported_path': 'local_m1_features_complete_sequence_shards',
-              'model_support': {'m1_regression': 'loader_and_sampler_only', 'm2_body': 'not_connected',
+              'model_support': {'m1_regression': 'synthetic_shard_trainer_cpu_cuda_api', 'm2_body': 'not_connected',
                                 'm3_whole_body': 'not_connected', 'rgb_2d_frontend': 'not_connected'},
-              'blockers': ['shard_trainer_not_connected', 'persistent_preparation_supply_not_connected',
+              'blockers': ['dataset_sample_training_release_not_implemented', 'persistent_preparation_supply_not_connected',
                            'colab_gpu_pilot_not_measured']}
     if not {'train', 'validation'} <= set(declared):
         report['blockers'].append('required_train_validation_splits_missing')
