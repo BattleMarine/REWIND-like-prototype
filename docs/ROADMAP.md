@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 완료 queue→로컬 진단 bundle: 별도 rewind_prepared_bundle API/CLI로 전체 명시 triplet·원본 producer report를 보존하고 RGB manifest와 pose job별 candidate/audit·키별 provenance를 연결했다. dataset version/scope·source/file/metadata SHA·전체 motion/split 누수·입력 전후 동일성과 기존 변환기 상한을 검사하며 새 출력/marker-last·실패 부분 보존·로컬 verify를 제공한다. 개발47개 회귀 및 최종 POSIX 정렬/완료 경로3개, root20개와 verify3개가 통과했다. 보존 합성3triplet/2pose job은 원본 조각 없이 build하고 queue 제거 후 verify했으며 실패 산출물도 보존했다. train_ready=false, 원본 전체 무결성·내용/시간 정합·실제 release·candidate→학습 shard는 미완료다. GPU20b7aa9 고정 산출물과 미실행 상태는 유지한다. [입력·예산·근거](PREPARED_BUNDLE.md)를 따른다.
+
 2026-11-02 Colab 합성 GPU 통합 pilot 준비: 고정 sourceZIP/40자리stamp·환경·1회worker·독립ZIP회수의4셀 notebook과 runner를 구현했다. GPU는native1024²/합성62관절/train256²/B2로 FP32·AMP 각RGB/3D full4 대 prefix1+resume3의전체state를검사하도록준비했다. global96attempt/600초/RSS4GiB/Torch CUDA allocated·reserved2GiB, worker120MiB+로그/보고여유8MiB+회수ZIP128MiB로결과256MiB예산을둔다. source업로드/해제공간은별도다. 로컬최종12개와root독립12개검사및CPU16update/정확재개·오류/ZIP회수만확인했고실제GPU는미실행이다. 초기검사기록과최종성공근거를분리보존한다. root가커밋후소스/ready notebook pins를고정해테스트세션에인계하며개발세션은실제실행하지않는다. 이시험으로Drive새VM/실데이터release·검증근거가해결되지는않는다. [실행준비와계측범위](SYNTHETIC_GPU_PILOT.md)를따른다.
 
 2026-11-02 T1 특징 chunk 연결: 명시 m1_t1_feature_shards_v1/window1과 별도 sampler policy를 추가해 동일 원seq의 disjoint chunk를 single_frame 3D 학습에 연결했다. 기존 m1_feature_shards_v1/temporal 정책·기본checkpoint API는 유지하고 원motion/split 고정·범위 겹침·예측계약/GTmask/fileSHA·byte상한을 검사한다. trainer/export 모두 T1에서는 single_frame/window1만 허용한다. 고정52개 검사와 현재코드 합성 RGB4update→native cache/join3개→T1catalog→3D split/full각4update(sample8)의 전체state·export예측 동일성을 확인했다. 원격/실제훈련/설치0이며 실제release와Colab통합pilot·GPU/AMP/비용확인은 남아 있다. [명시계약과 검증](T1_FEATURE_CHUNKS.md)을 따른다.

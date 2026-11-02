@@ -168,3 +168,11 @@ Root도 신규T1 8+기존M1 trainer14, 총22개를 독립 실행해 failure/erro
 [Runner·notebook·회수 가이드](SYNTHETIC_GPU_PILOT.md)를 추가했다. 고정 GPU profile은 native1024×1024·합성62관절/train256×256/B2이며 FP32/AMP 각각 RGB·T1 3D의 full4 대 prefix1+resume3 전체state를 비교하도록 준비했다. 전역96attempt/600초·worker RSS4GiB·Torch allocator2GiB·결과256MiB 상한과 오류/중단/lastdurable·독립 회수를 적용한다. source 업로드/해제 공간과 다른 프로세스/driver 메모리는 별도다.
 
 개발 최종12개와 root 독립12개, 별도 작은 CPU16update/정확재개·실패/ZIP 회수만 통과했다. 최초 개발검사 기록과 미확정 원인은 가이드·근거에 구분 보존한다. 실제 GPU·AMP·Colab supervisor/자원 시험은 실행하지 않았다. 오케스트레이션이 커밋 후 source ZIP/ready notebook pins를 고정해 테스트 세션에 인계하고 이 개발 세션은 준비·검증 후 멈춘다. Drive 새VM 지속성과 실제 data release/독립 validation·원본 motion·시간/좌표 근거는 여전히 미해결이며 학습 차단을 해제하지 않는다.
+
+## 완료 queue의 로컬 진단 bundle 연결
+
+[완료 bundle adapter](PREPARED_BUNDLE.md)는 완료 queue 전체의 명시 triplet을 새 로컬 출력에 모으고 기존 RGB builder·pose job별 converter를 연결한다. 서로 다른 pose 원본 manifest를 합성하지 않으며 전체 motion map의 split 누수 검사를 먼저 수행한다. spec/calibration/split/motion/selection과 plan/state/matching·producer/source/file SHA를 보존하고 입력 전후 동일성을 검사한다. 기존 변환기 상한·32triplet/128MiB 출력·협조적120초/RSS1GiB를 적용하며 실패 부분은 보존하고 marker 없는 디렉터리는 재사용하지 않는다.
+
+개발47개(신규20+queue13+prepare14) 회귀가 failure/error/skip0으로 통과했다. 마지막 inventory 정렬을 OS별 Path 비교에서 POSIX 상대 문자열로 고정한 뒤 정렬/완료/변조3개도 통과했다. Root 신규20개와 verify3개도 통과했다. 보존 합성3triplet/2pose job은 압축 원본 조각 없이 생성하고 원래 queue/압축본이 제거된 뒤 새 bundle만으로 verify했다. queue 전체 파일 hash는 불변이며 별도 의도적 실패의 부분 파일·이유/marker 부재도 확인했다. 근거는 `outputs/full_training_readiness_20261102/developer/prepared_bundle/`의 `final_tests.txt`, `final_inventory_tests.txt`, `final_integration/integration_summary.json`과 bundle/failed_bundle이며 root 근거는 같은 날짜 `root/prepared_bundle_tests.txt`, `root/prepared_bundle_verify_tests.txt`다.
+
+실행은 합성 로컬 진단이며 실제 Serena 변환/학습·네트워크·설치를 수행하지 않았다. job별 candidate의 train/validation 누락 blocker와 bundle 수준 독립 validation 미검증을 구분한다. 실제 dataset release·candidate→learning shard 변환·내용/시간/원본 motion/좌표 근거·전체 archive 무결성은 여전히 차단 상태다. marker는 파일 변경 탐지용 hash이며 신뢰 서명이나 학습 승인서가 아니다. 기존20b7aa9 GPU source ZIP·ready notebook·결과는 수정하지 않았고 실제 GPU 시험은 미실행이다.

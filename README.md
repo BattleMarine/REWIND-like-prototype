@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-02 완료 준비 queue를 로컬 RGB manifest·pose job별 candidate/audit·출처 연결 bundle로 묶는 UI 독립 adapter를 추가했습니다. 전체 triplet 명시 선택과 source/file/metadata SHA·split/motion·예산을 검사하고, 새 출력의 완료 marker를 검증합니다. 개발47개 회귀와 최종 정렬/완료 경로3개, root20개 및 verify3개가 통과했습니다. 이는 합성 로컬 준비 검증이며 학습 release·candidate→학습 shard·실제 GPU 실행은 포함하지 않습니다. [지원 범위와 검증 근거](docs/PREPARED_BUNDLE.md)를 따릅니다.
+
 2026-11-02 제한된 Colab 합성 GPU 통합 pilot의 runner·4셀 notebook·회수 가이드를 준비했습니다. 로컬 최종12개와 독립12개 검사, 작은 CPU16update 및 오류/ZIP 회수를 확인했으며 실제 GPU는 실행하지 않았습니다. 오케스트레이션이 source ZIP·ready notebook을 고정한 뒤 테스트 세션이 안내합니다. [GPU pilot 준비·예산·미검증 범위](docs/SYNTHETIC_GPU_PILOT.md)를 따릅니다.
 
 2026-11-02 같은 원본 sequence의 RGB 예측 chunk를 별도 T=1 특징 카탈로그로 연결했습니다. 단일 프레임 3D 학습·재개·평가·export까지 합성 통합을 확인했고52개 검사가 통과했습니다. 기존 temporal/완결-sequence 정책과 실제 데이터 release 차단은 유지합니다. [T1 연결 범위와 근거](docs/T1_FEATURE_CHUNKS.md)를 따릅니다.
