@@ -28,6 +28,8 @@ def preflight(input_root,expected_config_sha256):
     config,_=load(root/'config.json',MIB)
     check(digest(config)==expected_config_sha256 and config['schema_version']=='archvis_preindex_inputs_v1' and
           config['profile']==PREINDEX_PROFILE and config['limits']==asdict(PreindexLimits()),'preindex_config_pin_or_profile')
+    cache=config.get('runtime_cache_bytes',4*MIB)
+    check(type(cache) is int and cache in (4*MIB,16*MIB),'preindex_runtime_cache_policy')
     resume=config['resume'];receipt_path=root/safe_path(resume['receipt_relative_path'])
     receipt,raw_sha=load(receipt_path,16384)
     check(receipt==resume['anchor'] and raw_sha==resume['receipt_file_sha256'] and
@@ -39,4 +41,5 @@ def preflight(input_root,expected_config_sha256):
     return config,dict(job_id=config['job_id'],selection=config['selection'],expected_metadata=config['expected_metadata'],
         split_paths=split_paths,split_pins=config['split_pins'],pose_catalog=root/'pose_catalog.json',
         pose_sha256=config['pose_catalog_sha256'],limits=PreindexLimits(**config['limits']),profile=PREINDEX_PROFILE,
+        runtime_cache_bytes=cache,
         resume={'receipt_path':receipt_path,'receipt_file_sha256':resume['receipt_file_sha256'],'anchor':receipt})

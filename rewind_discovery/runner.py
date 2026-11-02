@@ -61,6 +61,22 @@ def check(value,reason):
     if not value:raise IndexFailure(reason)
 
 
+def preindex_storage_plan(limits,index_limits,db_bytes,other_bytes,last_snapshot_bytes):
+    """동시 peak를 계산한다. DB 실크기를 core checkpoint peak 한도로 쓰지 않는다."""
+    snap=SnapshotLimits()
+    checkpoint=3*(db_bytes+index_limits.max_state_bytes+index_limits.max_index_bytes+16384)
+    snapshot=2*snap.max_db_bytes+2*snap.max_bundle_bytes
+    recovery=max(last_snapshot_bytes,snap.max_bundle_bytes)
+    available=limits.disk_bytes-other_bytes-recovery-4*MIB
+    return {'current_db_bytes':db_bytes,'other_persistent_bytes':other_bytes,
+        'checkpoint_peak_bound_bytes':checkpoint,'snapshot_peak_bound_bytes':snapshot,
+        'snapshot_db_bound_bytes':snap.max_db_bytes,'snapshot_zip_bound_bytes':snap.max_bundle_bytes,
+        'recovery_reserve_bytes':recovery,'report_reserve_bytes':4*MIB,
+        'checkpoint_budget_bytes':max(0,available),
+        'required_total_bytes':other_bytes+max(checkpoint,snapshot)+recovery+4*MIB,
+        'scope':'separate checkpoint and snapshot peaks; reserve latest recovery and persistent files within total disk; no deletion'}
+
+
 def load(path,maximum):
     path=_path(path)
     check(path.is_file() and path.stat().st_size<=maximum,'discovery_input_limit')
@@ -106,11 +122,13 @@ def counts(state,owners,pose_keys):
 
 
 def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog,pose_sha256,
-        workspace,snapshot_directory,session_factory,limits=None,resume=None,profile=None):
+        workspace,snapshot_directory,session_factory,limits=None,resume=None,profile=None,runtime_cache_bytes=4*MIB):
     limits=limits or DiscoveryLimits();validate_selection(selection)
     preindex=profile==PREINDEX_PROFILE
     check((preindex and type(limits) is PreindexLimits and resume is not None) or
           (profile is None and type(limits) is DiscoveryLimits),'discovery_explicit_profile_limits')
+    check(type(runtime_cache_bytes) is int and runtime_cache_bytes in ((4*MIB,16*MIB) if preindex else (4*MIB,)),
+          'discovery_runtime_cache_policy')
     if preindex:check(resume['anchor']['bytes']+4*MIB<=limits.disk_bytes,'discovery_recovery_base_budget')
     check(selection['kind']=='rgb','discovery_rgb_only')
     check(isinstance(job_id,str) and re.fullmatch('[A-Za-z0-9_-]{1,64}',job_id),'discovery_job_id')
@@ -126,7 +144,7 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
     started=time.monotonic();runtime=None;session=None;read_bytes=decoded=0;meta_body=meta_requests=0
     timing=Timing() if preindex else None
     if preindex:report.update(profile=profile,scan_attempts=[],cumulative_cache={'hits':0,'misses':0,'read_bytes':0},
-        durable_discovered=None,working_discovered=None)
+        durable_discovered=None,working_discovered=None,runtime_cache_bytes=runtime_cache_bytes,runtime_range_bytes=MIB)
     def measured(name,function,*args,**kwargs):
         return timing.call(name,function,*args,**kwargs) if timing is not None else function(*args,**kwargs)
     last=resume['anchor'] if resume else None
@@ -177,17 +195,9 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
         check(meta_body<limits.body_bytes and meta_requests<limits.requests,'discovery_metadata_budget_exhausted')
         runtime=DriveRuntime(session,DriveLimits(max_body_bytes=limits.body_bytes-meta_body,
             max_requests=limits.requests-meta_requests,max_seconds=max(.001,limits.seconds-(time.monotonic()-started)-limits.reserve_seconds),
-            range_bytes=MIB,max_cache_bytes=4*MIB))
+            range_bytes=MIB,max_cache_bytes=runtime_cache_bytes))
         index_limits=IndexLimits(max_read_bytes=limits.read_bytes,max_decoded_bytes=limits.decoded_bytes,
             max_rss_bytes=limits.rss_bytes,max_disk_bytes=limits.disk_bytes,max_seconds=limits.seconds)
-        if preindex:
-            # scan은 payload를 저장하지 않는다. 기존 checkpoint 임시공간 계산의
-            # 3*(state+index)로 local DB의 보수적 상한을 별도 고정한다.
-            live_db_bound=3*(index_limits.max_state_bytes+index_limits.max_index_bytes)+65536
-            index_limits=replace(index_limits,max_disk_bytes=min(limits.disk_bytes,live_db_bound))
-            report['storage_plan']={'live_db_bound_bytes':live_db_bound,'snapshot_db_bound_bytes':SnapshotLimits().max_db_bytes,
-                'snapshot_zip_bound_bytes':SnapshotLimits().max_bundle_bytes,'report_reserve_bytes':4*MIB,
-                'scope':'before scan reserve local DB growth, snapshot backup/temp/publish, and latest recovery ZIP; no deletion'}
         db=workspace/'index.sqlite'
         if resume:
             check(set(resume)=={'receipt_path','receipt_file_sha256','anchor'},'discovery_resume_fields')
@@ -212,12 +222,13 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
         for batch in range(limits.batches):
             used=guard(True)
             if preindex:
-                plan=report['storage_plan']
-                # Export 실패의 부분 publish ZIP까지 남겨도 이전 receipt 회수가
-                # 가능하도록 시작 전에 peak 전체를 예약한다.
-                reserve=(plan['live_db_bound_bytes']+plan['snapshot_db_bound_bytes']+
-                    2*plan['snapshot_zip_bound_bytes']+max(last['bytes'],plan['snapshot_zip_bound_bytes'])+4*MIB)
-                check(used-db.stat().st_size+reserve<=limits.disk_bytes,'discovery_scan_snapshot_recovery_reserve')
+                db_bytes=db.stat().st_size
+                plan=preindex_storage_plan(limits,index_limits,db_bytes,used-db_bytes,last['bytes'])
+                report['storage_plan']=plan
+                check(plan['required_total_bytes']<=limits.disk_bytes,'discovery_scan_snapshot_recovery_reserve')
+                # 이 값은 live DB cap이 아니라 기존 core의 journal/new page 포함
+                # checkpoint peak 예산이다. 다른 영속 파일·회수 공간을 먼저 뺀다.
+                index_limits=replace(index_limits,max_disk_bytes=plan['checkpoint_budget_bytes'])
             remaining_read=limits.read_bytes-read_bytes;remaining_decode=limits.decoded_bytes-decoded
             check(remaining_read>0 and remaining_decode>0,'discovery_io_exhausted')
             state,_=index._snapshot();previous=len(state['members']);generation=state['generation']
@@ -264,6 +275,7 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
                 report['validation_rgb_stereo_found']=report['discovered']['keys']['stereo']['validation']>0
             if current['generation']>generation:
                 report['active_stage']='snapshot';save();used=guard()
+                if preindex:check(db.stat().st_size<=SnapshotLimits().max_db_bytes,'snapshot_db_limit')
                 check(used+3*db.stat().st_size+MIB<=limits.disk_bytes,'discovery_snapshot_disk_reserve')
                 remaining=limits.seconds-(time.monotonic()-started)
                 check(remaining>1,'discovery_snapshot_time_reserve')
