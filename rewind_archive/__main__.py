@@ -34,6 +34,7 @@ def main(argv=None):
         extract.add_argument("--output",type=Path,required=True)
         extract.add_argument("--profile",choices=tuple(PROFILES),default=None,help="고정 preset과 limits의 정확한 일치 검사")
         extract.add_argument("--exact-target",action="append",default=None,help="완료 시 즉시 중단할 literal member; include와 같은 집합")
+        if command=="extract":extract.add_argument("--persistent-index",type=Path,help="명시적 opt-in 자동 인덱스 준비 옵션 JSON")
     match = sub.add_parser("match")
     match.add_argument("--extraction",type=Path,action="append",required=True)
     match.add_argument("--output",type=Path,required=True)
@@ -51,7 +52,8 @@ def main(argv=None):
             report = operation(read_bounded_json(args.manifest),args.output,args.include or [],
                 Limits.from_dict(read_bounded_json(args.limits)),base=args.manifest.parent,
                 profile=args.profile,exact_targets=args.exact_target,
-                **({"mode":"scan"} if args.command=="scan" else {}))
+                **({"mode":"scan"} if args.command=="scan" else {}),
+                **({"persistent_index":read_bounded_json(args.persistent_index)} if getattr(args,"persistent_index",None) else {}))
             print(json.dumps({"stop_reason":report["stop_reason"],"complete_files":len(report["files"]) if args.command=="extract" else report["complete_files"],
                 "inspection_candidates_usable":report["inspection_candidates_usable"],
                 "whole_archive_integrity_verified":report["whole_archive_integrity_verified"],"train_ready":False,"stats":report["stats"],
@@ -74,7 +76,7 @@ def main(argv=None):
         return 0 if report["matching_valid"] else 1
     except (ValueError,OSError,KeyError) as exc:
         # 사용자 입력과 외부 exception의 credential을 출력하지 않는다.
-        parser.error(exc.reason if isinstance(exc,PreparationError) else "invalid_input_or_output")
+        parser.error(getattr(exc,"reason","invalid_input_or_output"))
 
 
 if __name__=="__main__":

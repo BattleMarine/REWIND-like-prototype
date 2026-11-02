@@ -146,7 +146,7 @@ def read_payload(reader, size, sink=None, on_chunk=None):
             raise PreparationError("nonzero_tar_padding")
 
 
-def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None, cache_input=None, cache_expectation=None):
+def prepare(manifest, output, includes, limits, base=".", authorized_session=None, clock=None, mode="extract", profile=None, exact_targets=None, request_policy=None, sleeper=None, cache_input=None, cache_expectation=None, persistent_index=None, persistent_context=None):
     """단일 writer용 새 출력. 중단에도 완전한 후보와 inspection report를 남긴다."""
     validate_manifest(manifest)
     if not isinstance(limits,Limits):
@@ -155,6 +155,14 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         raise PreparationError("preparation_mode")
     includes = [] if mode=="scan" and includes==[] else validate_includes(includes)
     exact_targets = validate_exact_targets(exact_targets,includes,limits,mode)
+    if persistent_index is not None:
+        if mode!="extract" or not exact_targets or any(value is not None for value in
+                (profile,request_policy,cache_input,cache_expectation,clock,sleeper)):
+            raise PreparationError("persistent_index_requires_plain_exact_targets")
+        from rewind_archive_index.preparation import prepare_indexed
+        return prepare_indexed(manifest,output,exact_targets,limits,persistent_index,base=base,
+            authorized_session=authorized_session,context=persistent_context)
+    if persistent_context is not None:raise PreparationError("persistent_index_options_required")
     validate_request_policy(request_policy)
     if request_policy and (profile not in POSE_PROFILES or mode!="extract" or len(exact_targets)!=2):
         raise PreparationError("request_policy_requires_pose_targeted_pair")

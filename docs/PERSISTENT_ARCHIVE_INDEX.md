@@ -50,4 +50,7 @@ Pose는 `--kind pose`로 별도 DB를 만들고 JSON의 정확한 member 경로�
 
 근거는 [개발 검사](../outputs/persistent_index_development_20261029/tests.json), [기존 회귀](../outputs/persistent_index_development_20261029/existing_core_regression.json), [실제 구간](../outputs/persistent_index_development_20261029/real_prefix/result.json), [독립 검사](../outputs/persistent_index_review_20261029/root_final_tests.txt)에 보존한다. 최종 방어 조건과 EOF 빈 줄 정리 후 root가13개 검사를 다시 통과했으며 최종 코드 hash를 함께 보존했다.
 
-기존 local source DB에는 경로와 파일 identity가 있으므로 다른 런타임에 복사만 해서 바로 재사용할 수 없다. 후속 [Drive 고정 source·닫힌 snapshot 연결](DRIVE_PERSISTENT_INDEX.md)은 runtime 경로 없는 원본 metadata와 명시 receipt로 저장·복원하는 adapter를 추가했으며 모의 검사와2026-10-30 실제 pose A→B 복원·목록16→32개 누적을 확인했다. 기존 gzip coverage 밖 확장·RGB 원격·대규모 처리량은 미검증이고 학습 hook·대규모 행 catalog도 미구현이다. Live DB는 로컬에서만 실행하며 Drive 동기화 원자성을 가정하지 않는다. 전체 데이터 인덱싱·실제 사용자 pilot은 root의 별도 고정 인계 후 진행한다.
+기존 local source DB에는 경로와 파일 identity가 있으므로 다른 런타임에 복사만 해서 바로 재사용할 수 없다. 후속 [Drive 고정 source·닫힌 snapshot 연결](DRIVE_PERSISTENT_INDEX.md)은 runtime 경로 없는 원본 metadata와 명시 receipt로 저장·복원하는 adapter를 추가했으며 모의 검사와2026-10-30 실제 pose A→B 복원·목록16→32개 누적을 확인했다. 2026-10-30 후속 C 시험에서는 실제 pose의 기존 gzip coverage 밖 확장·저장본 재추출도 확인했다([C 결과](PERSISTENT_INDEX_EXTENSION.md#2026-10-30-수정본-실제-c-시험-결과)). RGB 원격·대규모 처리량은 미검증이고 학습 hook·대규모 행 catalog도 미구현이다. Live DB는 로컬에서만 실행하며 Drive 동기화 원자성을 가정하지 않는다. 전체 데이터 인덱싱·실제 사용자 pilot은 root의 별도 고정 인계 후 진행한다.
+
+
+2026-11-02 [자동 준비 연결](AUTOMATIC_INDEX_PREPARATION.md)을 추가했다. Core 직접 extract의 독립 출력은 유지하며, 기존 prepare/CLI의 opt-in 경로가 자동 복원·확장·저장 후 기존 extraction manifest로 변환해 verify/matching/candidate 변환에 연결한다. 실제 Drive 통합·학습 epoch hook·전체 규모 처리는 별도이며 자동으로 전체 인덱싱 완료를 선언하지 않는다.

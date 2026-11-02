@@ -49,6 +49,10 @@ def verify_extraction(path, expected_manifest=None, allow_code_change=False):
         raise PreparationError("unusable_extraction")
     if not allow_code_change and report["code_sha256"]!=code_hashes():
         raise PreparationError("extraction_code_changed")
+    if report.get("profile")=="persistent_index_opt_in_v1":
+        from rewind_archive_index.preparation import backend_hashes
+        if not allow_code_change and report.get("persistent_backend_sha256")!=backend_hashes():
+            raise PreparationError("persistent_backend_code_changed")
     limits = Limits.from_dict(report["limits"])
     if len(report["files"])>limits.max_files or path.stat().st_size>report["report_disk_reserve_bytes"]:
         raise PreparationError("invalid_extraction_report")

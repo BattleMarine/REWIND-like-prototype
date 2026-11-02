@@ -317,7 +317,8 @@ def recover_report(*, workspace, run_id, provenance, phase='C'):
     return {'path': str(bundle), 'reused': False, 'status': summary['status']}
 
 
-def _check_bundle(path, root, run_id, pins):
+def _check_bundle(path, root, run_id, pins, *, allowed_names=None, selected_prefixes=('selected/new/','selected/old/')):
+    allowed_names = {'report.json','anchor.json'} if allowed_names is None else allowed_names
     data = _read(path, root, BUNDLE_LIMIT)
     import io
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -337,7 +338,7 @@ def _check_bundle(path, root, run_id, pins):
         if set(names) != set(info.get('files', {})) | {'recovery.json'}:
             raise IndexFailure('recovery_bundle_members')
         for name, expected in info['files'].items():
-            if name not in {'report.json', 'anchor.json'} and not name.startswith(('selected/new/', 'selected/old/')):
+            if name not in allowed_names and not name.startswith(selected_prefixes):
                 raise IndexFailure('recovery_bundle_members')
             raw = archive.read(name)
             if len(raw) != expected['bytes'] or hashlib.sha256(raw).hexdigest() != expected['sha256']:
