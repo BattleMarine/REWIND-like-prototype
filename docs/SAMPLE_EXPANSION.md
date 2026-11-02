@@ -1,5 +1,19 @@
 # 실제 샘플 확대를 위한 발견 인덱싱
 
+## job003 재개 준비 — 추가100 관측 후보 목표, 미실행
+
+현재 train stereo∩pose 관측 후보35개에서 추가100개(누적135개)를 목표로 두되, 기존 상한의 job003 한 번만 준비한다. 실제 추출0·validation0이며 관측 대응을 검증된 학습 pair로 취급하지 않는다. 달성을 보장하거나 자동 반복하지 않는다.
+
+job002의 정상 g5 snapshot SHA9ae9c6581f0b382ca46512fd07a85bc2cae21a0a6e09285cef9f4690bf4e1a2f에서 이어 간다. receipt 파일 SHA는0f6e0f41f7a2573a8c2bb4ac13a93c7f4a1c7d9541f09c1b47acf51a60879300, source SHA는73b7007fc0586e72ddc0109290c79af93b7e6954c2f65a3e708bd6e8917b2c37이다. 외부/내부 ZIP CRC·SHA와 receipt·내부DB SHA를 읽기 대조했으며 DB import/scan·원격 요청은 하지 않았다.
+
+실행 source677bc7f와 현재 runner/index 코드가 같아 기존 source ZIP을 유지하고, auth 보완 notebook1d776ff를 사용한다. job ID는 archvis_rgb_discovery_677bc7f_003이며 source/input/workspace/recovery와 새 snapshot 폴더를003으로 분리한다. INPUT_SNAPSHOT_DIRECTORY는002의 원 Drive 폴더, RESUME는 그 폴더의 정확한 g5 receipt 경로·위 파일SHA·anchor 전체다. 정확 설정과 원receipt는 outputs/discovery_job003_prep_20261102/developer/job003_settings.json 및 trusted_g5_receipt.json에 있다. source/input/selection pin·256MiB/2048HTTP/600초·read512MiB/decode256MiB/RSS1GiB/논리출력256MiB·32member×16batch 상한은 유지한다. 실제 재개에서는 원본 metadata/version과 anchor identity를 다시 대조하며 소비된job002를 재실행하지 않는다.
+
+root가 고정한 ready는 outputs/discovery_job003_prep_20261102/handoff/archvis_rgb_discovery_677bc7f_003_ready.ipynb,16,086bytes·SHA75c1a4abdf80358aed61c00f608c2f8b0c499a1f8df1658817a34041dc583afb다. 아직 실행하지 않았고 root의 검토·탐색 세션 인계가 다음 단계다.
+
+비용은 job002의 API body255.051MiB·phase222.865초/관측35개를 단순 비례하면 추가100개에 약728.717MiB·636.756초다. 이는 구간별 파일 순서/크기/pose 관측 coverage와 재개 비용에 따라 달라지는 참조치이며 요금 추정도 아니다. 준비·snapshot 동기화/회수 전송은 별도다. 단일256MiB job003에서100개 증가를 보장할 수 없고 이 계산으로 여러 job을 자동 시작하지 않는다.
+
+현재는600초보다 전송 cap에서 먼저 멈췄다. [ArchiveIndex.scan/_commit](../rewind_archive_index/core.py)은 저장 boundary의 restart 상태를 복원하고 generation·기존 catalog prefix 불변을 검사한다. 동일 gzip의 미인덱싱 뒤쪽은 검증된 해제 상태·tar 경계가 없어 임의 offset으로 독립 scan할 수 없으며, 여러 worker가 같은 저장점에서 시작하면 재해제/전송이 중복된다. gzip 조각000/001을 독립 스트림처럼 해제하거나 별도 suffix 인덱스를 합치는 기능도 없다. 별개 archive별 DB나 알려진 restart 범위의 독립 읽기, read-prefetch는 원리상 병렬화할 수 있지만 [DriveRuntime.block](../rewind_archive_index/drive.py)의 현재 cache/누적 장부는 thread 동기화가 없다. 이번에는 병렬화 코드를 추가하지 않으며 같은 body 상한에서 병렬화가 더 많은 후보를 보장하지 않는다.
+
 ## 2026-11-02 job002 실제 부분 인덱싱 결과
 
 수정 notebook1d776ff/실행 source677bc7f의 Colab job002 결과를 root가 독립 검토했다. 외부 ZIP SHA `251c8addd9e4d05ad0e5bcd09f5d65a2ac43d1cff39dc6ec015ff9c1c1a600a4`, 외부·내부 ZIP CRC와 receipt/report 일치, snapshot SHA `9ae9c6581f0b382ca46512fd07a85bc2cae21a0a6e09285cef9f4690bf4e1a2f`, SQLite SHA `3092b18f3f8cbaeec448ab797570b43ccfcf4a3bf8f46399ede97263ea454902`를 확인했다. 근거는 outputs/test_archvis_rgb_discovery_677bc7f_002_20261102/archvis_rgb_discovery_677bc7f_002_result.zip이다.
