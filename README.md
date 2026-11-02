@@ -6,18 +6,18 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 2026-11-02 기존 원본을 재검토해 Serena frame1·10의 실제 좌우 RGB+pose 대응2개를 확보했습니다. 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 다음은 실제 자료 확인·시험이 필요한 수동 경계입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했고, 보존된 좌우 RGB와 결합했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](docs/POSE_CACHE_BOUNDS.md)를 따르며 영상·좌표·학습 검증은 별도로 남습니다.
+로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 2026-11-02 기존 원본을 재검토해 Serena frame1·10의 실제 좌우 RGB+pose 대응2개를 확보했습니다. 실제 두 sample의 GT2D→3D 단일 프레임 CPU 진단 학습까지 확인했습니다. 실제 RGB 예측 baseline·GPU 성능·M1 전체 완료는 아직 미검증입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했고, 보존된 좌우 RGB와 결합했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](docs/POSE_CACHE_BOUNDS.md)를 따르며 후속 영상·좌표 검토와 GT2D 진단 결과는 아래에 기록하며, 정식 baseline 학습 검증은 남아 있습니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
 | M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, Serena 실제 stereo+pose2개 준비 | 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
-| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로더 Colab CPU 12개 검사와 고정 `65c4287`의 합성 전체 연결 Colab CPU 진단 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
+| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 합성 전체 연결 Colab CPU 진단 및 실제2sample GT2D→3D CPU 진단 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
 | M5~M6 개선·통합 | 미착수 | Ablation·failure 평가·최종 재현 |
 
-최신 실제 API10(`33adef1`)은 목표 JSON2개 완전 저장·hash·파싱에 성공했습니다. 현재 압축 캐시는234MiB이며 ArchVis 전체 본체 상한은351.091MiB입니다. 다른 장면의 최대 크기와 범용 운영 제안은 [JSON 캐시 상한 계산](docs/POSE_CACHE_BOUNDS.md)을 따릅니다. 실제 학습·전체 archive 무결성은 미검증입니다. [RGB 부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)에서는 실제19.68MiB·PNG31개와1/4/16MiB 간격을 비교하고, 원본 길이를 고정한 부분 인덱스 재개를 확인했습니다. 전체 RGB·Drive 연결은 미검증입니다.
+최신 실제 API10(`33adef1`)은 목표 JSON2개 완전 저장·hash·파싱에 성공했습니다. 현재 압축 캐시는234MiB이며 ArchVis 전체 본체 상한은351.091MiB입니다. 다른 장면의 최대 크기와 범용 운영 제안은 [JSON 캐시 상한 계산](docs/POSE_CACHE_BOUNDS.md)을 따릅니다. 실제 GT2D 소량 진단 이후의 baseline 학습·전체 archive 무결성은 미검증입니다. [RGB 부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)에서는 실제19.68MiB·PNG31개와1/4/16MiB 간격을 비교하고, 원본 길이를 고정한 부분 인덱스 재개를 확인했습니다. 전체 RGB·Drive 연결은 미검증입니다.
 
 최신 진입점은 [ArchVis pose 후속 시험 설계](docs/POSE_TAIL352_PLAN.md), [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
 
@@ -29,7 +29,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 2026-11-02 자동 인덱싱 연결: 기존 데이터 준비 `prepare`와 `python -m rewind_archive extract`에 명시적인 persistent-index 옵션을 추가하고 로컬 검증을 마쳤습니다. 요청한 파일이 목록에 없으면 예산 안에서 인덱스를 확장·저장하고, 다음 준비 요청은 저장 상태를 복원합니다. 기존 추출본 검증·매칭·pose candidate 변환 경로에 연결하며 학습 차단 조건은 유지합니다. 이미 추출한 파일의 재사용은 로컬 해시 검증으로 구분합니다. 학습 로더가 모든 archive를 자동 순회하거나 epoch 종료가 전체 인덱싱 완료를 의미하는 기능은 아닙니다. 실제 첫 Drive 통합 시험(`pose_auto_0da5ac5_001`)은 B 복원 후 최초 HEAD 저장 구간에서 실패했습니다. 예외 종류가 미기록되어 최초 오류의 실제 원인은 미확정입니다. [자동 준비 연결 안내](docs/AUTOMATIC_INDEX_PREPARATION.md)를 따릅니다. HEAD 게시의 hard link/fsync 의존을 제거하고 이전본 보존·읽기 검증·단계별 오류 기록을 보완했습니다. 관련 로컬35개 검사가 통과했으며 수정본의 실제 Drive 통합 시험도 통과했습니다. 상세 결과는 아래 전용 문서를 따릅니다.
 
-2026-11-02 실제 sample 확보: 기존 오른쪽 결과 ZIP을 회수해 왼쪽 RGB·pose와 결합했고, 추가 전송 없이 Serena frame1·10의 stereo+pose2개·RGB manifest·pose candidate·GT2D 검토 화면을 만들었습니다. 공식 train 소속·파일 hash·좌표 변환·재투영 수치 검사를 통과했고 root가 별도 재실행과 제한적 영상 대조를 했습니다. 두 frame은 비연속이며 정식 학습 release·독립 validation·원본 motion 검증은 남아 있습니다. 다음은 이 sample을 이용한 명시적 단일 프레임 진단 학습 연결이며, 전체 RGB 인덱싱 완료를 기다리지 않습니다. [준비 명령과 산출물](docs/REAL_DATA_NEXT_RUN.md)을 따릅니다.
+2026-11-02 실제 sample 확보: 기존 오른쪽 결과 ZIP을 회수해 왼쪽 RGB·pose와 결합했고, 추가 전송 없이 Serena frame1·10의 stereo+pose2개·RGB manifest·pose candidate·GT2D 검토 화면을 만들었습니다. 공식 train 소속·파일 hash·좌표 변환·재투영 수치 검사를 통과했고 root가 별도 재실행과 제한적 영상 대조를 했습니다. 두 frame은 비연속이며 정식 학습 release·독립 validation·원본 motion 검증은 남아 있습니다. 이 sample의 명시적 단일 프레임 GT2D 진단 학습까지 연결했고, 전체 RGB 인덱싱 완료를 기다리지 않습니다. [준비 명령과 산출물](docs/REAL_DATA_NEXT_RUN.md)을 따릅니다.
+
+2026-11-02 실제 단일 프레임 진단: Serena train frame1·10의62관절을 이용해 GT2D→3D CPU regression을 연결했다. 입력은(2,1,868), target은(2,1,62,3)mm이며 프레임을 독립 처리한다. 고정100update와50시점 재개50update의 전체 checkpoint 상태가 일치했고 같은2sample train-fit normalized MSE0.146078→0.015887, MPJPE618.13→188.49mm로 감소했다. 이는 RGB 예측·일반화·temporal 성능이 아닌 실제 GT입력 진단이며 좋은 정확도나 M1 전체 완료를 뜻하지 않는다. 일반 loader와 candidate 학습 차단은 유지하고 별도 diagnostic-only 진입점만 사용한다. [실행 안내](docs/REAL_GT2D_DIAGNOSTIC.md).
 
 ## 문서 안내
 
