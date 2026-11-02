@@ -1,5 +1,7 @@
 # 전체 데이터 학습 준비
 
+현재 상태: 고정20b7aa9 합성 A100 FP32/AMP 재개 시험은 통과했고 완료 bundle의 T1 진단 reader를 로컬 검증했다. 아래 초기 감사/준비 기록의 GPU 미검증은 당시 상태이며 실제 데이터 release·정식 학습·정확도·Drive 새VM 검증은 여전히 미완료다. 최신 범위는 문서 말미의 결과 수령 및 reader 기록을 따른다.
+
 2026-11-02 사용자 결정: Colab 기준으로 전체 데이터셋 학습을 준비하며 화면 개발보다 우선한다. 화면용 프론트와 모델·학습·평가·추론 코어를 분리한다. RGB에서 2D 관절을 예측하는 신경망 frontend는 학습 모델에 포함한다. 전체 다운로드·실제 장시간 학습·의존성 설치·원격 접근은 이 개발 작업에서 실행하지 않는다.
 
 ## 감사 결과
@@ -182,3 +184,11 @@ Root도 신규T1 8+기존M1 trainer14, 총22개를 독립 실행해 failure/erro
 2026-11-02 고정 `20b7aa9`의 사용자 Colab 합성 GPU 시험 `synthetic_gpu_20b7aa9_001`이 통과했다. A100-SXM4-40GB에서 FP32/AMP 각각 RGB·M1의 전체 학습 상태 재개 일치, native cache/join의 GT3D·mask 보존, export 예측 일치를 확인했다. 32attempt/32성공 update·AMP skip0, supervisor24.000초·관측 worker RSS2,676,375,552bytes, Torch allocator peak allocated174,359,552/reserved203,423,744bytes로 고정 예산 이내였다. 시간은 IO 포함이며 전체 driver VRAM 계측이 아니다. Root도 결과 ZIP CRC와 checkpoint12개 SHA를 독립 대조했다. 실제 데이터 학습·정확도·Drive queue 새VM 지속성은 미검증이며 `full_training_ready=false`를 유지한다. Drive 영구보관은 미확인이다.
 
 세부 환경·결과 파일은 [GPU 시험 근거](SYNTHETIC_GPU_PILOT.md)를 따른다. 앞선 미실행 기록은 준비 당시 상태다.
+
+## 완료 bundle의 모델 입력 T=1 reader
+
+[T1 데이터 계약](BUNDLE_T1_DATA.md)의 별도 rewind_bundle_data API/CLI로 준비 bundle과 모델 입력 사이의 진단 공급을 연결했다. 명시 완료 content SHA·단일 split·diagnostic_only를 요구하며 전체 파일 byte/SHA·plan target/matching/producer/candidate·원본 motion/split과62관절 raw→mm/mask/GT2D 특징을 먼저 감사한다. 이후 candidate 하나만 캐시하고 job 간 bounded batch·native RGB/GT2D/annotation mask·GT3D mm/target mask·T1 GT 특징을 CPU로 반환한다. 화면 밖의 유효 GT를 제거하지 않고 visibility와 mask를 구분한다. timestamp·temporal history를 추론하지 않으며 dataset_sample/diagnostic_only/train_ready=false와 기존 trainer gate는 유지한다.
+
+개발8개가22.499초, root 독립8개가23.447초에 failure/error/skip0으로 통과했다. 커밋되는 검사는 새 소량 archive/queue/bundle fixture를 생성해 실행하며 ignored 산출물 의존을 제거했다. 기존 converter와 pack_window(T1)의 수치/shape/mask·job 간 batch·상한·warm raw 변조·완료 검증 parity·CPU 명시·metadata CLI 무Torch/무모델 import를 확인했다. 보존 합성3triplet/2pose job의 별도 읽기 대조도 입력 전체 SHA 불변으로 통과했으며 metadata sampledRSS28,426,240bytes·native RGB batch peak274,923,520bytes였다. 이 값은 로컬 CPU 프로세스 관측이며4GiB 전체프로세스 guard/반환64MiB tensor 상한과 구분한다. 근거는 `outputs/full_training_readiness_20261102/developer/bundle_data/`의 `final_tests.txt`, `preserved_inspection.json`, `metadata_imports.json`과 root의 `bundle_data_tests.txt`다.
+
+기존 실제 Serena candidate는62관절/mm/2개 key·차단상태를 읽기 참고했으며 bundle로 변환하거나 새 실제 학습을 실행하지 않았다. 고정 GPU 코드·배포물과 기존 작은 진단 API는 보존했다. 실제 release·정식 RGB batch 학습 연결·독립 validation/정확도·원본 motion/단위/내용/시간 정합·Drive 새VM·temporal window는 후속이다. 이전 GPU 미실행 기록은 준비 당시 상태이며 고정20b7aa9의 합성 A100 FP32/AMP 통과 상태는 바로 위 결과 수령 기록과 구분한다.

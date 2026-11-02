@@ -6,6 +6,10 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-02 완료 bundle의 UI 독립 T=1 진단 reader를 추가했습니다. 명시 COMPLETE pin·split과 전체 byte/raw 수치 감사를 거쳐 candidate 한 개를 캐시하고, native RGB·GT2D/annotation mask·GT3D mm/target mask·GT2D 특징을 제한 batch로 읽습니다. 자체 생성 fixture 개발8개와 root 독립8개가 통과했으며 기존 학습 gate와 dataset_sample/diagnostic_only/train_ready=false를 유지합니다. [데이터 계약과 상한](docs/BUNDLE_T1_DATA.md)을 따릅니다.
+
+아래 날짜별 구현 기록의 GPU 미실행·미검증은 해당 준비 당시 상태입니다. 현재 고정20b7aa9의 합성 A100 FP32/AMP 시험은 통과했으며 실제 데이터 GPU 학습·정확도 검증은 별도입니다.
+
 2026-11-02 고정 `20b7aa9`의 사용자 Colab 합성 GPU 시험 `synthetic_gpu_20b7aa9_001`이 통과했다. A100-SXM4-40GB에서 FP32/AMP 각각 RGB·M1의 전체 학습 상태 재개 일치, native cache/join의 GT3D·mask 보존, export 예측 일치를 확인했다. 32attempt/32성공 update·AMP skip0, supervisor24.000초·관측 worker RSS2,676,375,552bytes, Torch allocator peak allocated174,359,552/reserved203,423,744bytes로 고정 예산 이내였다. 시간은 IO 포함이며 전체 driver VRAM 계측이 아니다. Root도 결과 ZIP CRC와 checkpoint12개 SHA를 독립 대조했다. 실제 데이터 학습·정확도·Drive queue 새VM 지속성은 미검증이며 `full_training_ready=false`를 유지한다. Drive 영구보관은 미확인이다. [시험 근거](docs/SYNTHETIC_GPU_PILOT.md).
 
 2026-11-02 완료 준비 queue를 로컬 RGB manifest·pose job별 candidate/audit·출처 연결 bundle로 묶는 UI 독립 adapter를 추가했습니다. 전체 triplet 명시 선택과 source/file/metadata SHA·split/motion·예산을 검사하고, 새 출력의 완료 marker를 검증합니다. 개발47개 회귀와 최종 정렬/완료 경로3개, root20개 및 verify3개가 통과했습니다. 이는 합성 로컬 준비 검증이며 학습 release·candidate→학습 shard·실제 GPU 실행은 포함하지 않습니다. [지원 범위와 검증 근거](docs/PREPARED_BUNDLE.md)를 따릅니다.

@@ -58,4 +58,4 @@ python -m rewind_prepared_bundle verify --root new_bundle
 
 job별 train/validation 누락 blocker는 **각 candidate**의 범위다. bundle 전체에 양 split이 있어도 독립 validation·원본 motion 검증이 완료되었다고 해석하지 않는다. RGB/pose 내용 정합·timestamp·전체 archive coverage·단위 가정의 독립 검증, 실제 데이터 release와 candidate→학습 shard 변환은 여전히 미완료다.
 
-기존 `20b7aa9` GPU source ZIP·ready notebook·산출물은 보존하며 실제 GPU/AMP 시험은 미실행 상태다. 이 작업에서 네트워크·설치·실제 데이터 변환/학습을 수행하지 않는다.
+이 bundle 구현 기록의 GPU 미실행은 준비 당시 상태다. 이후 고정 `20b7aa9`의 합성 A100 FP32/AMP 시험이 통과했으며 [최신 GPU 결과](SYNTHETIC_GPU_PILOT.md)를 따른다. 고정 배포물은 보존한다. 후속 [T1 진단 reader](BUNDLE_T1_DATA.md)는 candidate를 학습 문서로 바꾸지 않고 RGB/GT 데이터를 읽는다. 실제 데이터 release·정식 학습·temporal 지원은 여전히 별도다.
