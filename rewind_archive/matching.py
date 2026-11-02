@@ -106,18 +106,20 @@ def contiguous_runs(values):
     return runs
 
 
-def match_extractions(paths):
+def match_extractions(paths, *, allow_code_change=False):
+    if type(allow_code_change) is not bool:raise PreparationError("matching_allow_code_change_bool")
     if not paths or len(paths)>32:
         raise PreparationError("matching_inputs")
     by_sequence, reports, issues = {}, [], []
     versions = set()
     for path in paths:
-        report = verify_extraction(path)
+        report = verify_extraction(path,allow_code_change=allow_code_change)
         manifest = report["archive_manifest"]
         versions.add(manifest["dataset_version"])
         reports.append({"archive_id":manifest["archive_id"],"source_scope":manifest["source_scope"],
             "extraction_manifest_sha256":digest(report),"stop_reason":report["stop_reason"],
             "whole_archive_integrity_verified":report["whole_archive_integrity_verified"]})
+        reports[-1]["producer_code_sha256"]=report["code_sha256"]
         for file in report["files"]:
             try:
                 seq, frame, view = identify(file["member"],manifest["kind"])
@@ -148,7 +150,7 @@ def match_extractions(paths):
             "observed_frames":observed,"observed_runs":runs,"missing_frame_ranges_between_observations":gaps,
             "matched_triplet_frames":complete,"matched_triplet_runs":contiguous_runs(complete),"missing_views":missing,
             "sequence_start_end_completeness":"unknown","frames":[{"frame_index":i,"views":frames[i]} for i in observed]})
-    report = {"schema_version":"archive_matching_v1","inputs":reports,"dataset_versions":sorted(versions),
+    report = {"schema_version":"archive_matching_v1","inputs":reports,"dataset_versions":sorted(versions),"allow_code_change":allow_code_change,
         "issues":issues,"sequences":sequences,"matching_valid":not issues,"train_ready":False,
         "matched_triplet_count":sum(len(s["matched_triplet_frames"]) for s in sequences),
         "incomplete_frame_count":sum(len(s["missing_views"]) for s in sequences),

@@ -284,6 +284,33 @@ class ArchiveTests(ArchiveTestCase):
         with self.assertRaises(FileExistsError): prepare(json.loads((fixture/'pose_manifest.json').read_text()),outputs[1],['**'],self.limits,base=fixture)
 
 
+class MatchingCompatibilityTests(ArchiveTestCase):
+    def test_old_code_is_rejected_by_default_and_explicitly_allowed(self):
+        manifest,base=self.manifest();original,out=self.run_extract(manifest,base)
+        with patch('rewind_archive.matching.code_hashes',return_value={}):
+            with self.assertRaisesRegex(PreparationError,'extraction_code_changed'):match_extractions([out])
+            allowed=match_extractions([out],allow_code_change=True)
+        self.assertTrue(allowed['allow_code_change'])
+        self.assertEqual(allowed['inputs'][0]['producer_code_sha256'],original['code_sha256'])
+        self.assertFalse(allowed['train_ready'])
+
+    def test_explicit_code_allowance_does_not_allow_payload_or_manifest_damage(self):
+        manifest,base=self.manifest();report,out=self.run_extract(manifest,base)
+        file=out/'files'/member();raw=file.read_bytes();file.write_bytes(b'xyz')
+        with self.assertRaisesRegex(PreparationError,'extracted_file_hash'):match_extractions([out],allow_code_change=True)
+        file.write_bytes(raw)
+        path=out/'extraction_manifest.json';doc=json.loads(path.read_bytes());doc['train_ready']=True;path.write_bytes(canonical(doc))
+        with self.assertRaisesRegex(PreparationError,'extraction_manifest_hash'):match_extractions([out],allow_code_change=True)
+
+    def test_matching_cli_code_allowance_is_explicit(self):
+        manifest,base=self.manifest();report,out=self.run_extract(manifest,base)
+        command=['match','--extraction',str(out),'--output',str(self.root/'matching.json')]
+        with patch('rewind_archive.matching.code_hashes',return_value={}):
+            with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):main(command)
+            with contextlib.redirect_stdout(io.StringIO()):self.assertEqual(main(command+['--allow-code-change']),0)
+        self.assertTrue(json.loads((self.root/'matching.json').read_bytes())['allow_code_change'])
+
+
 class RangeHandler(BaseHTTPRequestHandler):
     def log_message(self,*args):
         pass

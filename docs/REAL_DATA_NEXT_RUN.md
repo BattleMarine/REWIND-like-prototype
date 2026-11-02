@@ -1,5 +1,49 @@
 # 다음 실제 데이터 준비 실행
 
+## 2026-11-02 현재 최단 경로 — 새 전송 없이 실제 정적2sample 준비 완료
+
+기존 다운로드 폴더에서 오른쪽 성공 원본 `rewind_pilot_2c11fc10.zip`을 회수해 CRC·manifest 자체hash·usable bounded stop·PNG2개 hash/CRC를 확인했다. 이전의 “오른쪽 성공 ZIP 미회수”와 stereo+pose 교집합0은 당시 조사 결과다. 기존 left1/10과 이후 확보한 pose1/10을 같은 sequence/frame으로 대조해 **실제 stereo RGB+pose 두 sample을 추가 네트워크0으로 준비했다.** Lab 장면 RGB prefix에서 새 대응 pose를 찾거나 Serena 목표를 다시 깊게 탐색할 필요가 없었다.
+
+동일 sequence는 `ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Shape_01/003/Getting_Up__1_`, frame은1·10이다. 서로 비연속이며 한 sequence의 공식 **train** 소속이다. 두 frame을 train/validation으로 나누거나 연속 clip·학습 준비 완료로 취급하지 않는다.
+
+| 보존 원본 | 경로 | 고정 ZIP SHA256 |
+| --- | --- | --- |
+| right RGB | `outputs/real_stereo_sample_20261102/root/rewind_pilot_2c11fc10.zip` | `3264743f26e254b87c86031cdd45071fa595f1173127baee59e3724d2fdadac2` |
+| left RGB | `outputs/test_archvis_left_counterpart_20261017/archive_job_archvis_left_1_10_64m_001.zip` | `61a64a6ef635dec46f8582708c425ef4af4956f43b078839ea635c2edf22697a` |
+| pose | `outputs/test_archvis_pose_tail352_20261029/archive_job_archvis_pose_1_10_tail352_001.zip` | `e072992e64c907f3ff3e9bcfeb02b42bc18cbc41171821fecc50341011115544` |
+
+[`scripts/prepare_serena_static_sample.py`](../scripts/prepare_serena_static_sample.py)는 위 세 원본의 SHA/CRC·내용 hash를 대조하고 새 출력에만 복원한다. 과거 producer code hash는 그대로 보존하며 `--allow-code-change`를 명시한 경우에만 현재 verifier/matching/RGB builder가 과거 코드를 허용한다. Payload·manifest 검증은 생략하지 않는다. 기본 거부·명시 허용·손상 거부 회귀를 통과했다. 기존 manifest를 현재 code hash로 재발급하거나 raw/cache/index를 바꾸지 않는다.
+
+재현은 의존성(Pillow·numpy·torch)이 준비된 Python 실행 파일로 아래 wrapper를 호출한다. 이미 존재하는 출력은 거부하며 새 출력 경로를 사용한다. 이 명령은 개발 재현용이고 사용자 Colab 재시험 요청이 아니다.
+
+```text
+python scripts/prepare_serena_static_sample.py
+  --right outputs/real_stereo_sample_20261102/root/rewind_pilot_2c11fc10.zip
+  --left outputs/test_archvis_left_counterpart_20261017/archive_job_archvis_left_1_10_64m_001.zip
+  --pose outputs/test_archvis_pose_tail352_20261029/archive_job_archvis_pose_1_10_tail352_001.zip
+  --reference-zip .local-archive/20261023/legacy_outputs.zip
+  --output outputs/real_stereo_sample_20261102/developer/new_prepared
+  --allow-code-change
+```
+
+실제 실행 결과는 `outputs/real_stereo_sample_20261102/developer/prepared/`에 보존한다.
+
+- `matching.json`: 실제 좌우·pose 교집합2개와 과거 producer hashes, 명시적 code 변경 허용 여부.
+- `rgb/manifest.json`: 검증된1024×1024 stereo2record와 각 PNG/원본 archive의 출처. `inputs/`에는 원래 member 경로를 보존한 복원본만 둔다.
+- `pose/candidate.json`, `pose/audit.json`: 기존 converter가 만든 학습 차단 candidate와 단위/좌표/어안 재투영 감사.
+- `review/review.html`, `review/report.json`: 원본 PNG와 GT2D·누락 mask·화면 밖 관절을 확인하는 기존 검토 UI. `representative_overlay.png`는 원본 좌표에 점을 그린 뒤 영상과 함께0.5배 축소한 대표 비교 이미지다.
+- `preparation_report.json`: 원본ZIP3개 전후 SHA 일치, 공식 split/calibration pin, 실제2sample·새 전송0·미해결 blocker.
+
+공식 train/validation/test와 Scaramuzza 파일은 보존 `legacy_outputs.zip`에서 필요한4개 member만 읽어 현재 `real_archvis62_v1`의 pinned SHA와 모두 대조했다. 이 archive 전체의 무결성을 재검사했다는 뜻은 아니다. 원본 motion ID는 경로 기준 `declared_unverified`로 기록한다.
+
+수치 감사는 기존 구현 가정 아래 통과했다. World→camera 최대 오차는 raw 단위 `2.8422e-14`, inverse `4.2633e-14`, camera↔device `2.1316e-14`, 어안 재투영은 최대 `6.6154e-5px`였다. 단위 상태는 `adopted_metric_anchor_inference`이며 별도 실측으로 단위를 새 확정한 것은 아니다. Frame1의 화면 밖 관절은 left22/right20, frame10은0/0이고 각 view의 유효 annotation62개와 구분해 그대로 보존했다. Occlusion/visibility를 유효 mask로 대체하지 않는다.
+
+학습 차단은 유지한다. RGB–pose의 최종 사람 검토, timestamp 의미, 원본 motion 독립성, 독립 validation, 비연속 frame의 temporal 사용, training release는 별도 조건이다. `train_ready=False`, `training_release=not_implemented`이며 학습은 실행하지 않았다. 대표 이미지에 대한 오케스트레이션 시각 검토는 별도 결과로 기록한다. 새 원격 notebook/합성 UI 재시험은 만들지 않았다.
+
+실제 offline 준비와 관련 local archive/matching·RGB builder·converter 회귀40개가 실패·오류·건너뜀 없이 통과했다. 근거는 `outputs/real_stereo_sample_20261102/developer/{tests.json,tests.txt,code_hashes.json}`이다. README/ROADMAP의 현재 상태와 이후 작업 선택은 오케스트레이션이 관리한다.
+
+Root도 별도 출력 `outputs/real_stereo_sample_20261102/root/prepared/`에서 실제 준비를 재실행해 같은2sample과 수치 감사를 확인했다. 대표 이미지에서 보이는 몸통·팔·손·무릎에 명백한 frame/좌우 불일치는 보이지 않았으나, 이는 제한적인 육안 검토이며 가려진 관절·화면 밖 관절·관절별 정확도를 검증한 것은 아니다. 기존 candidate를 학습 승인으로 바꾸지 않는다. Root의 로컬 archive/matching21개 검사도 통과했다. 별도 사용자 Colab/합성 UI 재시험은 요청하지 않으며 다음은 실제 단일 프레임 진단 학습 연결이다.
+
 ## 2026-10-29 API10 실제 목표 확보 — 시험 종료
 
 `archvis_pose_1_10_tail352_001`에서 두 JSON 완전 저장·hash·object 파싱을 확인했다. 기존192MiB cache 재사용 후 신규42MiB를 읽었고 준비158.097초/506HTTP, prefix234MiB에서 조기 종료했다. 전체 EOF/CRC·좌우 영상/좌표/시간·학습은 미검증이다. 같은 JOB를 재실행하지 않는다. [실제 결과와 캐시 상한 계산](POSE_CACHE_BOUNDS.md)을 따르며 아래 인계 준비는 종료된 시험의 이력이다.

@@ -6,11 +6,11 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 조사한 실제 자료의 stereo+pose 대응 확인은0개입니다(전체 자료 부재를 뜻하지 않음). 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 다음은 실제 자료 확인·시험이 필요한 수동 경계입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](docs/POSE_CACHE_BOUNDS.md)를 따르며 영상·좌표·학습 검증은 별도로 남습니다.
+로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 2026-11-02 기존 원본을 재검토해 Serena frame1·10의 실제 좌우 RGB+pose 대응2개를 확보했습니다. 실제 데이터·GPU 성능·M1 전체 완료는 미검증이며 다음은 실제 자료 확인·시험이 필요한 수동 경계입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했고, 보존된 좌우 RGB와 결합했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](docs/POSE_CACHE_BOUNDS.md)를 따르며 영상·좌표·학습 검증은 별도로 남습니다.
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
-| M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, API10 Serena 목표 pose2개 확보 | 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
+| M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, Serena 실제 stereo+pose2개 준비 | 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
 | M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 로더 Colab CPU 12개 검사와 고정 `65c4287`의 합성 전체 연결 Colab CPU 진단 통과 | 실제 RGB front-end·예측 입력 baseline·GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
@@ -28,6 +28,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 고정 Drive 원본 명세의 Range reader와 닫힌 snapshot 저장·복원 연결을 추가했습니다. [Drive 지속형 인덱스 시험](docs/DRIVE_PERSISTENT_INDEX.md)에서 2026-10-30 실제 pose의 Drive 저장본을 새 Colab CPU 런타임으로 복원하고 목록을16→32개로 이어 가는 시험을 통과했습니다. 선택 JSON2개의 실제 해시도 일치했습니다. 후속 C pilot은 B 저장본을 복원해 기존 gzip coverage 밖의 새 JSON과 인덱스 확장을 확인하고, 새 snapshot을 다시 열어 재추출하는 경로입니다. 실제 C 첫 실행은 B 복원 기록만 남은 채 미완료이며, 회수 DB는32member/generation2로 확장 저장이 없습니다. 최초 중단 원인은 미확정입니다. 후속 수정본은 실행 전 버전·입력 식별값과 단계·중단 종류를 저장하고, 실행 셀을 다시 돌리지 않고 디스크 기록에서 보고서를 회수하도록 보완했습니다. 수정본 `1c31a73`의 실제 Colab CPU C 시험에서는 목록32→80개, gzip coverage3,791,957→6,324,814bytes 확장과 저장된 새 인덱스로 기존·신규 JSON3개 재추출·해시 일치를 확인했습니다. 응답body3,673,616bytes/54HTTP로 예산 내였고 보고서 회수와 flush가 완료됐습니다. [실제 C 결과](docs/PERSISTENT_INDEX_EXTENSION.md#2026-10-30-수정본-실제-c-시험-결과)를 따릅니다. C 이후 새VM 지속성·RGB 원격 검증은 남아 있습니다. 기존 archive_prepare/학습 epoch 자동 연결과 대규모 행 단위 catalog는 미구현입니다. 기존 API10과 캐시는 변경하지 않았고, Core 직접 추출 형식과 달리 아래 opt-in 준비 경로는 기존 추출 검증 도구에 연결했습니다. 학습1epoch 완료를 전체 인덱싱 완료로 표시하지 않습니다. 관측 목록 완료와 전체 gzip CRC 검증을 별도로 기록하며 두 조건을 만족해야 전체 완료입니다.
 
 2026-11-02 자동 인덱싱 연결: 기존 데이터 준비 `prepare`와 `python -m rewind_archive extract`에 명시적인 persistent-index 옵션을 추가하고 로컬 검증을 마쳤습니다. 요청한 파일이 목록에 없으면 예산 안에서 인덱스를 확장·저장하고, 다음 준비 요청은 저장 상태를 복원합니다. 기존 추출본 검증·매칭·pose candidate 변환 경로에 연결하며 학습 차단 조건은 유지합니다. 이미 추출한 파일의 재사용은 로컬 해시 검증으로 구분합니다. 학습 로더가 모든 archive를 자동 순회하거나 epoch 종료가 전체 인덱싱 완료를 의미하는 기능은 아닙니다. 실제 첫 Drive 통합 시험(`pose_auto_0da5ac5_001`)은 B 복원 후 최초 HEAD 저장 구간에서 실패했습니다. 예외 종류가 미기록되어 최초 오류의 실제 원인은 미확정입니다. [자동 준비 연결 안내](docs/AUTOMATIC_INDEX_PREPARATION.md)를 따릅니다. HEAD 게시의 hard link/fsync 의존을 제거하고 이전본 보존·읽기 검증·단계별 오류 기록을 보완했습니다. 관련 로컬35개 검사가 통과했으며 수정본의 실제 Drive 통합 시험도 통과했습니다. 상세 결과는 아래 전용 문서를 따릅니다.
+
+2026-11-02 실제 sample 확보: 기존 오른쪽 결과 ZIP을 회수해 왼쪽 RGB·pose와 결합했고, 추가 전송 없이 Serena frame1·10의 stereo+pose2개·RGB manifest·pose candidate·GT2D 검토 화면을 만들었습니다. 공식 train 소속·파일 hash·좌표 변환·재투영 수치 검사를 통과했고 root가 별도 재실행과 제한적 영상 대조를 했습니다. 두 frame은 비연속이며 정식 학습 release·독립 validation·원본 motion 검증은 남아 있습니다. 다음은 이 sample을 이용한 명시적 단일 프레임 진단 학습 연결이며, 전체 RGB 인덱싱 완료를 기다리지 않습니다. [준비 명령과 산출물](docs/REAL_DATA_NEXT_RUN.md)을 따릅니다.
 
 ## 문서 안내
 

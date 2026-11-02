@@ -38,6 +38,7 @@ def main(argv=None):
     match = sub.add_parser("match")
     match.add_argument("--extraction",type=Path,action="append",required=True)
     match.add_argument("--output",type=Path,required=True)
+    match.add_argument("--allow-code-change",action="store_true",help="과거 추출본 code hash 변경을 명시적으로 허용; payload 검증은 유지")
     plan = sub.add_parser("plan-counterparts")
     plan.add_argument("--extraction",type=Path,action="append",required=True)
     plan.add_argument("--max-frames",type=int,default=8)
@@ -63,7 +64,7 @@ def main(argv=None):
             report = verify_extraction(args.extraction,read_bounded_json(args.manifest))
             print(json.dumps({"verified_complete_file_hashes":len(report["files"]),"train_ready":False,"stop_reason":report["stop_reason"]},indent=2))
             return 0
-        report = counterpart_plan(args.extraction,args.max_frames) if args.command=="plan-counterparts" else match_extractions(args.extraction)
+        report = counterpart_plan(args.extraction,args.max_frames) if args.command=="plan-counterparts" else match_extractions(args.extraction,allow_code_change=args.allow_code_change)
         args.output.parent.mkdir(parents=True,exist_ok=True)
         with args.output.open("xb") as f:
             f.write(canonical(report)+b"\n")
