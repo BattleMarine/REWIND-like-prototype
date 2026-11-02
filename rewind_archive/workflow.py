@@ -13,7 +13,7 @@ from .drive_metadata import MetadataLimits, build_drive_manifest, provenance, sa
 from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
-from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits
+from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits, TARGET67_PROFILE, validate_target67, validate_target67_cache
 from .diagnostics import request_failure, safe_request_failure
 from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
 from .prefix_cache import validate_input_spec, export_cache
@@ -67,6 +67,7 @@ def make_preflight(config, history):
     cache_policy=for_profile(config.get("profile"))
     expectation=validate_expectation(config.get("cache_expectation"),required=cache_policy is not None,
         **({"policy":cache_policy} if cache_policy else {}))
+    validate_target67_cache(config.get("profile"),expectation)
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -85,13 +86,16 @@ def make_preflight(config, history):
         validate_profile_limits(config["profile"],limits)
     if any(value>asdict(MetadataLimits())[key] for key,value in asdict(metadata).items()):
         raise PreparationError("workflow_budget_increase_not_supported")
-    config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode)
+    maximum=67 if config["profile"]==TARGET67_PROFILE else 32
+    config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode,maximum=maximum)
+    validate_target67(config["profile"],config["exact_targets"],mode,purpose)
     if config["profile"] in TARGET_PAIR_PROFILES and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
         raise PreparationError("counterpart_profile_requires_targeted_pair")
     if config["profile"] in POSE_PROFILES and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
         raise PreparationError("pose_profile_requires_pose_kind")
     if request_policy and (config["profile"] not in POSE_PROFILES or
-            (mode!="review" and (mode,purpose)!=("extract","targeted")) or len(config["exact_targets"])!=2):
+            (mode!="review" and (mode,purpose)!=("extract","targeted")) or
+            (len(config["exact_targets"])!=2 and config["profile"]!=TARGET67_PROFILE)):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
     if cache_input is not None and config["profile"] not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
     if expectation is not None and cache_policy is None:raise PreparationError("warm_profile_required")
@@ -114,7 +118,7 @@ def make_preflight(config, history):
         if mode=="scan" and config["includes"]==[]:
             pass
         else:
-            validate_includes(config["includes"])
+            validate_includes(config["includes"],maximum=maximum)
         if purpose=="discovery" and limits.max_files>2:
             raise PreparationError("workflow_discovery_set_max_files_at_most_2")
     effective={k:config[k] for k in ("mode","purpose","selection","includes","limits","metadata_limits")}
@@ -301,6 +305,10 @@ def review_run(path):
                 "selected_pair_passed":bool(report.get("targets_complete")) and len(parsed)==2 and not invalid
                     and result["file_verification"]=="passed_current_code",
                 "scope":"JSON object syntax and stored-file hashes only; pose semantics unverified"}
+            if report.get("profile")==TARGET67_PROFILE:
+                result["selected_json_verification"].update(expected_targets=67,
+                    selected_targets_passed=bool(report.get("targets_complete")) and len(parsed)==67 and
+                    set(parsed)==set(report["exact_targets"]) and not invalid and result["file_verification"]=="passed_current_code")
     if (extraction_root/"pilot_report.json").is_file():
         pilot=read_report(extraction_root/"pilot_report.json")
         result["sample_acquired"]=pilot.get("sample_acquired",False)

@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-02 Colab RGB job003은 g5/160항목에서 g9/270항목으로 재개·확장했습니다. train stereo는59→102개, 기존 pose 관측 대응은35개로 유지됐으며 실제 추출0·validation0입니다. 추가 전송을 자동 반복하지 않고, 기존234MiB warm cache에서 미관측 pose67개를 고정 추출하는 전용 profile·notebook을 준비했습니다. 로컬24개 검사 통과이며 실제 pose67 원격 실행·학습 준비는 미완료입니다. [RGB 실제 결과](docs/SAMPLE_EXPANSION.md)와 [pose67 준비·상한·회수](docs/POSE_MISSING67.md)를 따릅니다.
+
 2026-11-02 Colab job002에서 ArchVis RGB 부분 인덱싱·스냅샷 저장·결과 회수에 성공했습니다. 전송 상한에서 정상 중단했으며 저장 항목160개, train 좌우 RGB 대응59개 중 pose 관측 대응35개를 확인했습니다. 실제 추출0개·validation0개로 학습 준비 완료는 아닙니다. 다음은 저장 인덱스에서 후보 일부를 추출·검증하고 validation 후보 탐색을 이어가는 것입니다. [실제 결과와 제한](docs/SAMPLE_EXPANSION.md)을 따릅니다.
 
 2026-11-02 실제 샘플 확대 조사와 ArchVis RGB 증분 인덱싱 실행본을 준비했습니다. 보존 pose 목록에서 validation 후보 1,331개(20개 sequence)를 확인했지만, 대응 RGB가 없어 완전한 추출 triplet은 기존 Serena train 2개뿐입니다. 보유 Lab prefix의 복사 DB를 한 번 확장했으나 다음 파일이 불완전해 새 후보는 늘지 않았습니다. 새 Drive 원본의 인덱스를 최대 256MiB·600초·512개 항목까지 확장하고 저장하는 도구와 CPU 노트북을 준비했으며, 로컬 모의 검사 4개를 통과했습니다. 실제 Colab 원격 실행은 아직 하지 않았습니다. 검토한 고정본은 데이터셋 탐색 세션에 인계합니다. [조사 결과·상한·운영 인계](docs/SAMPLE_EXPANSION.md)를 따릅니다.

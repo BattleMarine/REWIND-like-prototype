@@ -26,9 +26,9 @@ def digest(doc):
     return hashlib.sha256(canonical(doc)).hexdigest()
 
 
-def validate_includes(includes):
+def validate_includes(includes, *, maximum=32):
     """인증·metadata 전에 공유하는 선택 preflight. 중복도 입력 오류다."""
-    if not isinstance(includes,list) or not 1 <= len(includes) <= 32:
+    if type(maximum) is not int or maximum not in (32,67) or not isinstance(includes,list) or not 1 <= len(includes) <= maximum:
         raise PreparationError("explicit_selection_required")
     for pattern in includes:
         if not isinstance(pattern,str) or not pattern or len(pattern.encode("utf-8"))>1024:
@@ -39,10 +39,10 @@ def validate_includes(includes):
     return list(includes)
 
 
-def validate_exact_targets(targets, includes, limits, mode):
+def validate_exact_targets(targets, includes, limits, mode, *, maximum=32):
     if targets is None:
         return []
-    if not isinstance(targets,list) or len(targets)>32:
+    if type(maximum) is not int or maximum not in (32,67) or not isinstance(targets,list) or len(targets)>maximum:
         raise PreparationError("exact_targets_list")
     if not targets:
         return []
@@ -53,7 +53,7 @@ def validate_exact_targets(targets, includes, limits, mode):
             raise PreparationError("exact_targets_canonical_literal_path")
     if len({t.casefold() for t in targets})!=len(targets):
         raise PreparationError("exact_targets_duplicate")
-    validate_includes(includes)
+    validate_includes(includes,maximum=maximum)
     if set(includes)!=set(targets):
         raise PreparationError("selection_exact_targets_mismatch")
     return list(targets)

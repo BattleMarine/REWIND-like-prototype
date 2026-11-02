@@ -2,6 +2,8 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
+2026-11-02 최신 데이터 준비: 실제 RGB job003은 g5/160→g9/270항목, train stereo59→102개로 확장했으나 pose 관측 대응35개·실제 추출0·validation0이다. 기존234MiB v4 warm cache와 정확한 미관측67개만 허용하는 posePrefixTargets67_v1·전용 notebook을 준비했고 로컬24개 검사(skip0)를 통과했다. 신규 media는 보존 prefix 뒤에서 읽고 기존234MiB는 로컬 재해제한다. 실제 pose67 원격 실행과 좌표/시간/RGB 정합·학습 release는 미완료이며 M0/M1 완료로 올리지 않는다. Root 검토·고정본 인계 후 탐색 세션이 한 번 실행·회수한다. [실제 RGB 결과](SAMPLE_EXPANSION.md)와 [pose67 계약·예산·회수](POSE_MISSING67.md)를 따른다.
+
 2026-10-29 현재 결정: RGB·pose의 인덱스를 원본 archive별로 영구 보존하고 재개·확장하는 구조를 구현한다. 원본 순서와 identity를 고정하고, 학습 epoch와 인덱스 coverage를 독립 관리한다. 전체 RGB 스캔이나 실제 학습 착수는 아니다.
 
 

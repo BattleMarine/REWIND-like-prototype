@@ -31,9 +31,9 @@ WARM_POLICIES=(WARM128_POLICY,WARM192_POLICY,TAIL352_POLICY)
 
 def for_profile(profile):
     if not isinstance(profile,str):return None
-    from .profiles import WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE
+    from .profiles import WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE,TARGET67_PROFILE
     return {WARM128_PROFILE:WARM128_POLICY,WARM192_PROFILE:WARM192_POLICY,
-        TAIL352_PROFILE:TAIL352_POLICY}.get(profile)
+        TAIL352_PROFILE:TAIL352_POLICY,TARGET67_PROFILE:TAIL352_POLICY}.get(profile)
 
 
 def validate_expectation(value,required=False,policy=WARM128_POLICY):
