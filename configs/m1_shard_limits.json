@@ -1,0 +1,7 @@
+{
+  "max_catalog_bytes": 4194304,
+  "max_shards": 4096,
+  "max_shard_bytes": 33554432,
+  "max_records": 4096,
+  "max_tensor_elements": 8388608
+}

@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-02 전체 데이터 학습 준비를 우선하며 Colab 기준으로 진행합니다. UI와 학습 모델을 분리한 상태에서 로컬 M1 특징 shard·제한 로딩·epoch cursor·readiness 검사·추론 가중치 경계를 추가했습니다. 신규17개와 관련13개 검사 통과, 실제 candidate의 기존 학습 차단은 유지합니다. 아직 shard trainer·persistent 준비 공급·실제 release·GPU pilot은 연결하지 않았습니다. [전체 학습 준비와 단계별 완료 기준](docs/FULL_TRAINING_READINESS.md)을 따릅니다.
+
 2026-11-02 공통 프레임 입력의 선언과 기존 이미지 로더 연결을 구현했습니다. Local RGB 로더와 RGB 진단 입력이 원본 출처·좌우 뷰·미확인 시간/geometry 이유를 보존하며, 기존 이미지 tensor·정답 mask는 유지합니다. 현재 Serena1·10은 독립 T=1 입력이고 동영상 decoder·UI·temporal 처리는 후속 범위입니다. [공통 프레임 입력](docs/FRAME_INPUT.md)을 따릅니다.
 
 로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 2026-11-02 기존 원본을 재검토해 Serena frame1·10의 실제 좌우 RGB+pose 대응2개를 확보했습니다. 실제 두 sample의 GT2D→3D 진단과 RGB→예측2D cache→3D 단일 프레임 CPU 진단 학습까지 확인했습니다. 실제 RGB 예측 baseline·GPU 성능·M1 전체 완료는 아직 미검증입니다. [M1 기록](docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했고, 보존된 좌우 RGB와 결합했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](docs/POSE_CACHE_BOUNDS.md)를 따르며 후속 영상·좌표 검토와 GT2D 진단 결과는 아래에 기록하며, 정식 baseline 학습 검증은 남아 있습니다.
