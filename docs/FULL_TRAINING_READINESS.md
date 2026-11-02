@@ -176,3 +176,9 @@ Root도 신규T1 8+기존M1 trainer14, 총22개를 독립 실행해 failure/erro
 개발47개(신규20+queue13+prepare14) 회귀가 failure/error/skip0으로 통과했다. 마지막 inventory 정렬을 OS별 Path 비교에서 POSIX 상대 문자열로 고정한 뒤 정렬/완료/변조3개도 통과했다. Root 신규20개와 verify3개도 통과했다. 보존 합성3triplet/2pose job은 압축 원본 조각 없이 생성하고 원래 queue/압축본이 제거된 뒤 새 bundle만으로 verify했다. queue 전체 파일 hash는 불변이며 별도 의도적 실패의 부분 파일·이유/marker 부재도 확인했다. 근거는 `outputs/full_training_readiness_20261102/developer/prepared_bundle/`의 `final_tests.txt`, `final_inventory_tests.txt`, `final_integration/integration_summary.json`과 bundle/failed_bundle이며 root 근거는 같은 날짜 `root/prepared_bundle_tests.txt`, `root/prepared_bundle_verify_tests.txt`다.
 
 실행은 합성 로컬 진단이며 실제 Serena 변환/학습·네트워크·설치를 수행하지 않았다. job별 candidate의 train/validation 누락 blocker와 bundle 수준 독립 validation 미검증을 구분한다. 실제 dataset release·candidate→learning shard 변환·내용/시간/원본 motion/좌표 근거·전체 archive 무결성은 여전히 차단 상태다. marker는 파일 변경 탐지용 hash이며 신뢰 서명이나 학습 승인서가 아니다. 기존20b7aa9 GPU source ZIP·ready notebook·결과는 수정하지 않았고 실제 GPU 시험은 미실행이다.
+
+## 실제 합성 GPU pilot 결과 수령
+
+2026-11-02 고정 `20b7aa9`의 사용자 Colab 합성 GPU 시험 `synthetic_gpu_20b7aa9_001`이 통과했다. A100-SXM4-40GB에서 FP32/AMP 각각 RGB·M1의 전체 학습 상태 재개 일치, native cache/join의 GT3D·mask 보존, export 예측 일치를 확인했다. 32attempt/32성공 update·AMP skip0, supervisor24.000초·관측 worker RSS2,676,375,552bytes, Torch allocator peak allocated174,359,552/reserved203,423,744bytes로 고정 예산 이내였다. 시간은 IO 포함이며 전체 driver VRAM 계측이 아니다. Root도 결과 ZIP CRC와 checkpoint12개 SHA를 독립 대조했다. 실제 데이터 학습·정확도·Drive queue 새VM 지속성은 미검증이며 `full_training_ready=false`를 유지한다. Drive 영구보관은 미확인이다.
+
+세부 환경·결과 파일은 [GPU 시험 근거](SYNTHETIC_GPU_PILOT.md)를 따른다. 앞선 미실행 기록은 준비 당시 상태다.

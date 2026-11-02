@@ -1,6 +1,6 @@
 # 합성 RGB→T1 Colab GPU 통합 pilot
 
-2026-11-02 **실행 준비본이며 실제 Colab GPU 결과는 아직 없다.** 오케스트레이션이 최종 커밋·source ZIP·ready notebook의 revision/hash/job ID를 고정해 테스트 세션에 인계하고, 테스트 세션이 사용자 실행을 안내한다. 이 개발 세션은 작은 CPU smoke와 오류·회수 경로만 확인한다.
+2026-11-02 **고정 `20b7aa9`의 실제 Colab 합성 GPU 시험이 통과했다. 아래 준비 절차는 당시 고정 시험의 기록이다.** 오케스트레이션이 최종 커밋·source ZIP·ready notebook의 revision/hash/job ID를 고정해 테스트 세션에 인계하고, 테스트 세션이 사용자 실행을 안내한다. 이 개발 세션은 작은 CPU smoke와 오류·회수 경로만 확인한다.
 
 ## 목적과 고정 범위
 
@@ -76,3 +76,11 @@ python -m rewind_m1.gpu_pilot --profile cpu_smoke --job-id local_cpu_smoke --exp
 최종 커밋 후 오케스트레이션이 source ZIP/ready notebook의 정확한 경로·revision·SHA·job ID를 고정해 테스트 세션 `01a14391-c1b9-7a40-b537-af6b0b43709c`에 인계한다. 디벨로퍼는 준비·로컬 검증까지만 수행하고 실제 Colab 실행을 시작하지 않는다.
 
 **이 합성 GPU pilot으로 해결되지 않는 조건:** Drive queue의 새VM 지속성·전송/복원, 실제 독립 validation·원본 motion identity·단위/좌표/calibration/시간·RGB 대응 근거, 실제 데이터 학습 release, 전체 archive coverage/CRC·전체 데이터/논문 규모 정확도·실시간 성능. 실제 release 차단은 유지한다. [전체 학습 준비 상태](FULL_TRAINING_READINESS.md)를 따른다.
+
+## 2026-11-02 실제 GPU 결과와 독립 검토
+
+2026-11-02 고정 `20b7aa9`의 사용자 Colab 합성 GPU 시험 `synthetic_gpu_20b7aa9_001`이 통과했다. A100-SXM4-40GB에서 FP32/AMP 각각 RGB·M1의 전체 학습 상태 재개 일치, native cache/join의 GT3D·mask 보존, export 예측 일치를 확인했다. 32attempt/32성공 update·AMP skip0, supervisor24.000초·관측 worker RSS2,676,375,552bytes, Torch allocator peak allocated174,359,552/reserved203,423,744bytes로 고정 예산 이내였다. 시간은 IO 포함이며 전체 driver VRAM 계측이 아니다. Root도 결과 ZIP CRC와 checkpoint12개 SHA를 독립 대조했다. 실제 데이터 학습·정확도·Drive queue 새VM 지속성은 미검증이며 `full_training_ready=false`를 유지한다. Drive 영구보관은 미확인이다.
+
+환경은 Python3.13.16, Torch2.11.0+cu130, CUDA13.0, Pillow11.3.0, psutil5.9.5다. source ZIP pin이 일치했고 supervisor/run 모두 `passed`, returncode0·child_alive=false였다. Runner wall18.113초와 supervisor24.000초를 구분한다. 합성 데이터 결과이므로 실제 정확도나 논문 규모 성능으로 해석하지 않는다.
+
+결과는 `outputs/test_synthetic_gpu_20b7aa9_20261102/synthetic_gpu_pilot_result.zip`에 보관했다. 1,800,422bytes, SHA256 `93db55b5dc8293d33258679028c4af246d8ce7dd21d1be9e38ef4805a99c8882`. ZIP CRC와 마지막 durable checkpoint12개의 파일 SHA를 Root가 직접 확인했다. 앞선 CPU 런타임의 CUDA 미제공 검사는 worker 미실행 출력만 전달됐으며 ZIP은 미수령이다. 이후 GPU 시험 결과와 혼합하지 않는다. 같은 시험의 반복 실행을 요구하지 않는다.
