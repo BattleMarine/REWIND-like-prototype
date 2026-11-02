@@ -12,7 +12,7 @@ from .__main__ import save_report
 from .artifacts import export_weights
 from .data import InputContract
 from .models import make_model
-from .shards import _integer, _read, _require, read_catalog, validate_catalog
+from .shards import _integer, _read, _require, read_catalog, validate_catalog, validate_model_catalog
 from .shard_training import FORMAT, ShardTrainer
 from .training import save_checkpoint, source_identity, validate_config
 
@@ -34,6 +34,7 @@ def export_checkpoint(checkpoint, checkpoint_sha256, output):
              checkpoint.get('full_training_ready') is False, 'shard_checkpoint_format')
     config = validate_config(checkpoint['config'])
     catalog = validate_catalog(checkpoint['catalog'])
+    validate_model_catalog(config,catalog)
     contract = InputContract.from_dict(catalog['contract'])
     _require(config['window_size'] == catalog['window_size'] and config['hidden'] <= 1024
              and len(contract.joint_names) <= 256 and contract.data_kind == 'synthetic_fixture', 'shard_export_model_contract')

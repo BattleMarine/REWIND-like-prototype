@@ -19,7 +19,7 @@ pose의 `manifest.id`/`dataset_version`은 공통 데이터셋 identity이며 ch
 
 이는 원본 sequence 전체 coverage·timestamp 정합·연속 clip 검증이 아니다. `temporal_ready=false`를 유지한다. 원본 motion 문자열 중복을 검사한 것과 실제 원본 motion identity를 독립 확인한 것도 구분한다.
 
-기존 **M1 3D feature shard 카탈로그는 동일 sequence가 여러 shard에 걸치면 거부**한다. 따라서 이 2D chunk들을 그대로 묶어 3D 학습에 자동 연결할 수 없다. 후속으로 T=1의 명시 chunk 계약 또는 temporal context/overlap 경계를 보존하는 확장이 필요하다. 이번 구현을 전체 RGB→2D cache→3D 공급 완료로 표시하지 않는다.
+기존 **완결-sequence M1 3D feature shard 카탈로그는 동일 sequence가 여러 shard에 걸치면 계속 거부**한다. 이후 [별도 T=1 명시 계약](T1_FEATURE_CHUNKS.md)으로 독립 단일 프레임의 RGB cache/join chunk를 연결했다. 자동 승격하지 않으며 temporal context/overlap 경계를 보존하는 확장은 여전히 필요하다. 이를 전체 데이터/temporal 공급 완료로 표시하지 않는다.
 
 ## 자원 제한과 lazy 로딩
 

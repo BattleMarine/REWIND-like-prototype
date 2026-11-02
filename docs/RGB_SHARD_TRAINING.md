@@ -30,7 +30,7 @@ cache adapter는 한 native sample씩 동일 resize로 추론한 뒤 각축 `(na
 
 cache CLI도 pose를 읽지 않고 RGB manifest의 raw 파일 size/SHA/content hash·dataset/native 크기·record/split/frame 범위·PNG 선언 크기와 낮춘 catalog limits를 적용한다. CLI는 검증 pins를 얻기 위해 `--checkpoint`를 받지만 순수 추론 API는 checkpoint 파일을 열지 않는다. 각 chunk cache를 기존 `join_predictions`와 실제 결합해 GT3D·mask 보존을 확인한다.
 
-**기존 M1 3D feature catalog는 같은 sequence의 여러 chunk를 아직 거부한다.** chunk별 cache/join 통과가 전체3D 학습 자동 연결 완료를 뜻하지 않는다. T=1 chunk 또는 temporal context/overlap 경계 확장은 후속이며, timestamp·원본 motion·독립 validation 등 실제 release 근거도 별도다.
+**기존 완결-sequence M1 3D feature catalog는 같은 sequence의 여러 chunk를 계속 거부한다.** 이후 [별도 T=1 schema](T1_FEATURE_CHUNKS.md)로 단일 프레임 chunk만 명시 연결했다. 자동 승격/temporal 연결은 제공하지 않으며 context/overlap 경계 확장, timestamp·원본 motion·독립 validation 등 실제 release 근거는 별도다.
 
 ## 실행 예시
 
@@ -51,3 +51,5 @@ standalone evaluate/cache에도 기본300초 cooperative `--max-seconds`가 적�
 `outputs/full_training_readiness_20261102/developer/rgb_trainer/`에 고정 검사·실행 결과를 보존한다. `verify.py`, `tests.json/txt`, `code_hashes.json`, `commands.json`, `cli_*.txt`, `verification_pipeline.json`, `fixture/`, `run/`의 checkpoint·weights·native cache·joined feature·평가를 구분해 확인한다. 실제 학습/원격 접근/설치를 수행하지 않았으며 작은 합성 CPU update만 개발 회귀로 실행했다. GPU/AMP는 실행 경로와 mock skip 검사 범위이고 실제 GPU 수치·성능·VRAM 검증이 아니다. [전체 학습 준비 상태](FULL_TRAINING_READINESS.md)를 따른다.
 
 고정38개(신규RGB13·기존M1 trainer14·RGB 공급11)가 failure/error/skip0으로 통과했다. 최종 회귀에서 RGB53/M1 84개의 합성 성공 update와 mock AMP skip2회를 실행했다. 별도 보존 CLI는1step에서2epoch까지 재개해 step4·실제sample8을 기록했고, 세 chunk의 native cache/join에서 GT3D·mask가 동일했다. 이 합성 검사는 실제 데이터 정확도나 대규모 학습 성능 결과가 아니다.
+
+Root도 신규RGB13개와 기존M1 trainer14개, 총27개를 독립 실행해 failure/error/skip0으로 확인했다. 근거는 `outputs/full_training_readiness_20261102/root/stage3b2_tests.txt`에 보존한다.

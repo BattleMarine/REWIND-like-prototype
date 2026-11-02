@@ -10,7 +10,7 @@
 | `rewind_m1.shard_training`(2차 추가) | 별도 합성 M1 shard trainer, epoch cursor·실제 sample 수 재개·독립 validation·checkpoint 기반 추론 export | 실제 release·persistent 준비 공급·GPU/AMP pilot 미검증 |
 | `rewind_m2`, `rewind_m3` | UI 없는 합성 causal diffusion·cascade 학습과 재개 | 실제 데이터 계약·shard 공급·독립 validation 연결 필요 |
 | `rewind_m1.frontend_train` | 작은 CPU RGB→2D 진단, inference weights 저장 | 소량/100step 제한, 일반 재개·GPU·장시간 공급 미지원 |
-| `rewind_m1.rgb_shards`(3b1 추가) | native RGB+GT 한-shard 공급·독립frame chunk·split/identity·PNG lazy/full 검사·epoch cursor | 기존3D featurecatalog로 chunk 자동 연결 미구현 |
+| `rewind_m1.rgb_shards`(3b1 추가) | native RGB+GT 한-shard 공급·독립frame chunk·split/identity·PNG lazy/full 검사·epoch cursor | T1은 별도 명시 연결, temporal chunk/context 확장은 미구현 |
 | `rewind_m1.rgb_training`(3b2 추가) | 명시 resize·작은2D CNN 합성 CPU 학습/재개·native cache/join·독립 validation | 실제 release·GPU/AMP 실측·전체 데이터 성능 미검증 |
 | `rewind_archive_index.preparation` | 명시 target의 예산 제한 탐색·snapshot 저장/복원·선택 추출·로컬 재사용 | epoch와 archive coverage는 별개 |
 | `rewind_prepare_queue`(3a 추가) | 기존 backend 소량 범위의 raw 준비 순서·영속 cursor·전역 예약/정산·partial 재개·준비 목록 | 학습 shard 변환/자동 공급·eviction·실제 Drive queue/새VM 지속성 미검증 |
@@ -151,4 +151,14 @@ python -m rewind_m1.shard_cli export --checkpoint outputs/m1_shard_example/last.
 
 고정38개(신규RGB13+기존M1 trainer14+공급11)가 failure/error/skip0으로 통과했다. 별도 합성 CPU 실행은1step→2epoch 재개(step4/sample8), checkpoint만 export,3chunk native cache→기존join의 GT3D/mask 보존을 확인했다. Resize weights는 기존 native weights 형식과 분리하고 학습 코드를 import하지 않는 adapter가 native 좌표로 복원한다. cache에는 checkpoint/catalog/weights 파일 SHA 출처를 남기며 shard별256record/4MiB를 유지한다.
 
+Root의 별도 신규13+기존14, 총27개도 failure/error/skip0으로 통과했다. 독립 검토 근거는 `outputs/full_training_readiness_20261102/root/stage3b2_tests.txt`다.
+
 실제 dataset_sample 학습은 계속 명시 거부하며 GPU/AMP 실제 실행·VRAM/비용은 미검증이다. 동일sequence의2D chunk를 기존3D catalog에 자동 결합하는 제약, 실제 release 근거·독립 validation·원본 motion/시간 정합과 Colab pilot은 남아 있다. 모델 구조를 논문 규모로 확장하거나 전체 데이터 학습 준비 완료로 표시하지 않는다.
+
+## T1 특징 chunk 연결
+
+[별도 T1 schema와 policy](T1_FEATURE_CHUNKS.md)를 추가해 같은 원본 sequence의 disjoint 예측 특징 chunk를 `single_frame/window_size=1`에 연결했다. 기존 완결-sequence catalog/temporal 동작·기본 checkpoint/API는 유지한다. builder는 명시 `build-t1`만 사용하고 원motion/split/범위·dataset/예측계약·파일 identity와 누적 byte 상한을 검증한다. Trainer와 export 모두 새 schema의 T1 모델 조건을 강제한다.
+
+고정52개가 failure/error/skip0으로 통과했고 기존 temporal causality/streaming도 유지했다. 이전 checkpoint source 검사를 우회하지 않고 현재 코드로 합성 RGB4update→native cache/join3개→T1catalog→3D split/full각4update를 보존했다. 3D sample8/2epoch의 전체 학습 state와 export 예측이 동일하고 GT3D·mask·원본 key/출처를 보존했다. 실제 데이터 학습/원격/설치는0이며 실제release/Colab Drive·GPU·AMP·비용 검증은 남아 있다. Temporal chunk/context 공급을 완료했다고 표시하지 않는다.
+
+Root도 신규T1 8+기존M1 trainer14, 총22개를 독립 실행해 failure/error/skip0으로 확인했다(`root/stage_t1_tests.txt`). 다음 인계는 합성 RGB→2D→cache→T1→3D의 제한된 Colab GPU FP32/AMP·재개·자원 측정 pilot을 준비하는 범위다. 이 합성 GPU 시험이 Drive 새VM 지속성이나 실제 독립 validation/원본 motion·단위/시간 근거를 해결하지는 않는다. 실제 데이터 release 차단은 유지한다.

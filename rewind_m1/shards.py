@@ -9,6 +9,8 @@ from pathlib import Path, PurePosixPath
 from .data import DataContractError, InputContract, content_hash, load_document
 
 SCHEMA = 'm1_feature_shards_v1'
+T1_SCHEMA = 'm1_t1_feature_shards_v1'
+T1_POLICY = 'm1_t1_feature_epoch_python_random_v1'
 DEFAULT_LIMITS = {'max_catalog_bytes': 4*1024**2, 'max_shards': 4096,
                   'max_shard_bytes': 32*1024**2, 'max_records': 4096,
                   'max_tensor_elements': 8*1024**2}
@@ -42,6 +44,20 @@ def _limits(value):
     for key, ceiling in DEFAULT_LIMITS.items():
         _require(_integer(value[key], 1, ceiling), 'shard_limit_range_'+key)
     return copy.deepcopy(value)
+
+
+def _json_size(value, maximum):
+    total=0
+    for piece in json.JSONEncoder(sort_keys=True,separators=(',',':'),allow_nan=False).iterencode(value):
+        total+=len(piece.encode('utf8'))
+        _require(total+1 <= maximum,'shard_catalog_byte_limit')
+    return total
+
+
+def validate_model_catalog(config, catalog):
+    if catalog['schema_version'] == T1_SCHEMA:
+        _require(config['model']=='single_frame' and config['window_size']==1,
+                 't1_requires_single_frame_window_one')
 
 
 def _relative(value):
@@ -92,7 +108,7 @@ def _sequences(records):
 def validate_catalog(doc):
     _require(isinstance(doc, dict) and set(doc) == {'schema_version', 'dataset_identity', 'contract', 'window_size',
              'limits', 'shards', 'content_sha256'}, 'shard_catalog_fields')
-    _require(doc['schema_version'] == SCHEMA and doc['content_sha256'] ==
+    _require(doc['schema_version'] in (SCHEMA,T1_SCHEMA) and doc['content_sha256'] ==
              content_hash({k:v for k,v in doc.items() if k != 'content_sha256'}), 'shard_catalog_hash')
     limits = _limits(doc['limits'])
     identity = doc['dataset_identity']
@@ -100,10 +116,13 @@ def validate_catalog(doc):
              all(isinstance(v, str) and 0 < len(v.encode('utf8')) <= 1024 for v in identity.values()),
              'shard_dataset_identity')
     _require(_integer(doc['window_size'], 1, 256), 'shard_window_limit')
+    t1=doc['schema_version']==T1_SCHEMA
+    _require(not t1 or doc['window_size']==1,'t1_requires_window_one')
     contract = InputContract.from_dict(doc['contract'])
     shards = doc['shards']
     _require(isinstance(shards, list) and 1 <= len(shards) <= limits['max_shards'], 'shard_count_limit')
     sequences, motions, paths = set(), {}, set()
+    owners, ranges = {}, {}
     for shard in shards:
         _require(isinstance(shard, dict) and set(shard) == {'path', 'sha256', 'size_bytes', 'records', 'sequences'},
                  'shard_descriptor_fields')
@@ -118,14 +137,19 @@ def validate_catalog(doc):
         _require(elements <= limits['max_tensor_elements'], 'shard_tensor_element_limit')
         rows = shard['sequences']
         _require(isinstance(rows, list) and 1 <= len(rows) <= shard['records'], 'shard_sequence_rows')
-        count = 0
+        count, local = 0, set()
         for row in rows:
             _require(isinstance(row, dict) and set(row) == {'sequence_id', 'motion_id', 'split', 'records', 'first_frame', 'last_frame'},
                      'shard_sequence_fields')
             seq, motion, split = row['sequence_id'], row['motion_id'], row['split']
             _require(all(isinstance(x, str) and 0 < len(x.encode('utf8')) <= 1024 for x in (seq, motion)),
                      'shard_sequence_motion_id')
-            _require(seq not in sequences, 'shard_sequence_crosses_shards')
+            if t1:
+                _require(seq not in local,'t1_duplicate_sequence_group')
+                _require(owners.get(seq,(motion,split))==(motion,split),'t1_sequence_motion_split_changed')
+                owners[seq]=(motion,split); local.add(seq)
+            else:
+                _require(seq not in sequences, 'shard_sequence_crosses_shards')
             sequences.add(seq)
             _require(split in ('train', 'validation', 'test') and motions.get(motion, split) == split,
                      'shard_motion_split_overlap')
@@ -134,8 +158,13 @@ def validate_catalog(doc):
                      _integer(row['first_frame'], 0, 10**12) and
                      _integer(row['last_frame'], row['first_frame'], 10**12) and
                      row['records'] <= row['last_frame']-row['first_frame']+1, 'shard_sequence_bounds')
+            if t1: ranges.setdefault(seq,[]).append((row['first_frame'],row['last_frame']))
             count += row['records']
         _require(count == shard['records'], 'shard_record_count')
+    if t1:
+        for chunks in ranges.values():
+            ordered=sorted(chunks)
+            _require(all(a[1] < b[0] for a,b in zip(ordered,ordered[1:])), 't1_chunk_overlap')
     return copy.deepcopy(doc)
 
 
@@ -202,10 +231,19 @@ class ShardDataset:
 
 def build_catalog(paths, base, window_size=1, limits=None):
     """이미 준비한 특징 파일의 전체 읽기 검증. 원본 분할/정렬/승격은 하지 않는다."""
+    return _build_catalog(paths,base,window_size,limits,SCHEMA)
+
+
+def build_t1_catalog(paths, base, limits=None):
+    """원본 sequence 이름을 유지한 독립 T1 특징 chunk만 명시적으로 묶는다."""
+    return _build_catalog(paths,base,1,limits,T1_SCHEMA)
+
+
+def _build_catalog(paths, base, window_size, limits, schema):
     limits = _limits(limits or DEFAULT_LIMITS)
     _require(_integer(window_size, 1, 256), 'shard_window_limit')
     _require(isinstance(paths, list) and 1 <= len(paths) <= limits['max_shards'], 'shard_count_limit')
-    rows, contract, identity = [], None, None
+    rows, contract, identity, catalog_bytes = [], None, None, 0
     for name in paths:
         raw = _read(_path(base, name), limits['max_shard_bytes'])
         doc = json.loads(raw)
@@ -214,12 +252,17 @@ def build_catalog(paths, base, window_size=1, limits=None):
         if contract is None:
             contract = doc.get('contract')
             identity = {k:doc.get('manifest', {}).get(k) for k in ('id', 'dataset_version')}
+            catalog_bytes=_json_size({'schema_version':schema,'dataset_identity':identity,'contract':contract,
+                'window_size':window_size,'limits':limits,'shards':[],'content_sha256':'0'*64},limits['max_catalog_bytes'])
         _require(doc.get('contract') == contract, 'shard_contract_mismatch')
         _require(isinstance(doc.get('manifest'), dict) and
                  all(doc['manifest'].get(k) == v for k,v in identity.items()), 'shard_dataset_identity_mismatch')
-        rows.append({'path': name, 'sha256': hashlib.sha256(raw).hexdigest(), 'size_bytes': len(raw),
-                     'records': len(doc['records']), 'sequences': _sequences(doc['records'])})
-    body = {'schema_version': SCHEMA, 'dataset_identity': identity, 'contract': contract, 'window_size': window_size,
+        row={'path': name, 'sha256': hashlib.sha256(raw).hexdigest(), 'size_bytes': len(raw),
+             'records': len(doc['records']), 'sequences': _sequences(doc['records'])}
+        catalog_bytes+=_json_size(row,limits['max_catalog_bytes'])+(1 if rows else 0)
+        _require(catalog_bytes+1 <= limits['max_catalog_bytes'],'shard_catalog_byte_limit')
+        rows.append(row)
+    body = {'schema_version': schema, 'dataset_identity': identity, 'contract': contract, 'window_size': window_size,
             'limits': limits, 'shards': rows}
     catalog = validate_catalog({**body, 'content_sha256': content_hash(body)})
     _require(len(json.dumps(catalog).encode()) <= limits['max_catalog_bytes'], 'shard_catalog_byte_limit')
@@ -230,6 +273,9 @@ def build_catalog(paths, base, window_size=1, limits=None):
 class EpochSampler:
     """고정 split의 shard/anchor 순회. peek 후 성공한 update만 commit한다."""
     POLICY = 'm1_shard_epoch_python_random_v1'
+
+    def _policy(self):
+        return T1_POLICY if self.catalog['schema_version']==T1_SCHEMA else self.POLICY
 
     def __init__(self, catalog, split, seed, shuffle=True):
         self.catalog = validate_catalog(catalog)
@@ -267,7 +313,7 @@ class EpochSampler:
                 self.epoch += 1
 
     def state_dict(self):
-        return {'policy': self.POLICY, 'catalog_sha256': self.catalog['content_sha256'],
+        return {'policy': self._policy(), 'catalog_sha256': self.catalog['content_sha256'],
                 'split': self.split, 'seed': self.seed, 'shuffle': self.shuffle,
                 'epoch': self.epoch, 'shard_position': self.shard_position, 'offset': self.offset}
 

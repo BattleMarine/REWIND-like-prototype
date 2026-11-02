@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from rewind_prepare.converter import validate_candidate
-from .shards import DEFAULT_LIMITS, ShardDataset, _read, build_catalog, read_catalog
+from .shards import DEFAULT_LIMITS, T1_SCHEMA, ShardDataset, _read, build_catalog, build_t1_catalog, read_catalog
 
 
 def inspect_catalog(path, full_read=False):
@@ -22,6 +22,10 @@ def inspect_catalog(path, full_read=False):
                                 'm3_whole_body': 'not_connected', 'rgb_2d_frontend': 'not_connected'},
               'blockers': ['dataset_sample_training_release_not_implemented', 'persistent_preparation_supply_not_connected',
                            'colab_gpu_pilot_not_measured']}
+    if catalog['schema_version']==T1_SCHEMA:
+        report['supported_path']='local_m1_t1_feature_chunks'
+        report['model_support']['m1_regression']='synthetic_single_frame_window1_only'
+        report['temporal_ready']=False
     if not {'train', 'validation'} <= set(declared):
         report['blockers'].append('required_train_validation_splits_missing')
     if catalog['contract']['data_kind'] == 'dataset_sample':
@@ -55,6 +59,11 @@ def main(argv=None):
     build.add_argument('--window-size', type=int, default=1)
     build.add_argument('--limits', type=Path)
     build.add_argument('--output', type=Path, required=True, help='base 바로 아래 catalog 경로')
+    t1 = sub.add_parser('build-t1')
+    t1.add_argument('--base',type=Path,required=True)
+    t1.add_argument('--shard',action='append',required=True)
+    t1.add_argument('--limits',type=Path)
+    t1.add_argument('--output',type=Path,required=True)
     inspect = sub.add_parser('inspect')
     inspect.add_argument('--catalog', type=Path, required=True)
     inspect.add_argument('--full-read', action='store_true')
@@ -62,13 +71,15 @@ def main(argv=None):
     candidate.add_argument('--candidate', type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command == 'build':
+        if args.command in ('build','build-t1'):
             if args.output.resolve().parent != args.base.resolve():
                 raise ValueError('catalog_output_must_be_in_base')
             limits = json.loads(_read(args.limits, 4096)) if args.limits else None
-            catalog = build_catalog(args.shard, args.base, args.window_size, limits)
+            catalog = (build_t1_catalog(args.shard,args.base,limits) if args.command=='build-t1' else
+                       build_catalog(args.shard, args.base, args.window_size, limits))
             with args.output.open('x', encoding='utf8') as stream:
-                stream.write(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n')
+                stream.write((json.dumps(catalog,sort_keys=True,separators=(',',':')) if args.command=='build-t1'
+                              else json.dumps(catalog,ensure_ascii=False,indent=2))+'\n')
             result = inspect_catalog(args.output, full_read=False)
             result['build_payloads_fully_read'] = True
         elif args.command == 'inspect':

@@ -6,7 +6,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-11-02 UI 독립 RGB2D shard trainer를 추가했습니다. 작은 CNN에 명시 resize·native 좌표 복원·epoch/optimizer/RNG 재개를 연결했고, 개발38개 검사와 합성 checkpoint→weights→native cache→기존 join을 확인했습니다. 실제 dataset_sample 학습은 계속 거부하며 GPU/AMP 실측·3D chunk 자동 연결은 남아 있습니다. [2D 학습·재개와 추론 경계](docs/RGB_SHARD_TRAINING.md)를 따릅니다.
+2026-11-02 같은 원본 sequence의 RGB 예측 chunk를 별도 T=1 특징 카탈로그로 연결했습니다. 단일 프레임 3D 학습·재개·평가·export까지 합성 통합을 확인했고52개 검사가 통과했습니다. 기존 temporal/완결-sequence 정책과 실제 데이터 release 차단은 유지합니다. [T1 연결 범위와 근거](docs/T1_FEATURE_CHUNKS.md)를 따릅니다.
+
+2026-11-02 UI 독립 RGB2D shard trainer를 추가했습니다. 작은 CNN에 명시 resize·native 좌표 복원·epoch/optimizer/RNG 재개를 연결했고, 개발38개 검사와 합성 checkpoint→weights→native cache→기존 join을 확인했습니다. 실제 dataset_sample 학습은 계속 거부하며 GPU/AMP 실측·temporal chunk 연결은 남아 있습니다. [2D 학습·재개와 추론 경계](docs/RGB_SHARD_TRAINING.md)를 따릅니다.
 
 2026-11-02 RGB·GT chunk 공급을 추가했습니다. 같은 원본 sequence의 겹치지 않는 2D 독립 frame chunk를 한 shard씩 읽고, native RGB/GT 좌표·mask와 기존 API를 보존합니다. 개발20개 검사와 root 신규11개가 통과했으며 공급 경로는 실제 학습 release 차단 상태를 유지합니다. [RGB·GT shard 범위와 사용법](docs/RGB_GT_SHARDS.md)을 따릅니다.
 

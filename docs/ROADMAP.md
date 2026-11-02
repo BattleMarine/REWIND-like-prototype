@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 T1 특징 chunk 연결: 명시 m1_t1_feature_shards_v1/window1과 별도 sampler policy를 추가해 동일 원seq의 disjoint chunk를 single_frame 3D 학습에 연결했다. 기존 m1_feature_shards_v1/temporal 정책·기본checkpoint API는 유지하고 원motion/split 고정·범위 겹침·예측계약/GTmask/fileSHA·byte상한을 검사한다. trainer/export 모두 T1에서는 single_frame/window1만 허용한다. 고정52개 검사와 현재코드 합성 RGB4update→native cache/join3개→T1catalog→3D split/full각4update(sample8)의 전체state·export예측 동일성을 확인했다. 원격/실제훈련/설치0이며 실제release와Colab통합pilot·GPU/AMP/비용확인은 남아 있다. [명시계약과 검증](T1_FEATURE_CHUNKS.md)을 따른다.
+
 2026-11-02 전체 학습 준비 3b2: 작은 StereoHeatmapNet을 유지한 별도 UI 독립 RGB trainer/CLI를 구현했다. native 한 sample씩 명시 해상도로 bilinear align_corners=True resize 후 batch를 만들고 FP32 heatmap loss, 감독0 명시 중단, 성공 update만 cursor/sample 진행, Adam/StepLR/scaler/Python·Torch RNG/source/Pillow/resize환경 정확 재개를 연결했다. 기존 M1의 checkpoint/durable/예산 보호를 최소 확장해 재사용했고 기존14개를 포함한38개 검사가 통과했다. 보존한 합성 CPU 실행은 1step→2epoch 재개로 step4/sample8이며 checkpoint만 export하고 3chunk native cache→기존 join에서 GT3D/mask 보존을 확인했다. 실제 데이터 release/GPU·AMP 실측은 미완료이며 2D chunk를 기존3D catalog에 자동 결합하지 않는다. [지원 범위와 검증](RGB_SHARD_TRAINING.md)을 따른다.
 
 2026-11-02 전체 학습 준비 3b1: 새 RGB+GT 독립frame shard catalog/CLI와 한-shard loader·RGB epoch sampler를 구현했다. 공통dataset identity/version·GT contract·joint/native size·pose/RGB hash/byte·PNG선언상한을고정하고, 동일sequence의split/motion고정과disjoint chunk범위·키누수를검사한다. catalog는descriptor별incremental byte계수로4MiB초과전중단한다. 기존loader/supervision의nativeRGB/GTxy/mask를보존하고 PNG는요청시에만hash/decode한다. 개발20개(신규11+기존frame9)와root별도11개검사통과, 학습/원격/설치0이다. 실제release·resize/2Dtrainer는3b2후속이며 동일seq복수chunk는기존3D featurecatalog에직접합칠수없어T1/temporal경계확장이남는다. [선언/실제PNG검사·메모리·호환범위](RGB_GT_SHARDS.md)를따른다.

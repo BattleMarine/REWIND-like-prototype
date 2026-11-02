@@ -1,0 +1,13 @@
+{
+  "model": "single_frame",
+  "window_size": 1,
+  "hidden": 8,
+  "dropout": 0.1,
+  "batch_size": 3,
+  "learning_rate": 0.005,
+  "seed": 73,
+  "target_scale_mm": 100.0,
+  "amp": false,
+  "scheduler_step": 2,
+  "scheduler_gamma": 0.8
+}

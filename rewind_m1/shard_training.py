@@ -9,7 +9,7 @@ import torch
 from .data import InputContract
 from .metrics import masked_mse, metric_sums
 from .models import make_model
-from .shards import EpochSampler, ShardDataset, _integer, _require, validate_catalog
+from .shards import EpochSampler, ShardDataset, _integer, _require, validate_catalog, validate_model_catalog
 from .training import (require_torch_api, restore_rng, rng_state, seed_run,
                        source_identity, validate_config)
 
@@ -27,6 +27,7 @@ class ShardTrainer:
         self.config = validate_config(config)
         self.check_budget = check_budget or (lambda: None)
         self.catalog = validate_catalog(catalog)
+        validate_model_catalog(config,self.catalog)
         _require(config['window_size'] == self.catalog['window_size'], 'shard_model_window_mismatch')
         _require(config['batch_size'] <= self.catalog['limits']['max_records'], 'shard_batch_size_limit')
         _require(config['seed'] <= 2**32-1, 'shard_seed_limit')
