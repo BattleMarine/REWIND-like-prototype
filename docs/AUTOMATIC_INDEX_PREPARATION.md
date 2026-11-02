@@ -95,3 +95,11 @@ Notebook8개 code cell 구문·기본False gate·미mount 인증 전 거부·REP
 `head_publish_pre`, `head_check_pre`, `head_create_pre`, `head_backup_pre`, `head_stage_pre`, `head_cas_pre`, `head_replace_pre`, `head_verify_pre`, `head_publish_post`와 snapshot 전 단계를 고정해 기록한다. 실패에는 안전한 `failure.type`, 정수 또는null의 `failure.errno`, `failure.operation`을 남긴다. 원시 message·URL·token은 저장하지 않는다. 기존 실패/중단 기록과 예외 재전파는 유지한다.
 
 신규 HEAD8개와 기존 준비12개·통합5개·C 회수10개, 총35개 로컬 검사가 실패·오류·건너뜀 없이 통과했다. EPERM/ENOTSUP형 hard link·fsync 미지원, 초기/갱신 충돌, 부분 HEAD 거부, 미지원 replace와 이전본/닫힌 staging 보존, 손상 backup 거부, safe errno/단계 기록과 기존 연결·회수를 확인했다. 근거는 `outputs/automatic_index_mount_diagnostics_20261102/{tests.json,tests.txt,code_hashes.json}`이다. 기존 예산·성공 기준을 확대하지 않았으며 실제 Drive에서 수정본의 지원 동작은 아직 미검증이다. 새 배포·사용자 재실행 안내·commit/push는 개발 세션에서 수행하지 않았다.
+
+## 2026-11-02 수정본 실제 자동 준비 통합 결과
+
+수정본 `73bd4b8`의 실제 Colab CPU 통합 시험 `pose_auto_73bd4b8_001`을 통과했다. 자동 준비에서 B 목록32→80개·generation2→5·gzip coverage3,791,957→6,324,814bytes로 확장하고 HEAD를 저장했다. 같은 런타임의 새 workspace 복원은 추가 scan 없이 선택 JSON3개의 해시가 일치했으며 추출본 재사용은 읽기·해제·HTTP 증가0이었다. 누적52HTTP/응답body3,673,436bytes/ledger15.237초로 예산 이내였고 보고서 회수와 flush가 완료됐다. 전체 archive CRC·RGB·학습·새VM 내구성은 미검증이며 최초 실패 errno도 미확정이다.
+
+오케스트레이션이 수령 ZIP CRC·recovery 목록6개 크기/SHA·선택 JSON object와 기존 목표 해시·고정 revision의 코드 bytes·입력 pin·B→g3→g4→g5 parent/lineage를 독립 대조했다. 마지막 HEAD receipt와 복원 receipt가 일치하며 HEAD 게시 verified=true다. mount_atomicity_claimed=false 및 durability_proven=false는 유지한다. 재사용은 고정 manifest의 로컬 검증이며 원격 원본 live 검증을 뜻하지 않는다.
+
+Python3.13.18/indexed_gzip1.10.3/psutil5.9.5, 원본 read6,488,071bytes/반환 decode4,694,814bytes/peak RSS158,130,176bytes였다. 인증과 flush는 원본 phase 계측과 별도다. 근거는 `outputs/test_automatic_index_73bd4b8_20261102/`의 원본 ZIP·flush·`root_review.json`이며 ZIP SHA256은 `6bf8e24821c418a13ef02bb975541055fa7b06fea30057d70c3ddca3bf7d465e`다. 이번 범위에서는 추가 반복 시험을 요구하지 않는다.
