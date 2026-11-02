@@ -41,12 +41,19 @@ class RGBTrainer(ShardTrainer):
     def _new_sampler(self):
         return RGBEpochSampler(self.catalog,'train',self.config['seed'])
 
+    def _open_data(self, catalog, base):
+        catalog = validate_catalog(catalog)
+        contract = InputContract.from_dict(catalog['contract'])
+        _require(contract.data_kind=='synthetic_fixture','rgb_dataset_sample_release_not_implemented')
+        return catalog,contract,RGBShardDataset(catalog,base)
+
+    def _make_model(self, joints):
+        return StereoHeatmapNet(joints).to(self.device)
+
     def __init__(self, config, catalog, base, device='cpu', check_budget=None):
         require_torch_api(); self.config=validate_config(config)
-        self.catalog=validate_catalog(catalog)
-        self.contract=InputContract.from_dict(self.catalog['contract'])
-        _require(self.contract.data_kind=='synthetic_fixture','rgb_dataset_sample_release_not_implemented')
         self.check_budget=check_budget or (lambda:None)
+        self.catalog,self.contract,self.dataset=self._open_data(catalog,base)
         width,height=self.contract.image_sizes[0]; joints=len(self.contract.joint_names)
         _require(24*width*height+18*joints <= min(config['max_native_tensor_bytes'],self.catalog['limits']['max_batch_tensor_bytes']),
                  'rgb_native_sample_tensor_limit')
@@ -54,7 +61,6 @@ class RGBTrainer(ShardTrainer):
         _require(config['batch_size'] <= self.catalog['limits']['max_records'] and
                  config['batch_size']*2*joints*((tw+1)//2)*((th+1)//2) <= config['max_heatmap_elements'],
                  'rgb_heatmap_allocation_limit')
-        self.dataset=RGBShardDataset(self.catalog,base)
         report=self.dataset.verify_all(check_budget=self.check_budget)
         self.counts=report['metadata_records']
         _require({'train','validation'} <= set(self.counts), 'rgb_requires_train_validation')
@@ -64,7 +70,7 @@ class RGBTrainer(ShardTrainer):
         if self.device.type=='cuda':
             _require(os.environ.get('CUBLAS_WORKSPACE_CONFIG',':4096:8') in (':4096:8',':16:8'),'rgb_cuda_workspace')
         seed_run(config['seed'])
-        self.model=StereoHeatmapNet(joints).to(self.device)
+        self.model=self._make_model(joints)
         self.optimizer=torch.optim.Adam(self.model.parameters(),lr=config['learning_rate'])
         self.scheduler=torch.optim.lr_scheduler.StepLR(self.optimizer,config['scheduler_step'],config['scheduler_gamma'])
         self.scaler=torch.amp.GradScaler('cuda',enabled=config['amp'])

@@ -1,5 +1,11 @@
 # 다음 실제 데이터 준비 실행
 
+## 2026-11-02 실제 정식 RGB2D 연결 후 현재 차단 상태
+
+[외부 검토 release와 학습 연결](REAL_RGB2D_RELEASE.md)은 구현·로컬 검증했지만 현재 실제 Serena는 train2/validation0이며 original_motion=declared_unverified다. 원 candidate의6개 blockers·SHA44ec803069ddee642e45832f88a71979c5cf1966bbe2e8574d37bd9742bec0e2를 그대로 보존했다. 별도 감사는 outputs/full_training_readiness_20261102/developer/rgb_release/serena_blocked/report.json에 있고 실제 학습·release·policy 발급은0이다.
+
+다음은 독립 원본motion의 nonempty validation stereo+pose/완료 bundle, 전체sequence 원본motion 식별·split중복배제 근거, key별 내용정합·관절·단위/geometry 채택 검토와 외부policy 고정이 필요하다. 기존 train 두 frame을 split으로 나누지 않는다. 테스트 세션은 아직 학습을 실행하지 않으며 root가 검토된 고정revision/소스·자료·release/policy/config SHA와 예산을 확정한 뒤 별도 인계한다. 기존 합성GPU 시험 반복 요청은 없다. 아래 정적2sample 준비는 진단 자료 확보 이력이다.
+
 ## 2026-11-02 현재 최단 경로 — 새 전송 없이 실제 정적2sample 준비 완료
 
 기존 다운로드 폴더에서 오른쪽 성공 원본 `rewind_pilot_2c11fc10.zip`을 회수해 CRC·manifest 자체hash·usable bounded stop·PNG2개 hash/CRC를 확인했다. 이전의 “오른쪽 성공 ZIP 미회수”와 stereo+pose 교집합0은 당시 조사 결과다. 기존 left1/10과 이후 확보한 pose1/10을 같은 sequence/frame으로 대조해 **실제 stereo RGB+pose 두 sample을 추가 네트워크0으로 준비했다.** Lab 장면 RGB prefix에서 새 대응 pose를 찾거나 Serena 목표를 다시 깊게 탐색할 필요가 없었다.

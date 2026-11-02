@@ -47,7 +47,8 @@ def export_checkpoint(checkpoint, checkpoint_sha256, output):
 
 
 def train(args, *, trainer_class=ShardTrainer, catalog_reader=read_catalog,
-          checkpoint_reader=read_checkpoint, exporter=export_checkpoint, run_schema='m1_shard_run_v1'):
+          checkpoint_reader=read_checkpoint, exporter=export_checkpoint, run_schema='m1_shard_run_v1',
+          training_scope='synthetic_fixture_only'):
     output = args.output
     config = json.loads(_read(args.config, 65536))
     catalog = catalog_reader(args.catalog)
@@ -72,7 +73,7 @@ def train(args, *, trainer_class=ShardTrainer, catalog_reader=read_catalog,
     durable = None
     can_write_report = not report_path.exists()
     report = {'schema_version':run_schema, 'status':'started', 'full_training_ready':False,
-              'training_scope':'synthetic_fixture_only', 'limits':{'max_attempts':args.max_attempts,
+              'training_scope':training_scope, 'limits':{'max_attempts':args.max_attempts,
               'max_seconds':args.max_seconds, 'log_limit':args.log_limit},
               'target':{'steps':args.steps, 'epochs':args.epochs}, 'log':[]}
 
@@ -94,7 +95,7 @@ def train(args, *, trainer_class=ShardTrainer, catalog_reader=read_catalog,
         report.update(step=trainer.step, samples_seen=trainer.samples_seen, coverage=trainer.coverage(),
                       attempts=trainer.attempts, skipped_updates=trainer.skipped_updates,
                       source=trainer.source, environment=trainer.environment,
-                      catalog_sha256=catalog['content_sha256'])
+                      catalog_sha256=trainer.catalog['content_sha256'])
         record()
 
     try:

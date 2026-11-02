@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 외부 고정 policy로 검토된 실제 데이터만 허용하는 bounded RGB2D release→train/validation/정확 재개/checkpoint/export 경로를 구현했습니다. 한 bundle32frame·T1/2D 범위이며 기존 synthetic gate와 원 candidate는 보존합니다. 개발34개 및 root 신규7개·기존27개 검사를 통과했고 명시 development_fixture CPU에서 전체4update와2+2재개의 전체state 일치를 확인했습니다. 현재 실제 Serena는 train2/validation0·원본motion/외부검토근거 미충족으로 차단했고 실제 학습/release/policy 발급은0입니다. [계약·신뢰범위·CLI/config·다음 자료 요건](REAL_RGB2D_RELEASE.md)을 따릅니다.
+
 2026-11-02 완료 bundle의 UI 독립 T=1 진단 reader를 추가했습니다. 명시 COMPLETE pin·split과 전체 byte/raw 수치 감사를 거쳐 candidate 한 개를 캐시하고, native RGB·GT2D/annotation mask·GT3D mm/target mask·GT2D 특징을 제한 batch로 읽습니다. 자체 생성 fixture 개발8개와 root 독립8개가 통과했으며 기존 학습 gate와 dataset_sample/diagnostic_only/train_ready=false를 유지합니다. [데이터 계약과 상한](BUNDLE_T1_DATA.md)을 따릅니다.
 
 아래 날짜별 구현 기록의 GPU 미실행·미검증은 해당 준비 당시 상태입니다. 현재 고정20b7aa9의 합성 A100 FP32/AMP 시험은 통과했으며 실제 데이터 GPU 학습·정확도 검증은 별도입니다.

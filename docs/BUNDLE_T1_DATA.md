@@ -55,3 +55,5 @@ python -m rewind_bundle_data inspect --root bundle --completion-sha256 CONTENT_S
 실제 Serena의 기존 작은 진단 API와 고정 GPU 소스/배포물을 변경하지 않는다. 합성 GPU `20b7aa9`의 A100 FP32/AMP 재개 시험은 이미 통과했으며, 이 reader 작업은 로컬 데이터 공급 검증이다. 실제 release·정식 batch 학습·실제 데이터 정확도·독립 validation·원본 motion/내용/시간/단위 근거·temporal window·Drive 새VM 지속성은 여전히 후속이다.
 
 개발8개(22.499초) 및 root 독립8개(23.447초)가 failure/error/skip0으로 통과했다. 보존 bundle의3triplet/2pose job 중 train2개를 native RGB 포함 batch로 읽고 전체 입력 SHA 불변을 확인했다. metadata CLI subprocess의 Torch·모델·학습 import는0이며 sampledRSS28,426,240bytes, batch 관측 peak274,923,520bytes였다. `outputs/full_training_readiness_20261102/developer/bundle_data/`의 `final_tests.txt`, `preserved_inspection.json`, `metadata_imports.json`과 root `bundle_data_tests.txt`에 근거를 보존했다. 초기 상한 검사의 기대 지점을 기존 RGB 생성 단계보다 뒤로 잡은 fixture를 수정한 뒤의 최종 결과다.
+
+후속 [검토형 실제 RGB2D release adapter](REAL_RGB2D_RELEASE.md)는 이 reader의 진단 계약을 바꾸지 않고 외부 policy로 명시 허용된 T1/2D 공급만 연결한다. 원래 dataset_sample/diagnostic_only/train_ready=false와 기존 trainer gate를 전역 해제하지 않는다. 현재 실제Serena는 train2/validation0·원본motion/검토근거 미충족으로 차단되어 실제 학습/release 발급은 없다.

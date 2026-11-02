@@ -18,6 +18,7 @@ FORMAT = 'm1_shard_checkpoint_v1'
 
 class ShardTrainer:
     CHECKPOINT_FORMAT = FORMAT
+    TRAINING_SCOPE = 'synthetic_fixture_only'
 
     def _new_sampler(self):
         return EpochSampler(self.catalog, 'train', self.config['seed'])
@@ -176,11 +177,11 @@ class ShardTrainer:
                 'scheduler':self.scheduler.state_dict(), 'scaler':self.scaler.state_dict(), 'rng':rng_state(),
                 'cursor':self.sampler.state_dict(), 'step':self.step, 'samples_seen':self.samples_seen,
                 'attempts':self.attempts, 'skipped_updates':self.skipped_updates,
-                'training_scope':'synthetic_fixture_only', 'full_training_ready':False}
+                'training_scope':self.TRAINING_SCOPE, 'full_training_ready':False}
 
     def resume(self, checkpoint):
         _require(isinstance(checkpoint, dict) and checkpoint.get('format_version') == self.CHECKPOINT_FORMAT and
-                 checkpoint.get('training_scope') == 'synthetic_fixture_only' and
+                 checkpoint.get('training_scope') == self.TRAINING_SCOPE and
                  checkpoint.get('full_training_ready') is False, 'shard_checkpoint_format')
         _require(checkpoint['config'] == self.config and checkpoint['catalog'] == self.catalog,
                  'shard_resume_config_catalog')
