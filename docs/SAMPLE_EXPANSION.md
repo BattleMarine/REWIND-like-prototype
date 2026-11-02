@@ -1,5 +1,13 @@
 # 실제 샘플 확대를 위한 발견 인덱싱
 
+## 2026-11-02 job003 실제 재개 결과
+
+Root가 결과 ZIP SHA d3e35128ee38278716515f3b111d306c81e5f3cb1df57ae70f31a1366a79cee1, 외부·내부CRC와 최종 snapshot/DB SHA 및 receipt 일치를 독립 확인했다. 근거는 outputs/test_archvis_rgb_discovery_677bc7f_003_20261102/archvis_rgb_discovery_677bc7f_003_result.zip이다. g6의 parent는 고정 g5와 일치하며 160항목/g5에서270항목/g9로 재개·확장했다. 최종 snapshot은ec213878a03784b22fa7e6d53f26f16a61409aa8854228e177fd97f4e2101f8b, receipt raw SHA는3d4c6c11953318661b5cf905155b7e0384cb87430fe9f97192dff5df4f7351e9다.
+
+bounded_stop/transfer_bytes_limit으로 종료했다. API body267439414bytes·815요청·228.930초이며 disk 실측값은 없다. train stereo59→102(+43), stereo∩pose35→35(+0), validation0·실제추출0이다. RGB 재개는 성공했지만 추가100개의 RGB+pose 후보 목표는 진척하지 않았다. 앞선 약729MiB/637초는 첫 구간의 단순 비례 참조치이며 현재 구간에는 적용할 수 없다.
+
+다음 판단은 RGB 반복 실행보다 새 stereo 키와 기존 pose 목록의 누락 범위를 먼저 대조하는 것이다. pose 목록에 없다는 사실을 원본 pose 부재로 단정하지 않는다. 고정 g9와 기존 결과를 보존하며 job003 자동반복/예산확대는 하지 않는다. 관측35개에서 소량 추출을 검증하는 경로도 유지한다.
+
 ## job003 재개 준비 — 추가100 관측 후보 목표, 미실행
 
 현재 train stereo∩pose 관측 후보35개에서 추가100개(누적135개)를 목표로 두되, 기존 상한의 job003 한 번만 준비한다. 실제 추출0·validation0이며 관측 대응을 검증된 학습 pair로 취급하지 않는다. 달성을 보장하거나 자동 반복하지 않는다.
