@@ -1,5 +1,7 @@
 # 자동 인덱싱과 실제 데이터 준비 연결
 
+후속 [샘플 확대 discovery](SAMPLE_EXPANSION.md)는 특정 파일 추출과 구분한 신규 source의 bounded 목록 확장이다. 기존 opt-in 준비/학습 gate/pose notebook을 유지하며, 현재 실제 triplet은 train2/val0이고 실제 Colab discovery는 아직 실행하지 않았다.
+
 2026-11-02 · 기존 API10·prefix cache·고정 A/B/C 시험과 분리된 명시적 opt-in 경로다. 로컬 개발 검증과 실제 Colab 통합 시험을 구분하며, 전체 archive 완료·실제 학습 readiness를 판정하지 않는다.
 
 ## 연결한 진입점

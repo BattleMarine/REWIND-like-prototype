@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 실제 샘플 확대 조사와 ArchVis RGB 증분 인덱싱 실행본을 준비했습니다. 보존 pose 목록에서 validation 후보 1,331개(20개 sequence)를 확인했지만, 대응 RGB가 없어 완전한 추출 triplet은 기존 Serena train 2개뿐입니다. 보유 Lab prefix의 복사 DB를 한 번 확장했으나 다음 파일이 불완전해 새 후보는 늘지 않았습니다. 새 Drive 원본의 인덱스를 최대 256MiB·600초·512개 항목까지 확장하고 저장하는 도구와 CPU 노트북을 준비했으며, 로컬 모의 검사 4개를 통과했습니다. 실제 Colab 원격 실행은 아직 하지 않았습니다. 검토한 고정본은 데이터셋 탐색 세션에 인계합니다. [조사 결과·상한·운영 인계](SAMPLE_EXPANSION.md)를 따릅니다.
+
 2026-11-02 외부 고정 policy로 검토된 실제 데이터만 허용하는 bounded RGB2D release→train/validation/정확 재개/checkpoint/export 경로를 구현했습니다. 한 bundle32frame·T1/2D 범위이며 기존 synthetic gate와 원 candidate는 보존합니다. 개발34개 및 root 신규7개·기존27개 검사를 통과했고 명시 development_fixture CPU에서 전체4update와2+2재개의 전체state 일치를 확인했습니다. 현재 실제 Serena는 train2/validation0·원본motion/외부검토근거 미충족으로 차단했고 실제 학습/release/policy 발급은0입니다. [계약·신뢰범위·CLI/config·다음 자료 요건](REAL_RGB2D_RELEASE.md)을 따릅니다.
 
 2026-11-02 완료 bundle의 UI 독립 T=1 진단 reader를 추가했습니다. 명시 COMPLETE pin·split과 전체 byte/raw 수치 감사를 거쳐 candidate 한 개를 캐시하고, native RGB·GT2D/annotation mask·GT3D mm/target mask·GT2D 특징을 제한 batch로 읽습니다. 자체 생성 fixture 개발8개와 root 독립8개가 통과했으며 기존 학습 gate와 dataset_sample/diagnostic_only/train_ready=false를 유지합니다. [데이터 계약과 상한](BUNDLE_T1_DATA.md)을 따릅니다.

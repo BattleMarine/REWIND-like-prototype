@@ -1,5 +1,7 @@
 # 지속형 로컬 archive 인덱스
 
+후속 [실제 샘플 확대 discovery](SAMPLE_EXPANSION.md)는 별도 명시 profile과 신규 ArchVis RGB source로 batch별 snapshot/receipt를 누적한다. 아래 기본 한도·기존 pose notebook/DB는 바꾸지 않으며 metadata+Range body256MiB/600초 등의 확대 profile은 그 고정 job에만 적용한다.
+
 2026-10-29 첫 구현. `rewind_archive_index`는 RGB·pose의 로컬 분할 gzip/tar를 대상으로 인덱스를 저장·복원·확장하는 선택 기능이다. 기존 API10, archive_prepare notebook, 원본과 캐시는 변경하지 않는다.
 
 ## 지원 범위와 순서
