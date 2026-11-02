@@ -155,9 +155,9 @@ def cache_predictions(cache,data,manifest,weights_path,expected_weights_hash):
     return maps[1]
 
 
-def predicted_data(predictions,data,cache):
+def predicted_data(predictions,data,cache,*,frontend_version=VERSION):
     if set(predictions)!=set(data.tensors.anchors):raise ValueError('rgb_diagnostic_predictions_required')
-    contract={**data.contract,'input_source':'predicted_2d','frontend_version':VERSION,
+    contract={**data.contract,'input_source':'predicted_2d','frontend_version':frontend_version,
         'frontend_checkpoint_sha256':cache['weights_state_sha256'],'preprocessing_version':PREPROCESS}
     packed=[];names=tuple(data.identity['joint_names'])
     for i,(sequence,frame) in enumerate(data.tensors.anchors):

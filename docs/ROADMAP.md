@@ -2,6 +2,8 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
+2026-11-03 실제102페어 학습 연결 진단: 사용자 승인으로 고정 RGB204/pose102를 재검증하고 기존 StereoHeatmapNet→예측cache→SingleFrameRegressor를 별도diagnostic-only 경로로 연결했다. CPU FP32/thread1/Adam1e-4/B2/각51update의 정확한1pass를 실행해 stage별102key·finite/nonzero gradient·weights 변화·저장재추론 일치를 확인했다. 내부32.922초/관측RSS315.14MiB/출력16.46MiB/원격0으로 상한 이내였고 train-fit MPJPE682.60→634.07mm였다. Validation0·원래 blockers·train_ready=false와 기존32frame release/일반 gate를 유지한다. 25시점 loaded-state equality만 검사했고 무중단 대비 완전재개·일반화·GPU/정식 M1 완료는 별도다. 개발·root 계약검사15개 통과. [실행 근거·범위](REAL_RGB102_DIAGNOSTIC.md)를 따른다.
+
 2026-11-03 고정14d94d4의 실제 Colab 추출에서 RGB102페어(204PNG)+pose102 확보를 완료했습니다. 응답body266392949bytes(254.05MiB)·837HTTP·271.007초, 관측RSS202.23MiB였고7묶음 모두 내용 감사를 통과했습니다. Root는 ZIP CRC·인덱스 기준204PNG SHA/크기/decode와 고정 pose 입력을 독립 대조했습니다. 대표 overlay10장만 제한 시각 점검했으며 사람 승인·전체 영상 정합·validation·정식 학습 release는 별도입니다. [실제 결과와 한계](RGB102_PAIRS.md).
 
 2026-11-03 준비 당시 기록 — g9 stereo102의 RGB204 추출 준비: pose 부족33개를235MiB cache에서 원격0으로 확보해 raw102/기존69 SHA 대조와62관절 좌표·재투영 감사를 완료했다. RGB204의236.14MiB는 저장 인덱스의 이름·크기이며 실제 Colab 추출은 미실행이다. Core32개 제한·auto_build=False를 유지한 physical7묶음/공유runtime, 최초metadata 포함512MiB·3072HTTP·1200초/read1GiB/decode256MiB/RSS1GiB/work512MiB+ZIP384MiB로 고정하고 부분 결과를 회수한다. Root 검토·커밋 후 탐색 세션에 고정본을 인계하며 실제 영상 정합/시간/motion/validation0·학습 차단은 별도다. [입력과 지원 범위](RGB102_PAIRS.md)를 따른다.
