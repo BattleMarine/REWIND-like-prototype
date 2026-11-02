@@ -10,7 +10,8 @@
 | `rewind_m1.shard_training`(2차 추가) | 별도 합성 M1 shard trainer, epoch cursor·실제 sample 수 재개·독립 validation·checkpoint 기반 추론 export | 실제 release·persistent 준비 공급·GPU/AMP pilot 미검증 |
 | `rewind_m2`, `rewind_m3` | UI 없는 합성 causal diffusion·cascade 학습과 재개 | 실제 데이터 계약·shard 공급·독립 validation 연결 필요 |
 | `rewind_m1.frontend_train` | 작은 CPU RGB→2D 진단, inference weights 저장 | 소량/100step 제한, 일반 재개·GPU·장시간 공급 미지원 |
-| `rewind_archive_index.preparation` | 명시 target의 예산 제한 탐색·snapshot 저장/복원·선택 추출·로컬 재사용 | 학습 shard 공급 queue와 eviction/cursor 연결 미구현. epoch와 archive coverage는 별개 |
+| `rewind_archive_index.preparation` | 명시 target의 예산 제한 탐색·snapshot 저장/복원·선택 추출·로컬 재사용 | epoch와 archive coverage는 별개 |
+| `rewind_prepare_queue`(3a 추가) | 기존 backend 소량 범위의 raw 준비 순서·영속 cursor·전역 예약/정산·partial 재개·준비 목록 | 학습 shard 변환/자동 공급·eviction·실제 Drive queue/새VM 지속성 미검증 |
 | 실제 pose candidate | 원본 hash·좌표 수치 검사를 거친 진단용 candidate | `training_release=not_implemented`, 원본 motion identity·독립 validation 등 blockers 유지 |
 
 화면 UI를 학습 코드가 import하지 않는 구조는 이미 존재한다. 화면을 분리한다는 이유로 신경망 2D frontend를 제거하거나 학습을 화면 실행에 종속시키지 않는다. 기존 소량 진단은 전체 데이터셋 baseline 성능을 입증하지 않는다.
@@ -76,7 +77,7 @@ export/load는 CPU Torch RNG를 보존하고 export는 원본 모델의 mode/dev
 
 1. **현재 묶음:** 로컬 특징 shard 계약·읽기·readiness·sampler·추론 가중치. 기존 dataset gate 유지.
 2. **Shard trainer(로컬 합성 CPU 구현·검증):** 기존 M1 모델/loss 재사용, CPU/CUDA/AMP 실행 경로, 독립 validation 누적, cursor와 optimizer/scheduler/scaler/RNG·환경·catalog를 함께 저장. 합성 CPU uninterrupted/resume 동등성과 epoch coverage를 검증했다. CUDA/AMP 실제 실행은 미검증이며 기존 trainer API는 보존한다.
-3. **준비 공급 연결:** 기존 persistent-index의 명시 target·공유 예산·재사용을 queue에 연결. RGB/pose 키 대조·bounded 임시 디스크·eviction·중단/재개를 검사. archive 탐색 순서와 학습 shuffle 분리. 학습 epoch를 전체 indexing 완료로 사용하지 않음.
+3. **준비 공급 연결(3a 로컬 구현·검증):** 기존 persistent-index의 명시 target·전역 예약/정산·재사용을 제한된 raw queue에 연결했다. RGB/pose 키 대조·임시 디스크 상한·중단/재개를 검사하고 자동 삭제 없이 소비 표시를 기록한다. 학습 shard 변환/자동 공급·eviction·실제 Drive/새VM 시험은 남아 있다. archive 탐색 순서와 학습 shuffle을 구분하고 epoch를 전체 indexing 완료로 사용하지 않는다. [queue 계약](PREPARATION_QUEUE.md)을 따른다.
 4. **실제 release:** unit/좌표·calibration·RGB-pose·원본 motion·독립 validation의 근거 검토와 명시 release adapter. GT 입력 진단과 예측 입력 결과를 분리. 미검증 상태를 문자열로 해제하지 않음.
 5. **Colab pilot:** 테스트 세션에서 실제 GPU/VRAM·디스크·세션 길이·준비 비용을 측정. 작은 sample→overfit→pilot 순서, 실행 전 전송량/시간/RAM/디스크/업데이트 예산과 중단 조건 고정. artifact/checkpoint/manifest를 runtime 추출본과 분리 보관. 결과를 보고 다음 규모 결정.
 6. **M2/M3/2D 확장:** 지원한 M1 경로의 검증 후 모델별 input/loss/시간 정합성·재개 계약을 추가. 동영상 adapter/UI는 이 학습 준비 우선순위 뒤에서 진행.
@@ -125,3 +126,11 @@ python -m rewind_m1.shard_cli export --checkpoint outputs/m1_shard_example/last.
 2차 개발 근거는 `outputs/full_training_readiness_20261102/developer/trainer/`에 별도로 보관한다. `verify.py`·`tests.json`·`tests.txt`·`code_hashes.json`과 `commands.json`·`cli_*.txt`·`run/last.pt`·추론weights·평가/report를 확인한다. 이번에는 합성 CPU optimizer update가 포함되며 1차의 update0 검증과 구분한다. 실제 데이터 학습/원격 요청/설치는 수행하지 않았다.
 
 고정31개(신규trainer14개+기반17개)가 failure/error/skip0으로 통과했다. 최종 검사에서 합성 성공 update84개와 mock AMP skip1회를 확인했고 별도 보존 CLI 실행은2→5step 재개 총5update·실제sample22개·완료1epoch/현재10개를 기록했다. 두 모델 모두 shard 중간·shard 경계·epoch 경계 분할재개에서 model/optimizer/scheduler/scaler/RNG/cursor/counter 전체가 중단없는 실행과 동일했다. Root도 신규14개를 별도로 통과했으며 근거는 `outputs/full_training_readiness_20261102/root/stage2_tests.txt`, `stage2_review.json`이다.
+
+## 3a 구현: raw 준비 queue
+
+[제한된 준비 queue](PREPARATION_QUEUE.md)를 추가했다. 로컬 합성13개 검사와 보존 실행에서 서로 다른 left/right/pose 원본을 고정 순서로 준비하고, partial→새 attempt retry→같은 index 복원/계속→완료본 재사용→소비 표시를 확인했다. 별도 보존 결과는 source read5856bytes·returned decode12756bytes·신규member12·HTTP/body0·phase 누적7.345초이며 정확한 stereo/pose 키1개를 대조했다. 준비 결과는 `train_ready=false`이고 신경망 학습에 투입하지 않았다.
+
+전역 예산은 실행 전에 예약하고 정상 계측만 정산한다. crash와 미계측 예외는 예약을 유지하며 자동 재시도를 차단한다. 기존 backend의 read/decode/member/HTTP/body/time 상한도 실제 남은 예산 이하로 제한한다. 별도 init 없이 state를 재생성하지 않고 기존 partial/완료 출력·원본·snapshot을 보존한다. 자동 eviction은 없으며 disk 상한에서 중단한다. 테스트의 Drive 항목은 상한 전달 mock이고 실제 원격 요청은 없다.
+
+이는 기존 소량 상한 안의 raw 준비 기능이다. 전체 RGB/pose를 자동 순환하거나 학습 shard를 만들어 공급하지는 않는다. 다음3b는 pose 전체를 한번에 올리는 기존 `LocalRGBSupervision`의 한계를 피하도록 RGB+pose shard와 동일 epoch cursor를 활용하는 별도2D 학습/재개 경로를 설계한다. 실제 release에 필요한 독립 validation·원본 motion·단위/좌표/정합 근거와 Colab 자원 측정은 여전히 별도다.
