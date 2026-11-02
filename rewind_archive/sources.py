@@ -37,8 +37,9 @@ def http_open(url, headers, timeout):
 
 
 class SessionResponse:
-    def __init__(self, response):
+    def __init__(self, response, timing=None):
         self.response = response
+        self.timing = timing
         self.status, self.headers = response.status_code, response.headers
         if not callable(getattr(self.headers,"get",None)):
             raise TypeError("response_headers_mapping_required")
@@ -47,6 +48,8 @@ class SessionResponse:
         read1 = getattr(self.response.raw,"read1",None)
         if not callable(read1):
             raise PreparationError("authorized_transport_read1_required")
+        if self.timing is not None:
+            return self.timing.call('http_body_read1', read1, size, decode_content=False)
         return read1(size, decode_content=False)
 
     def set_timeout(self, timeout):
@@ -63,14 +66,17 @@ def session_opener(session, operation="unknown"):
     if getattr(session,"_max_refresh_attempts",0) != 0:
         raise PreparationError("session_retry_policy")
     def open_response(url, headers, timeout):
+        timing=getattr(session,'_rewind_request_timing',None)
         try:
-            response=session.get(url, headers=headers, stream=True, allow_redirects=False, timeout=timeout)
+            kwargs=dict(headers=headers,stream=True,allow_redirects=False,timeout=timeout)
+            response=(timing.call('http_request_to_headers',session.get,url,**kwargs) if timing is not None
+                      else session.get(url,**kwargs))
         except Exception as exc:
             # Session 예외에 token/URL이 들어 있더라도 로그에 전달하지 않는다.
             error=PreparationError("authorized_request_failed",request_failure=request_failure(exc,operation,"request_open"))
             raise mark_open_timeout(error,exc,operation) from None
         try:
-            return SessionResponse(response)
+            return SessionResponse(response,timing)
         except Exception as exc:
             try:response.close()
             except Exception:pass

@@ -14,6 +14,10 @@ from rewind_archive_index.drive import DriveRuntime,DriveLimits,make_drive_sourc
 from rewind_archive_index.extension_records import atomic_record
 from rewind_archive_index.snapshots import export_snapshot,import_snapshot,SnapshotLimits,_path
 from rewind_archive_index.source import IndexFailure,IndexLimits,MIB
+from rewind_archive.request_policy import validate_no_hidden_retries
+from .timing import Timing
+
+PREINDEX_PROFILE='archvis_preindex512_v1'
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,23 @@ class DiscoveryLimits:
                  'seconds':600,'rss_bytes':1024*MIB,'disk_bytes':256*MIB,'batch_members':32,'batches':16,'reserve_seconds':30}
         if any(type(v) is not int or not 1<=v<=maxima[k] for k,v in asdict(self).items()) or self.reserve_seconds>=self.seconds:
             raise IndexFailure('discovery_limits')
+
+
+@dataclass(frozen=True)
+class PreindexLimits(DiscoveryLimits):
+    body_bytes:int=512*MIB
+    requests:int=4096
+    read_bytes:int=1024*MIB
+    decoded_bytes:int=512*MIB
+    seconds:int=1200
+    disk_bytes:int=768*MIB
+    batches:int=32
+
+    def __post_init__(self):
+        maxima={'body_bytes':512*MIB,'requests':4096,'read_bytes':1024*MIB,'decoded_bytes':512*MIB,
+                 'seconds':1200,'rss_bytes':1024*MIB,'disk_bytes':768*MIB,'batch_members':32,'batches':32,'reserve_seconds':30}
+        if any(type(v) is not int or not 1<=v<=maxima[k] for k,v in asdict(self).items()) or self.reserve_seconds>=self.seconds:
+            raise IndexFailure('preindex_limits')
 
 
 def check(value,reason):
@@ -85,8 +106,12 @@ def counts(state,owners,pose_keys):
 
 
 def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog,pose_sha256,
-        workspace,snapshot_directory,session_factory,limits=None,resume=None):
+        workspace,snapshot_directory,session_factory,limits=None,resume=None,profile=None):
     limits=limits or DiscoveryLimits();validate_selection(selection)
+    preindex=profile==PREINDEX_PROFILE
+    check((preindex and type(limits) is PreindexLimits and resume is not None) or
+          (profile is None and type(limits) is DiscoveryLimits),'discovery_explicit_profile_limits')
+    if preindex:check(resume['anchor']['bytes']+4*MIB<=limits.disk_bytes,'discovery_recovery_base_budget')
     check(selection['kind']=='rgb','discovery_rgb_only')
     check(isinstance(job_id,str) and re.fullmatch('[A-Za-z0-9_-]{1,64}',job_id),'discovery_job_id')
     workspace=_path(workspace);snapshots=_path(snapshot_directory)
@@ -99,12 +124,18 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
             'archive_complete_claimed':False,'actual_extracted_triplets':0}
     path=workspace/'report.json';atomic_record(path,report,initial=True)
     started=time.monotonic();runtime=None;session=None;read_bytes=decoded=0;meta_body=meta_requests=0
+    timing=Timing() if preindex else None
+    if preindex:report.update(profile=profile,scan_attempts=[],cumulative_cache={'hits':0,'misses':0,'read_bytes':0},
+        durable_discovered=None,working_discovered=None)
+    def measured(name,function,*args,**kwargs):
+        return timing.call(name,function,*args,**kwargs) if timing is not None else function(*args,**kwargs)
     last=resume['anchor'] if resume else None
     report['last_receipt']=last
     def save():
         report.update(elapsed_seconds=time.monotonic()-started,read_bytes=read_bytes,decoded_bytes=decoded,
             body_bytes=meta_body+(runtime.transfer.transfer_bytes if runtime and hasattr(runtime,'transfer') else 0),
             requests=meta_requests+(runtime.transfer.ranges if runtime and hasattr(runtime,'transfer') else 0))
+        if timing is not None:report['timing']=timing.snapshot()
         atomic_record(path,report)
     def guard(reserve=False):
         import psutil
@@ -120,13 +151,17 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
         check(total+MIB<=limits.disk_bytes,'discovery_disk_limit')
         return total
     try:
-        owners,pose_keys,pose_report=input_keys(split_paths,split_pins,pose_catalog,pose_sha256)
+        owners,pose_keys,pose_report=measured('input_validation',input_keys,split_paths,split_pins,pose_catalog,pose_sha256)
         report.update(pose_observation=pose_report,split_sha256=split_pins)
         check(len(expected_metadata)==len(selection['parts']),'discovery_expected_metadata')
-        guard(True);session=session_factory()
+        guard(True);session=measured('session_factory',session_factory)
+        if timing is not None:
+            validate_no_hidden_retries(session)
+            check(not hasattr(session,'_rewind_request_timing'),'discovery_timing_hook_conflict')
+            session._rewind_request_timing=timing
         metadata_limits=MetadataLimits(max_files=len(selection['parts']),max_requests=len(selection['parts']),
             max_transfer_bytes=min(128*1024,limits.body_bytes),max_elapsed_seconds=min(30,limits.seconds-limits.reserve_seconds))
-        metadata=build_drive_manifest(selection,session,metadata_limits)
+        metadata=measured('initial_metadata',build_drive_manifest,selection,session,metadata_limits)
         meta_body=metadata['report']['stats']['transfer_bytes'];meta_requests=metadata['report']['stats']['requests']
         atomic_record(workspace/'metadata.json',metadata)
         if metadata['report']['stop_reason']=='interrupted':raise KeyboardInterrupt()
@@ -145,6 +180,14 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
             range_bytes=MIB,max_cache_bytes=4*MIB))
         index_limits=IndexLimits(max_read_bytes=limits.read_bytes,max_decoded_bytes=limits.decoded_bytes,
             max_rss_bytes=limits.rss_bytes,max_disk_bytes=limits.disk_bytes,max_seconds=limits.seconds)
+        if preindex:
+            # scan은 payload를 저장하지 않는다. 기존 checkpoint 임시공간 계산의
+            # 3*(state+index)로 local DB의 보수적 상한을 별도 고정한다.
+            live_db_bound=3*(index_limits.max_state_bytes+index_limits.max_index_bytes)+65536
+            index_limits=replace(index_limits,max_disk_bytes=min(limits.disk_bytes,live_db_bound))
+            report['storage_plan']={'live_db_bound_bytes':live_db_bound,'snapshot_db_bound_bytes':SnapshotLimits().max_db_bytes,
+                'snapshot_zip_bound_bytes':SnapshotLimits().max_bundle_bytes,'report_reserve_bytes':4*MIB,
+                'scope':'before scan reserve local DB growth, snapshot backup/temp/publish, and latest recovery ZIP; no deletion'}
         db=workspace/'index.sqlite'
         if resume:
             check(set(resume)=={'receipt_path','receipt_file_sha256','anchor'},'discovery_resume_fields')
@@ -152,15 +195,29 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
             check(receipt_sha==resume['receipt_file_sha256'] and receipt==last,'discovery_trusted_receipt_pin')
             report['last_receipt_path']=str(_path(resume['receipt_path']))
             used=guard(True)
-            report['restore']=import_snapshot(resume['receipt_path'],db,expected_source_sha256=source_sha,
+            report['restore']=measured('snapshot_restore',import_snapshot,resume['receipt_path'],db,expected_source_sha256=source_sha,
                 expected_snapshot_id=last['snapshot_id'],min_generation=last['generation'],known_anchor=last,index_limits=index_limits,
                 limits=SnapshotLimits(max_disk_bytes=max(1,limits.disk_bytes-used-MIB),
                     max_seconds=max(.001,limits.seconds-(time.monotonic()-started)-limits.reserve_seconds)))
             guard(True)
         else:ArchiveIndex(db,index_limits).create(spec)
         index=ArchiveIndex(db,index_limits,runtime);report['before']=index.status();save()
+        if preindex:
+            state,_=index._snapshot()
+            report['before_discovered']=counts(state,owners,pose_keys)
+            report['discovered']=report['before_discovered']
+            report['working_discovered']=report['before_discovered']
+            report['durable_discovered']=report['before_discovered']
+            report['durable_members']=len(state['members'])
         for batch in range(limits.batches):
-            guard(True)
+            used=guard(True)
+            if preindex:
+                plan=report['storage_plan']
+                # Export 실패의 부분 publish ZIP까지 남겨도 이전 receipt 회수가
+                # 가능하도록 시작 전에 peak 전체를 예약한다.
+                reserve=(plan['live_db_bound_bytes']+plan['snapshot_db_bound_bytes']+
+                    2*plan['snapshot_zip_bound_bytes']+max(last['bytes'],plan['snapshot_zip_bound_bytes'])+4*MIB)
+                check(used-db.stat().st_size+reserve<=limits.disk_bytes,'discovery_scan_snapshot_recovery_reserve')
             remaining_read=limits.read_bytes-read_bytes;remaining_decode=limits.decoded_bytes-decoded
             check(remaining_read>0 and remaining_decode>0,'discovery_io_exhausted')
             state,_=index._snapshot();previous=len(state['members']);generation=state['generation']
@@ -168,26 +225,57 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
             index.limits=replace(index_limits,max_read_bytes=remaining_read,max_decoded_bytes=remaining_decode,
                 max_seconds=max(.001,limits.seconds-(time.monotonic()-started)-limits.reserve_seconds))
             report['active_stage']='scan';save();prior_operation=runtime.operation
+            attempt=None
+            if preindex:
+                attempt={'batch':batch+1,'status':'started'};report['scan_attempts'].append(attempt)
+                before_timing=timing.snapshot()
             result=None
-            try:result=index.scan(min(limits.batch_members,index_limits.max_members-previous),expected_generation=generation,verify_end=False)
+            try:result=measured('scan',index.scan,min(limits.batch_members,index_limits.max_members-previous),expected_generation=generation,verify_end=False)
             finally:
                 if runtime.operation is not None and runtime.operation is not prior_operation:
                     stats=runtime.operation.stats();read_bytes+=stats['source_read_bytes'];decoded+=stats['returned_decoded_bytes']
+                    if preindex:
+                        attempt['stats']={k:v for k,v in stats.items() if k!='source_read_trace'}
+                        report['observed_peak_rss']=max(report.get('observed_peak_rss',0),stats['observed_peak_rss'])
+                        for dest,source in (('hits','remote_cache_hits'),('misses','remote_cache_misses'),('read_bytes','remote_cache_read_bytes')):
+                            report['cumulative_cache'][dest]+=stats.get(source,0)
+                if preindex:
+                    after_timing=timing.snapshot()
+                    call_delta={}
+                    for name in ('http_request_to_headers','http_body_read1'):
+                        a=before_timing['calls'].get(name,{});b=after_timing['calls'].get(name,{})
+                        call_delta[name]={k:b.get(k,0)-a.get(k,0) for k in ('calls','failed_calls','wall_seconds','process_cpu_seconds')}
+                    attempt.update(status='returned' if result is not None else 'failed_or_interrupted',
+                        timing_delta={**{k:after_timing[k]-before_timing[k] for k in ('wall_seconds','process_cpu_seconds')},
+                            'http_calls':call_delta})
+                    save()
             check(read_bytes<=limits.read_bytes and decoded<=limits.decoded_bytes,'discovery_cumulative_io_limit')
             current,_=index._snapshot()
             check(current['members'][:previous]==state['members'] and current['source_sha256']==source_sha,'discovery_saved_prefix_changed')
             event={'batch':batch+1,'new_members':len(current['members'])-previous,'generation':current['generation'],
                    'boundary':current['boundary'],'index_coverage':current['index_coverage'],'stop_reason':result.get('stop_reason'),
                    'checkpoint_deferred':bool(result.get('checkpoint_deferred'))}
+            old_counts=report.get('discovered')
             report['events'].append(event);report['discovered']=counts(current,owners,pose_keys)
+            if preindex:
+                report['working_discovered']=report['discovered']
+                event['new_keys_by_split']={k:{s:n-old_counts['keys'][k][s] for s,n in values.items()}
+                    for k,values in report['discovered']['keys'].items()}
+                report['validation_rgb_stereo_found']=report['discovered']['keys']['stereo']['validation']>0
             if current['generation']>generation:
                 report['active_stage']='snapshot';save();used=guard()
                 check(used+3*db.stat().st_size+MIB<=limits.disk_bytes,'discovery_snapshot_disk_reserve')
                 remaining=limits.seconds-(time.monotonic()-started)
                 check(remaining>1,'discovery_snapshot_time_reserve')
-                snap=export_snapshot(index,snapshots,known_anchor=last,
+                snap=measured('snapshot_export',export_snapshot,index,snapshots,known_anchor=last,
                     limits=SnapshotLimits(max_disk_bytes=limits.disk_bytes,max_seconds=remaining))
                 last=snap['receipt'];report['last_receipt']=last;event['receipt']=last
+                if preindex:
+                    event['snapshot']=snap
+                    event['snapshot_timing']={k:timing.calls['snapshot_export']['last_'+k]
+                        for k in ('wall_seconds','process_cpu_seconds')}
+                    report['durable_members']=len(current['members'])
+                    report['durable_discovered']=report['working_discovered']
                 report['last_receipt_path']=snap['receipt_path'];save()
                 check(guard()+last['bytes']+MIB<=limits.disk_bytes,'discovery_recovery_disk_reserve')
             if result.get('checkpoint_deferred') or not event['new_members'] or current['catalog_complete']:
@@ -196,12 +284,20 @@ def run(*,job_id,selection,expected_metadata,split_paths,split_pins,pose_catalog
         report['after']=index.status();report['active_stage']='finished';save();guard()
     except BaseException as exc:
         reason=getattr(exc,'reason',None)
-        report.update(status='interrupted' if isinstance(exc,KeyboardInterrupt) else 'failed',
+        bounded=preindex and reason in {'discovery_snapshot_disk_reserve','discovery_recovery_disk_reserve',
+            'discovery_disk_limit','discovery_time_reserve','discovery_time_limit','discovery_io_exhausted',
+            'snapshot_disk_limit','snapshot_db_limit','snapshot_bundle_limit','discovery_snapshot_time_reserve',
+            'discovery_catalog_limit','index_points_limit','index_bytes_limit','checkpoint_size_limit',
+            'discovery_scan_snapshot_recovery_reserve','checkpoint_disk_limit'}
+        report.update(status='bounded_stop' if bounded else 'interrupted' if isinstance(exc,KeyboardInterrupt) else 'failed',
             failure={'type':type(exc).__name__,'reason':reason if isinstance(reason,str) and re.fullmatch('[a-zA-Z0-9_:-]{1,128}',reason) else 'discovery_operation_failed'})
         save()
         if not isinstance(exc,Exception):raise
     finally:
         if session is not None:
+            if timing is not None and getattr(session,'_rewind_request_timing',None) is timing:
+                del session._rewind_request_timing
             try:session.close()
             except Exception:report['session_close_failed']=True;save()
+        if preindex:save()
     return report

@@ -2,6 +2,8 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
+2026-11-03 별도 사전 인덱싱 준비: 기존 discovery runner를 재사용해 고정 g9 이후를 CPU에서 한정 재개하고 배치별 immutable snapshot/receipt를 보존한다. 최신 pose 관측 15,465 key 중 validation 1,331 key / 20 sequence를 우선 근거로 삼되 RGB 위치를 추정하거나 이번 발견을 보장하지 않는다. 기본 256MiB 한도는 보존하고 명시 profile만 body 512MiB / 4096HTTP / 1200초 / read1GiB / decode512MiB / RSS1GiB / work+snapshot+회수768MiB / batch32×32를 허용한다. Scan 전 회수 공간을 예약하고 working/durable 관측을 구분하며 HTTP 호출·scan·snapshot wall/process CPU를 계측한다. 개발38개 검사 통과, 실제 원격0·학습0이며 core index/state/member/point/DB 상한·전체 EOF/CRC·새 runtime 검증은 별도다. GPU/압축 재포맷/병렬화/전체3TB 자동 실행은 이번 범위가 아니다. [계약과 인계](ARCHVIS_PREINDEX.md)를 따른다.
+
 2026-11-03 실제102페어 학습 연결 진단: 사용자 승인으로 고정 RGB204/pose102를 재검증하고 기존 StereoHeatmapNet→예측cache→SingleFrameRegressor를 별도diagnostic-only 경로로 연결했다. CPU FP32/thread1/Adam1e-4/B2/각51update의 정확한1pass를 실행해 stage별102key·finite/nonzero gradient·weights 변화·저장재추론 일치를 확인했다. 내부32.922초/관측RSS315.14MiB/출력16.46MiB/원격0으로 상한 이내였고 train-fit MPJPE682.60→634.07mm였다. Validation0·원래 blockers·train_ready=false와 기존32frame release/일반 gate를 유지한다. 25시점 loaded-state equality만 검사했고 무중단 대비 완전재개·일반화·GPU/정식 M1 완료는 별도다. 개발·root 계약검사15개 통과. [실행 근거·범위](REAL_RGB102_DIAGNOSTIC.md)를 따른다.
 
 2026-11-03 고정14d94d4의 실제 Colab 추출에서 RGB102페어(204PNG)+pose102 확보를 완료했습니다. 응답body266392949bytes(254.05MiB)·837HTTP·271.007초, 관측RSS202.23MiB였고7묶음 모두 내용 감사를 통과했습니다. Root는 ZIP CRC·인덱스 기준204PNG SHA/크기/decode와 고정 pose 입력을 독립 대조했습니다. 대표 overlay10장만 제한 시각 점검했으며 사람 승인·전체 영상 정합·validation·정식 학습 release는 별도입니다. [실제 결과와 한계](RGB102_PAIRS.md).

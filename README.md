@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 학습과 독립된 ArchVis 사전 인덱싱 실행본을 준비했습니다. 고정 g9부터 순차 재개하고 최신 pose 관측 15,465 key(그중 validation 1,331 key / 20 sequence)를 대조합니다. 명시 profile에서만 body 512MiB·1,200초와 snapshot/회수 공간을 제한하고, HTTP 호출·scan·snapshot의 겹치는 wall/process CPU를 계측합니다. 개발 38개 검사를 통과했으며 실제 원격 실행·validation RGB 발견·전체 데이터 인덱싱 완료는 아직 아닙니다. [고정 입력·예산·중단·회수 안내](docs/ARCHVIS_PREINDEX.md)를 따릅니다.
+
 2026-11-03 실제102 train 페어를 UI 독립 RGB→예측2D cache→T1 3D 진단 학습에 연결했습니다. Adam1e-4/B2로 각51update·102개 전체1pass(합102update)를32.922초에 실행했고 finite/nonzero gradient·weight 변화·저장weights 재추론 일치를 확인했습니다. 같은102개 train-fit MPJPE는682.60→634.07mm, 화면안2D 평균은330.33→330.28px였습니다. 오차는 크며 일반화/정식 학습 release는 별도입니다. 개발·root 계약검사15개가 통과했고 원래 blockers/train_ready=false를 유지합니다. [설정·coverage·실측·재개 한계](docs/REAL_RGB102_DIAGNOSTIC.md)를 따릅니다.
 
 2026-11-03 고정14d94d4의 실제 Colab 추출에서 RGB102페어(204PNG)+pose102 확보를 완료했습니다. 응답body266392949bytes(254.05MiB)·837HTTP·271.007초, 관측RSS202.23MiB였고7묶음 모두 내용 감사를 통과했습니다. Root는 ZIP CRC·인덱스 기준204PNG SHA/크기/decode와 고정 pose 입력을 독립 대조했습니다. 대표 overlay10장만 제한 시각 점검했으며 사람 승인·전체 영상 정합·validation·정식 학습 release는 별도입니다. [실제 결과와 한계](docs/RGB102_PAIRS.md).
