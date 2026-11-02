@@ -1,5 +1,11 @@
 # 실제 샘플 확대를 위한 발견 인덱싱
 
+## 2026-11-02 준비 업로드 실패 보완
+
+고정677bc7f 실행에서 source ZIP만 선택해 source 추출 후 input SHA 검사에 실패했다. auth/원본 읽기/scan 전에 중단됐으므로 인덱싱 실행 결과로 취급하지 않는다. source/input ZIP을 한 개씩 받되 양쪽 SHA·안전 경로·CRC·크기와 기존 추출본의 정확한 파일/폴더 집합·byte를 모두 검사한 뒤에만 추출하도록 template을 보완했다. 동일한 기존 추출본만 읽기 재사용하며 불완전/변조·추가 파일은 거부한다. 삭제·덮어쓰기 안내는 하지 않는다. WORKSPACE가 있으면 소비된 job이므로 준비 재실행은 계속 금지한다.
+
+고정 SELECTION_SHA256을 설정 셀에 두어 input config가 없어도 준비 실패를 회수한다. WORKSPACE가 없는 준비 실패는 별도 *_preparation_result.zip에 stdlib로 상태만 보존한다. 이후 정상 job의 결과 ZIP과 충돌하지 않으며, WORKSPACE가 있는 기존 job은677bc7f의 recover API와 호환한다. 이번 사용자의 실행 source ZIP/revision/hash·input ZIP·원job/경로·예산은 유지하고, 수정 notebook revision만 별도 고정한다. 기존 배포물은 보존하며 root가 검토 후 새 버전의 준비 notebook만 인계한다. 실제 notebook 셀의 로컬 mock 검사7개가 통과했고 Google·설치·scan은 실행하지 않았다. 근거는 outputs/discovery_upload_fix_20261102/developer/에 보존한다.
+
 2026-11-02 · 실제 자료의 저장 목록을 늘리는 작업이다. 인덱싱 증가·관측 key 대응·완전 추출 triplet을 구분하며 학습·release·전체 archive 완료를 선언하지 않는다. 이번 개발에서는 원격 archive 전송0이며, 실제 Colab 실행은 고정본 인계 뒤에 진행한다.
 
 ## 보존 자료 조사
