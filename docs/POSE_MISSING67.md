@@ -1,5 +1,13 @@
 # Pose 미관측67 목표의 warm 추출 준비
 
+## 2026-11-02 실제 Colab 결과: 67개 전부 확보
+
+고정5fe714a의 pose_missing67_001에서 정확목표67개·완전저장67개·미확보0, targets_complete 및 selected_targets_passed=true를 확인했다. Root도 각각의 파일SHA와JSON object파싱, 보고서selfhash, 두ZIP CRC, 확장cache의 모든chunk/prefix SHA를독립대조했다. 이전234MiB prefix SHA가그대로이고첫신규media시작은245366784다. 이번67개는원본결측이아니라기존조기종료목록의미관측파일이었다.
+
+신규media1048576bytes(1MiB),prepare body1049476bytes/14요청/19.103초,초기metadata별도290bytes/1요청이다. cache는234→235MiB(prefix246415360bytes),선택JSON총5735165bytes다. 준비시간에는로컬기존prefix재해제를포함하며업로드/인증/별도export비용과구분한다. 관측목록15465entry/219sequence/truncated=false이나전체목록은아니다. 목표조기종료로gzip EOF/전체CRC는검증하지않았고train_ready=false다. RGB102페어의기존35관측+이번67JSON이름대응을확보했지만RGB실제추출·내용정합·학습은미완료다.
+
+결과 ZIP SHA `7ebe1cea2b88e7945a380068e0ac7d3fc26e34794437900f896eae0482865211`,cache ZIP SHA `f902b25aadb1932c4c734795592e122061f8d30410bdeed5bb3866528ebff437`다. 원본과독립검토는 outputs/test_pose_missing67_001_20261102/에보존한다. 아래개발준비/미실행기록은실행전상태이며이결과로갱신한다.
+
 2026-11-02 개발 준비 상태다. 기존 ArchVis pose catalog는 Serena frame1·10 목표에서 조기 종료한 관측 목록이다. 목록에 없었던 다음67개를 원본 결측으로 판정하지 않고, 고정 warm cache에서 다시 탐색·선택 추출한다. 실제 원격 추출·Colab 실행은 아직 하지 않았다. 학습 release와 `train_ready=false`는 유지한다.
 
 ## 대상과 지원 범위
