@@ -10,6 +10,7 @@
 | `rewind_m1.shard_training`(2차 추가) | 별도 합성 M1 shard trainer, epoch cursor·실제 sample 수 재개·독립 validation·checkpoint 기반 추론 export | 실제 release·persistent 준비 공급·GPU/AMP pilot 미검증 |
 | `rewind_m2`, `rewind_m3` | UI 없는 합성 causal diffusion·cascade 학습과 재개 | 실제 데이터 계약·shard 공급·독립 validation 연결 필요 |
 | `rewind_m1.frontend_train` | 작은 CPU RGB→2D 진단, inference weights 저장 | 소량/100step 제한, 일반 재개·GPU·장시간 공급 미지원 |
+| `rewind_m1.rgb_shards`(3b1 추가) | native RGB+GT 한-shard 공급·독립frame chunk·split/identity·PNG lazy/full 검사·epoch cursor | resize/2D trainer·기존3D featurecatalog로 chunk 자동 연결 미구현 |
 | `rewind_archive_index.preparation` | 명시 target의 예산 제한 탐색·snapshot 저장/복원·선택 추출·로컬 재사용 | epoch와 archive coverage는 별개 |
 | `rewind_prepare_queue`(3a 추가) | 기존 backend 소량 범위의 raw 준비 순서·영속 cursor·전역 예약/정산·partial 재개·준비 목록 | 학습 shard 변환/자동 공급·eviction·실제 Drive queue/새VM 지속성 미검증 |
 | 실제 pose candidate | 원본 hash·좌표 수치 검사를 거친 진단용 candidate | `training_release=not_implemented`, 원본 motion identity·독립 validation 등 blockers 유지 |
@@ -134,3 +135,11 @@ python -m rewind_m1.shard_cli export --checkpoint outputs/m1_shard_example/last.
 전역 예산은 실행 전에 예약하고 정상 계측만 정산한다. crash와 미계측 예외는 예약을 유지하며 자동 재시도를 차단한다. 기존 backend의 read/decode/member/HTTP/body/time 상한도 실제 남은 예산 이하로 제한한다. 별도 init 없이 state를 재생성하지 않고 기존 partial/완료 출력·원본·snapshot을 보존한다. 자동 eviction은 없으며 disk 상한에서 중단한다. 테스트의 Drive 항목은 상한 전달 mock이고 실제 원격 요청은 없다.
 
 이는 기존 소량 상한 안의 raw 준비 기능이다. 전체 RGB/pose를 자동 순환하거나 학습 shard를 만들어 공급하지는 않는다. 다음3b는 pose 전체를 한번에 올리는 기존 `LocalRGBSupervision`의 한계를 피하도록 RGB+pose shard와 동일 epoch cursor를 활용하는 별도2D 학습/재개 경로를 설계한다. 실제 release에 필요한 독립 validation·원본 motion·단위/좌표/정합 근거와 Colab 자원 측정은 여전히 별도다.
+
+## 3b1 구현: 독립 frame RGB+GT chunk 공급
+
+[RGB·GT shard 계약](RGB_GT_SHARDS.md)을 추가했다. 같은 원본 sequence의 범위가 겹치지 않는 chunk를 허용하되 motion/split·dataset identity·native 크기/GT 계약을 고정한다. pose256record/4MiB와 RGB 선언 상한, catalog4MiB·최대4096chunk를 지키고 build는 각 descriptor의 byte 수를 누적해 append 전에 중단한다. 기존 `LocalRGBSupervision`의 전체 pose materialization은 현재 chunk 안으로 제한하고 기존 API·실데이터 gate는 바꾸지 않는다.
+
+개발20개(신규11+frame9)와 root 독립11개가 failure/error/skip0으로 통과했다. train 동일seq 두chunk4frame과 별도validation2frame의 native RGB/GTxy/annotation mask가 기존 경로와 같고 전체PNG6sample을 확인했다. metadata 선언 검사와 full PNG hash/decode 결과를 별도로 저장하며 학습/원격/설치는 수행하지 않았다. 공급 유틸이므로 readiness는 false다.
+
+다음3b2는 고정 학습해상도·명시 resize·native 좌표 복원과 작은2D CNN의 학습/정확재개를 연결한다. 이 2D chunk와 기존M1 3D featurecatalog의 완결sequence 제약은 다르므로 cache/join을 shard별로 만들더라도 3D catalog에 자동 결합 완료로 보고하지 않는다. T1 chunk 또는 temporal context/overlap 계약 확장과 실제 release/Colab pilot을 후속 검토한다.
