@@ -1,5 +1,15 @@
 # 실제 샘플 확대를 위한 발견 인덱싱
 
+## 2026-11-02 job002 실제 부분 인덱싱 결과
+
+수정 notebook1d776ff/실행 source677bc7f의 Colab job002 결과를 root가 독립 검토했다. 외부 ZIP SHA `251c8addd9e4d05ad0e5bcd09f5d65a2ac43d1cff39dc6ec015ff9c1c1a600a4`, 외부·내부 ZIP CRC와 receipt/report 일치, snapshot SHA `9ae9c6581f0b382ca46512fd07a85bc2cae21a0a6e09285cef9f4690bf4e1a2f`, SQLite SHA `3092b18f3f8cbaeec448ab797570b43ccfcf4a3bf8f46399ede97263ea454902`를 확인했다. 근거는 outputs/test_archvis_rgb_discovery_677bc7f_002_20261102/archvis_rgb_discovery_677bc7f_002_result.zip이다.
+
+status=bounded_stop, 6번째 batch에서 transfer_bytes_limit으로 중단하고 generation5/160항목의 마지막 정상 snapshot을 회수했다. tar boundary167135232·gzip index coverage167598184는 서로 다른 지표이며 압축 원본52441303081bytes의 완료 비율로 단순 나누지 않는다. train left59/right78/stereo59, stereo와 기존 pose 관측 교집합35이며 validation/test/unknown은0이다. 실제 추출triplet0·PNG decode 미검증·train_ready=false이고 전체 archive CRC/완료를 뜻하지 않는다.
+
+보고된 API body267440332bytes(약255.05MiB)/825requests, source read432874462bytes, decoded200673280bytes, elapsed222.865초, sampled RSS182218752bytes다. disk 실측값은 보고서에 없어 전체 디스크 상한 준수를 독립 확정하지 않는다. recovery의 archive_network_requested=false는 회수 작업의 무네트워크 의미이며 실제 인덱싱 전송이 없었다는 뜻이 아니다. 이번 결과는 부분 인덱싱·snapshot 회수를 검증했으며 새 런타임 복원·확장 및 실제 후보 추출은 별도 확인한다.
+
+다음 우선 작업은 저장한 generation5와 원본identity를 고정해 관측35개 중 소량의 좌우RGB+pose를 추출·파싱·대조하는 것이다. validation 후보 탐색과 원본motion/split 검증도 계속 필요하며 train 후보만으로 정식 baseline을 승인하지 않는다. 소비된 job002를 재실행하거나 예산을 자동 확대하지 않는다.
+
 ## 2026-11-02 session retry 설정 실패 보완
 
 job archvis_rgb_discovery_677bc7f_001의 회수 ZIP SHA b3191fbcd96ce756014683093a30dcfa938db5040d0e10d0866e188ade3c246c에서 CRC와 보고서를 대조했다. 초기 metadata5건/1,483bytes 이후 scan 진입의 session_retry_policy로 중단됐고 read/decode0·정상 receipt 없음이다. 외부 AuthorizedSession adapter만 retry0으로 설정하고 기본 내부 인증 session의 retry를 남긴 것이 원인이다.
