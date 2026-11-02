@@ -14,6 +14,7 @@ from .drive import DriveRuntime, DriveLimits, make_drive_source
 from .source import IndexFailure, IndexLimits, make_source, MIB
 from .snapshots import export_snapshot, import_snapshot, _anchor, _receipt
 from .extension_records import atomic_record, exception_kind
+from .head_storage import publish_head
 
 OPTIONS = {'workspace', 'snapshot_directory', 'input_snapshot_directory', 'anchor', 'batch_members', 'max_batches', 'spacing','request_id','provenance'}
 BOUNDED = {'read_bytes_limit','decoded_bytes_limit','elapsed_limit','ranges_limit','transfer_bytes_limit',
@@ -174,6 +175,14 @@ def backend_hashes():
     return {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(__file__).parent.glob('*.py'))}
 
 
+def _failure(exc,operation):
+    classes=(KeyboardInterrupt,SystemExit,GeneratorExit,PermissionError,FileExistsError,FileNotFoundError,
+             OSError,IndexFailure,PreparationError,ValueError,TypeError,Exception,BaseException)
+    kind=next(cls.__name__ for cls in classes if isinstance(exc,cls))
+    number=getattr(exc,'errno',None) if isinstance(exc,OSError) else None
+    return {'type':kind,'errno':number if type(number) is int else None,'operation':operation}
+
+
 def prepare_indexed(manifest,output,targets,limits,options,*,base='.',authorized_session=None,context=None):
     """명시 target 준비. 정확한 source별 HEAD만 읽으며 디렉터리 latest 탐색은 하지 않는다."""
     opts=_options(options);spec=_source(manifest,base);fingerprint=digest(spec)
@@ -217,6 +226,7 @@ def prepare_indexed(manifest,output,targets,limits,options,*,base='.',authorized
         report['stage']=stage;report['resources']=resources.report();atomic_record(record,report,initial=not record.exists())
     def publish():
         nonlocal head
+        save('head_publish_pre')
         resources.check()
         before=_head(head_path,fingerprint,opts['anchor'])
         if before!=head:raise IndexFailure('prepare_head_cas_conflict')
@@ -227,13 +237,18 @@ def prepare_indexed(manifest,output,targets,limits,options,*,base='.',authorized
         if len(history)>=64:raise IndexFailure('prepare_head_history_limit')
         if not unchanged:
             resources.check(3*index.path.stat().st_size+65536)
+            save('snapshot_pre')
             saved=export_snapshot(index,snapshot_dir,known_anchor=prior)
             report['last_published_snapshot']=saved;save('snapshot_published')
             history=history+[saved['receipt']]
         if _head(head_path,fingerprint,opts['anchor'])!=before:raise IndexFailure('prepare_head_cas_conflict')
         body={'schema':'archive_prepare_head_v1','source_sha256':fingerprint,'receipts':history}
         new={**body,'content_sha256':digest(body)}
-        atomic_record(head_path,new,initial=not head_path.exists());head=new
+        resources.check(2*len(canonical(new))+(len(canonical(head)) if head else 0))
+        report['head_publication']={}
+        publish_head(head_path,new,head,state=report['head_publication'],progress=save)
+        if _head(head_path,fingerprint,opts['anchor'])!=new:raise IndexFailure('prepare_head_publish_hash')
+        head=new
         report['head']=head;save('head_saved')
     try:
         save('restore')
@@ -281,6 +296,7 @@ def prepare_indexed(manifest,output,targets,limits,options,*,base='.',authorized
         if not isinstance(reason,str) or not re.fullmatch('[a-z0-9_]{1,100}',reason):reason='index_preparation_failed'
         report['status']='partial' if reason in BOUNDED else 'failed'
         report['failure_stage']=report['stage']
+        report['failure']=_failure(exc,report['stage'])
         if not isinstance(exc,Exception):
             report.update(status='interrupted',interruption={'type':exception_kind(exc),'stage':report['stage']})
             raise

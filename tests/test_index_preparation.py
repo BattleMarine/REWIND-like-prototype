@@ -96,11 +96,11 @@ class AutomaticPreparationTests(unittest.TestCase):
 
     def test_head_failure_preserves_previous_and_refuses_unpublished_local_branch(self):
         import rewind_archive_index.preparation as module
-        original=module.atomic_record
-        def fail(path,value,**kwargs):
+        original=module.publish_head
+        def fail(path,value,expected,**kwargs):
             if str(path).endswith('-head.json') and len(value.get('receipts',[]))>1:raise OSError('injected')
-            return original(path,value,**kwargs)
-        with patch.object(module,'atomic_record',fail):result=self.execute()
+            return original(path,value,expected,**kwargs)
+        with patch.object(module,'publish_head',fail):result=self.execute()
         self.assertEqual(result['persistent_index']['status'],'failed')
         previous=json.loads(next((self.root/'snapshots').glob('*-head.json')).read_bytes())
         self.assertEqual(len(previous['receipts']),1)

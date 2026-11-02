@@ -68,7 +68,7 @@ Snapshot 게시 후 HEAD 저장에 실패하면 이전 HEAD·게시 snapshot·lo
 
 중단되면 실행 셀을 다시 돌리지 않고 회수 셀만 실행한다. 회수는 고정 run/provenance와 일치하는 marker/요청 보고서·기존 extraction manifest·검증된 JSON만8항목/총20MiB 이내 ZIP에 포함한다. 인증·원본·DB는 읽지 않고, 기존 ZIP은 목록·크기·hash 검증 후 재다운로드한다. 누락/손상 marker는 성공 대신 진단으로 표시한다. 실패에서 마지막 정상 저장본을 보존하며 자동 학습·예산 확대·추가 원격 시험은 하지 않는다.
 
-실제 Colab 통합 시험은 아직 실행하지 않았다. 로컬 합성 검증은 실제 source identity·Drive latency·새 VM 지속성 검증을 대체하지 않는다. 모든 결과는 `train_ready=False`, converter의 `training_release=not_implemented`를 유지한다.
+개발 검증 당시 실제 Colab 통합 시험은 미실행이었고, 최초 실제 실행의 실패와 보완은 아래 후속 절에 기록한다. 로컬 합성 검증은 실제 source identity·Drive latency·새 VM 지속성 검증을 대체하지 않는다. 모든 결과는 `train_ready=False`, converter의 `training_release=not_implemented`를 유지한다.
 
 ## 2026-11-02 개발 검증과 남은 경계
 
@@ -77,3 +77,21 @@ Snapshot 게시 후 HEAD 저장에 실패하면 이전 HEAD·게시 snapshot·lo
 Notebook8개 code cell 구문·기본False gate·미mount 인증 전 거부·REPORT 없는 ZIP 생성/재다운로드·중단 상태 flush 거부를 별도로 확인했다. 개발 근거는 `outputs/automatic_index_development_20261102/{tests.json,tests.txt,notebook.json,code_hashes.json}`에 보존한다. 기존99개 회귀는 오케스트레이션이 수행했으며 sandbox loopback 제한으로 실패한 HTTP 사례는 localhost 허용 환경에서 별도 재검증했다. 이는 외부 Google 요청이 아니다.
 
 오케스트레이션의 독립 재생은 보존 pose cache 앞8MiB의 chunk/hash를 대조한 뒤 유한 mock transport로 B32member를 재구성했다. 자동80member/3batch, 새 workspace scan0 복원과 reuse read0을 확인했고 mock52HTTP/응답body3,673,094bytes로 preset 이내였다. 근거는 `outputs/automatic_index_review_20261102/offline-automatic/review.json`이다. 실제 사용자 B snapshot 자체의 검증이나 Drive 지연·전체 archive·새 VM 내구성 검증을 대체하지 않는다. 추가 원본 접근·실제 Colab 통합 시험·학습·commit/push는 개발 세션에서 수행하지 않았다.
+
+## 2026-11-02 첫 실제 자동 준비 실패와 mount HEAD 보완
+
+고정 `0da5ac5`의 첫 Colab 자동 준비는 실패했다. 수령 ZIP은 `outputs/test_automatic_index_0da5ac5_20261102/pose_auto_0da5ac5_001-auto-report.zip`, 실제 SHA256은 `41e1c879310bdcc5eb5490489d4e4694e4fdedfc844b89ce52a0be775492022b`다. ZIP CRC와 내부 목록을 확인했다. B 복원 결과와 before/after generation2·32member·coverage3,791,957, 빈 scans만 남았고 HEAD나 새 snapshot 결과는 없다. 실패는 `failure_stage=restore`, `stop_reason=index_preparation_failed`이며 transport는 미기록/unknown이다. 원본 변경이나 실제 원본 요청0을 입증하지 않는다.
+
+코드상 context/index 초기화와 before 조회 뒤 첫 `publish()`에서 초기 HEAD를 만들기 전/중의 형태와 일치한다. 기존 local `atomic_record(initial=True)`는 POSIX에서 `os.link`를 호출했고 HEAD temp와 target은 Drive mount에 있었다. Snapshot의 `_publish_file` hard link는 **로컬 DB 복원**에만 쓰이며 Drive snapshot export는 이미 exclusive write와 hash 대조를 사용한다. 기존 C 성공과 이번 HEAD 실패 가설은 양립한다.
+
+고정 `0da5ac5` 소스를 로드한 합성 B(generation2·8member, 실제 수령 B가 아님)에서 HEAD hard link의 EPERM1/ENOTSUP95를 주입하니 같은 제어 흐름 기록을 재현했다. 임시 파일 생성 EACCES13도 같은 형태를 만들었다. 실제 보고서에 최초 예외 class/errno가 없어 **hard link 가설을 재현했지만 실제 원인은 확정하지 못했다.** 재현 중 원본 archive source 호출·실제 Google/auth는0이고 수령 ZIP SHA는 전후 동일했다. 근거는 `outputs/automatic_index_mount_diagnostics_20261102/{reproduce.py,reproduction.json}`이다.
+
+보완은 mount의 HEAD 게시만 `head_storage.publish_head`로 분리한다. 로컬 marker의 `atomic_record`, snapshot core, 기존 실패 자료·B/C 저장본은 유지한다. 최초 HEAD는 exclusive create로 쓴 뒤 닫고 전체 JSON/hash와 읽은 내용을 확인한다. Hard link나 mount fsync 지원을 요구하지 않는다.
+
+갱신 때는 검증된 기존 HEAD의 원시 bytes를 hash 이름의 별도 `*-previous-<sha>.json`에 exclusive 저장·재검증한다. 새 JSON도 별도 staging에 완전히 쓰고 닫은 뒤 CAS를 다시 대조하고 `replace`한다. 게시 후 전체 JSON·checksum·source/receipt chain을 다시 검사해야 성공이다. 이미 있는 backup은 bytes가 같을 때만 재사용하고 덮어쓰지 않는다. 초기 생성 충돌·stale HEAD·불완전 JSON·손상 backup·게시 hash 불일치는 거부한다.
+
+이 방식은 단일 writer용이며 Drive rename의 atomicity·내구성을 주장하지 않는다. Rename 자체가 미지원이면 이전 HEAD/backup/닫힌 staging을 보존한 실패로 제한한다. 부분 쓰기/replace로 HEAD가 손상됐으면 이를 정상 HEAD로 읽지 않고 자동 rollback·branch 선택도 하지 않는다. 이전 bytes는 별도 검증한 backup에 남으며, mount 동기화나 런타임 상실 뒤 영구 보존까지 입증한 것은 아니다. 게시 결과도 `mount_atomicity_claimed=False`, `durability_proven=False`로 기록한다.
+
+`head_publish_pre`, `head_check_pre`, `head_create_pre`, `head_backup_pre`, `head_stage_pre`, `head_cas_pre`, `head_replace_pre`, `head_verify_pre`, `head_publish_post`와 snapshot 전 단계를 고정해 기록한다. 실패에는 안전한 `failure.type`, 정수 또는null의 `failure.errno`, `failure.operation`을 남긴다. 원시 message·URL·token은 저장하지 않는다. 기존 실패/중단 기록과 예외 재전파는 유지한다.
+
+신규 HEAD8개와 기존 준비12개·통합5개·C 회수10개, 총35개 로컬 검사가 실패·오류·건너뜀 없이 통과했다. EPERM/ENOTSUP형 hard link·fsync 미지원, 초기/갱신 충돌, 부분 HEAD 거부, 미지원 replace와 이전본/닫힌 staging 보존, 손상 backup 거부, safe errno/단계 기록과 기존 연결·회수를 확인했다. 근거는 `outputs/automatic_index_mount_diagnostics_20261102/{tests.json,tests.txt,code_hashes.json}`이다. 기존 예산·성공 기준을 확대하지 않았으며 실제 Drive에서 수정본의 지원 동작은 아직 미검증이다. 새 배포·사용자 재실행 안내·commit/push는 개발 세션에서 수행하지 않았다.
