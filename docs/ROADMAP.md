@@ -2,9 +2,11 @@
 
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
+2026-11-03 g9 stereo102의 RGB204 추출 준비: pose 부족33개를235MiB cache에서 원격0으로 확보해 raw102/기존69 SHA 대조와62관절 좌표·재투영 감사를 완료했다. RGB204의236.14MiB는 저장 인덱스의 이름·크기이며 실제 Colab 추출은 미실행이다. Core32개 제한·auto_build=False를 유지한 physical7묶음/공유runtime, 최초metadata 포함512MiB·3072HTTP·1200초/read1GiB/decode256MiB/RSS1GiB/work512MiB+ZIP384MiB로 고정하고 부분 결과를 회수한다. Root 검토·커밋 후 탐색 세션에 고정본을 인계하며 실제 영상 정합/시간/motion/validation0·학습 차단은 별도다. [입력과 지원 범위](RGB102_PAIRS.md)를 따른다.
+
 2026-11-02 pose 미관측67개를 실제 Colab에서 모두 추출·파싱·hash 검증했습니다. 기존234MiB 캐시를 재사용하고 신규1MiB media로 약19.1초에 목표완료했습니다. 원본 결측이 아니라 이전 조기종료의 미관측이었습니다. RGB102페어와 pose의 이름대응은 확보했지만 실제 RGB 추출·내용정합·학습은 미완료입니다. [실제 결과·독립 검토](POSE_MISSING67.md).
 
-2026-11-02 최신 데이터 준비: 실제 RGB job003은 g5/160→g9/270항목, train stereo59→102개로 확장했으나 pose 관측 대응35개·실제 추출0·validation0이다. 기존234MiB v4 warm cache와 정확한 미관측67개만 허용하는 posePrefixTargets67_v1·전용 notebook을 준비했고 로컬24개 검사(skip0)를 통과했다. 신규 media는 보존 prefix 뒤에서 읽고 기존234MiB는 로컬 재해제한다. 실제 pose67 원격 실행과 좌표/시간/RGB 정합·학습 release는 미완료이며 M0/M1 완료로 올리지 않는다. Root 검토·고정본 인계 후 탐색 세션이 한 번 실행·회수한다. [실제 RGB 결과](SAMPLE_EXPANSION.md)와 [pose67 계약·예산·회수](POSE_MISSING67.md)를 따른다.
+2026-11-02 최신 데이터 준비: 실제 RGB job003은 g5/160→g9/270항목, train stereo59→102개로 확장했으나 pose 관측 대응35개·실제 추출0·validation0이다. 기존234MiB v4 warm cache와 정확한 미관측67개만 허용하는 posePrefixTargets67_v1·전용 notebook을 준비했고 로컬24개 검사(skip0)를 통과했다. 신규 media는 보존 prefix 뒤에서 읽고 기존234MiB는 로컬 재해제한다. 이는 당시 준비 상태이며 pose67 원격 추출은 후속 성공 기록을 따른다. 좌표/시간/RGB 정합·학습 release는 별도이며 M0/M1 완료로 올리지 않는다. [실제 RGB 결과](SAMPLE_EXPANSION.md)와 [pose67 계약·예산·회수](POSE_MISSING67.md)를 따른다.
 
 2026-10-29 현재 결정: RGB·pose의 인덱스를 원본 archive별로 영구 보존하고 재개·확장하는 구조를 구현한다. 원본 순서와 identity를 고정하고, 학습 epoch와 인덱스 coverage를 독립 관리한다. 전체 RGB 스캔이나 실제 학습 착수는 아니다.
 

@@ -6,9 +6,11 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 저장 g9 RGB102페어의 실제 추출·내용 감사 실행본을 준비했습니다. 부족했던 pose33개를 원격 없이235MiB 캐시에서 확보해 총102 JSON·기존69 SHA 일치와 좌표/재투영 감사를 확인했습니다. RGB204 PNG(236.14MiB)는 아직 Colab에서 추출하지 않았으며, 512MiB 전송·1200초의 누적 예산과 부분 결과 회수로 한 번 실행하도록 준비했습니다. 학습 release·시각 정합 승인은 별도입니다. [입력 pin·예산·내용 감사·회수](docs/RGB102_PAIRS.md)를 따릅니다.
+
 2026-11-02 pose 미관측67개를 실제 Colab에서 모두 추출·파싱·hash 검증했습니다. 기존234MiB 캐시를 재사용하고 신규1MiB media로 약19.1초에 목표완료했습니다. 원본 결측이 아니라 이전 조기종료의 미관측이었습니다. RGB102페어와 pose의 이름대응은 확보했지만 실제 RGB 추출·내용정합·학습은 미완료입니다. [실제 결과·독립 검토](docs/POSE_MISSING67.md).
 
-2026-11-02 Colab RGB job003은 g5/160항목에서 g9/270항목으로 재개·확장했습니다. train stereo는59→102개, 기존 pose 관측 대응은35개로 유지됐으며 실제 추출0·validation0입니다. 추가 전송을 자동 반복하지 않고, 기존234MiB warm cache에서 미관측 pose67개를 고정 추출하는 전용 profile·notebook을 준비했습니다. 로컬24개 검사 통과이며 실제 pose67 원격 실행·학습 준비는 미완료입니다. [RGB 실제 결과](docs/SAMPLE_EXPANSION.md)와 [pose67 준비·상한·회수](docs/POSE_MISSING67.md)를 따릅니다.
+2026-11-02 Colab RGB job003은 g5/160항목에서 g9/270항목으로 재개·확장했습니다. train stereo는59→102개, 기존 pose 관측 대응은35개로 유지됐으며 실제 추출0·validation0입니다. 추가 전송을 자동 반복하지 않고, 기존234MiB warm cache에서 미관측 pose67개를 고정 추출하는 전용 profile·notebook을 준비했습니다. 이는 당시 준비 기록이며, 후속 pose67 실제 추출 성공은 위 기록을 따릅니다. 학습 준비는 미완료입니다. [RGB 실제 결과](docs/SAMPLE_EXPANSION.md)와 [pose67 준비·상한·회수](docs/POSE_MISSING67.md)를 따릅니다.
 
 2026-11-02 Colab job002에서 ArchVis RGB 부분 인덱싱·스냅샷 저장·결과 회수에 성공했습니다. 전송 상한에서 정상 중단했으며 저장 항목160개, train 좌우 RGB 대응59개 중 pose 관측 대응35개를 확인했습니다. 실제 추출0개·validation0개로 학습 준비 완료는 아닙니다. 다음은 저장 인덱스에서 후보 일부를 추출·검증하고 validation 후보 탐색을 이어가는 것입니다. [실제 결과와 제한](docs/SAMPLE_EXPANSION.md)을 따릅니다.
 
