@@ -33,6 +33,8 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제다
 
 ## 현재 상태와 실행 결정
 
+2026-11-02 실제 RGB 입력 진단: 확보한 Serena 두 train sample로 RGB→2D frontend→예측 cache→3D regression을 연결했다. 원본1024영상을64로 bilinear align_corners=True 축소하고 예측을 원좌표로 복원했다. Frontend100+regression100update의 CPU 실행과 저장weights 재추론·cache 좌표/특징 hash 대조를 통과했다. Heatmap MSE3.38376e-5→3.32889e-5, 같은 sample의2D 화면안 평균오차315.452px로 예측정확도는 낮다. 예측2D입력3D train-fit MSE0.150696→0.015842, MPJPE623.06→187.98mm였다. GT2D 입력대체 없이3D mask124개를 유지하며 두 stage50시점 재로드상태 일치를 확인했다. 중단없는 학습과의 완전동등성·일반화·실시간성·M1 전체 완료를 주장하지 않는다. 일반학습 차단은 유지한다. 상세는 [실제 RGB 진단](REAL_RGB_DIAGNOSTIC.md)을 따른다.
+
 2026-11-02 실제 단일 프레임 진단: Serena train frame1·10의62관절을 이용해 GT2D→3D CPU regression을 연결했다. 입력은(2,1,868), target은(2,1,62,3)mm이며 프레임을 독립 처리한다. 고정100update와50시점 재개50update의 전체 checkpoint 상태가 일치했고 같은2sample train-fit normalized MSE0.146078→0.015887, MPJPE618.13→188.49mm로 감소했다. 이는 RGB 예측·일반화·temporal 성능이 아닌 실제 GT입력 진단이며 좋은 정확도나 M1 전체 완료를 뜻하지 않는다. 일반 loader와 candidate 학습 차단은 유지하고 별도 diagnostic-only 진입점만 사용한다. 상세는 [실제 GT2D 진단](REAL_GT2D_DIAGNOSTIC.md)을 따른다.
 
 2026-11-02 데이터 사용 우선: 보존된 오른쪽 성공 ZIP과 기존 left/pose를 결합해 Serena frame1·10의 실제 stereo+pose2개를 추가 전송0으로 확보했다. 공식 split/calibration pin·완전 payload hash·62관절 candidate·좌표 변환/재투영을 검사하고 RGB manifest와 GT2D 검토 화면을 생성했다. Root 별도 준비 재실행 및 제한적 시각 대조도 완료했다. 프레임은 비연속이며 모두 공식 train이다. 이 소량 sample의 명시적 단일 프레임 진단 학습은 위 후속 기록에서 완료했다. 후보 schema를 임의 해제하지 않으며 정식 baseline은 독립 validation/원본 motion 및 입력 계약을 별도로 충족해야 한다. 연속 clip이나 전체 데이터셋 인덱싱을 이번에 확보한 것으로 표시하지 않는다. 상세는 [실제 데이터 준비](REAL_DATA_NEXT_RUN.md)를 따른다.
