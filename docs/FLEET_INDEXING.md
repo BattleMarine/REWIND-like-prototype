@@ -18,6 +18,27 @@ Root는 원격 요청 없이 보존된4.8MB/두 조각 합성 archive에 동일 
 
 같은4MiB 논리 읽기 한도로 직접 engine buffer를 비교하면64KiB와1MiB는 각각 반환 decoded589,824/1,048,576bytes에서 실패했고,4MiB buffer는1.5MiB 목표 읽기를 통과했다. 그러나 마지막 경우 export point가0인 lazy index 상태여서 checkpoint·재개 해결로 판정하지 않았다. 정확 scanner 재현에서는 finally export가 정상 완료하고 재seek하지 않아 원래 `gz.read` 오류가 가려진 경우는 아니었다. 다른 경계에서의 원예외 보존은 별도 검증이 필요하다. 이 조사에서는 코드 변경 없이6개 오프라인 probe를1.437초에 수행했다. 근거는 `outputs/test_fleet_calibration_001_20261103/developer_diagnosis/FINDINGS.md`, `proof.json`, `investigate.py`다.
 
+### 실제 RGB bytes의 원인 대조 검증 (2026-11-03)
+
+추가 원인 검증에서 root는 이미 보존한 공식 Lab_Scene gzip prefix20,636,340bytes(SHA256 `46bff8311c9e211c5dcda9d494b190849ce8d9e2aa0cd9643a1fabe16b168dcb`)를 동일 calibration runner에 입력했다. 논리 read4,194,304bytes/반환 decoded531,968bytes에서 `read_bytes_limit → ZranError`가 재현됐다. 이때 실제 원본의 최대 읽기 끝은1,114,112bytes로 prefix 끝에 도달하지 않았다. 표준 gzip은 동일 파일에서 decoded2,097,152bytes를 정상 반환했다. 따라서 합성 fixture에만 한정된 현상이 아니며, 이 재현에는 해당 구간의 원본 손상이나 prefix EOF가 필요하지 않다.
+
+이 자료는 실패한 Drive ArchVis와 다른 공식 Lab_Scene 원본이다. 이번 검증은 원격 요청0이며, 전체 gzip CRC와 실제 Colab 사건의 직접 원인은 확정하지 않는다. 근거는 `outputs/test_fleet_calibration_001_20261103/real_lab_repro.py`, `real_lab_repro/proof.json`, `real_lab_repro/control.json`이다.
+
+### 같은 입력·예산의 인과 비교
+
+전체 gzip CRC가 정상인4.8MB 합성 원본을 사용했다. Source read soft4MiB/hard8MiB, decode32MiB, 모의 Drive body16MiB/158HTTP를 고정하고 production 파일을 바꾸지 않은 격리 overlay로 비교했다. 개발의4개 비교를 root도 별도 출력 경로에서 독립 재실행해 동일한 결과를 확인했다.
+
+| 실험 | 바꾼 부분 | 결과 |
+| --- | --- | --- |
+| A | 원본 그대로 | 논리 read4MiB/decoded532,480bytes에서 `read_bytes_limit → ZranError`. Partial 결과를 반환하지 못함 |
+| B | `gz.read` 예외에서 `budget.last_source_failure` 복원만 추가 | A와 같은 소비량에서 정상 partial 반환. 완전한400,000bytes 파일1개를 시험 store에 저장하고 새 reader로 SHA 동일 재추출. Scan+재추출 logical8MiB 이내 |
+| C | B에 buffer2MiB 추가 | Partial 파일5개 반환. Checkpoint까지 logical5,308,416bytes 사용했으나 남은 예산으로 마지막 파일 재추출 실패. 버퍼 변경만으로 해결했다고 볼 수 없음 |
+| D | B에 첫 deflate block 손상 입력 | 65,536bytes read 뒤 `ZranError` 유지, source budget 사유 없음. 실제 손상을 정상 budget 중단으로 오분류하지 않음 |
+
+A의 보존 결과0은 오류 전에 완전한 파일을 하나도 파싱하지 않았다는 뜻이 아니다. B는 실패 분류만 바꿔 이미 완전한 파일을 반환·보존할 수 있음을 보여준다. 따라서 **읽기 한도 예외 복원 누락이 partial 진전을 잃게 만드는 원인**임을 이 대조 실험으로 확인했다. 작은 read의 반복 inflate가 예산을 빠르게 소진하는 문제는 별개이며 C만으로 해결이 입증되지 않았다.
+
+이 검증은 직접 scanner와 시험용 Store.commit/extract 경로다. Full runner의 settlement, 다음 scan 재개, Drive 영구 보존까지 검증한 것이 아니며 production 수정본도 아니다. 실측·예약을 구분하는 실패 보고 보완은 여전히 필요하다. 개발 근거는 `causal_developer/final_trial/proof.json`, root 독립 근거는 `causal_developer/root_trial/proof.json`이며 모두 `outputs/test_fleet_calibration_001_20261103/` 아래에 있다. 기존 Drive pending과 예산은 변경하지 않았다.
+
 ## 현재 범위와 결정
 
 2026-11-03 사용자는 학습과 별도로 전체 데이터셋 인덱싱 코드를 준비하고, **산출한 비용의 2배를 상한**으로 사용하기로 했다. `rewind_fleet`는 이 목적의 별도 구현이다. 기존 v1 인덱스·g25·RGB102/269 실행 계약과 학습 gate를 수정하지 않는다. 전체 원본 다운로드·결합·추출, 전체 학습을 자동 시작하지 않는다.

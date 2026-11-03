@@ -6,7 +6,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-11-03 첫 fleet 비용 측정은 metadata pin 후 ZranError로 중단했다. Root는 회수본 무결성과 계획을 확인하고 로컬 합성 archive에서 읽기 한도 예외가 ZranError로 감싸지는 결함과 초반 반복 읽기를 재현했다. 실제 Colab 원인 chain·소비량은 미수집이므로 동일 원인 확정이나 비용 측정 성공으로 보지 않는다. Pending/예약을 보존하고 원격 재실행 없이 조사 중이다. [실패 근거·예산 상태·후속 검증](docs/FLEET_INDEXING.md).
+2026-11-03 첫 fleet 비용 측정은 metadata pin 후 ZranError로 중단했다. Root는 회수본·계획을 확인하고 합성 및 보존된 실제 Lab RGB에서 읽기 한도 예외의 ZranError 감싸짐을 재현했다. 같은 입력·예산에서 예외 복원만 추가한 격리본이 완전한 파일 보존·재추출에 성공하여 partial 진전 소실의 코드 원인을 확인했다. 실제 Colab 원인 chain·소비량은 미수집이므로 동일 원인 확정이나 비용 측정 성공으로 보지 않는다. Pending/예약을 보존하고 원격 재실행 없이 조사 중이다. [실패 근거·예산 상태·후속 검증](docs/FLEET_INDEXING.md).
 
 2026-11-03 실제 RGB269 추출 완료: 사용자 재실행에서 269쌍/538PNG를 17묶음으로 확보했다. Root는 결과 ZIP 전체 CRC·SHA, 고정 입력285파일 바이트 동일성, 538개 index SHA/크기/native1024 RGB decode와 pose key 대응을 독립 검증했고 기존102와 중복 없는 총371쌍을 확인했다. 실제 body683808609bytes/2131HTTP/580.226초로 상한 이내이며 대표 overlay4장만 제한 시각 검토했다. 최초 중단 원인·소비량은 미확정, validation0/train_ready=false이며371 학습은 아직 시작하지 않았다. [실제 결과·검토·후속 경계](docs/RGB269_PAIRS.md).
 
