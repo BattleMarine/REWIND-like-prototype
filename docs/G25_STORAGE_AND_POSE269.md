@@ -1,5 +1,9 @@
 # g25 저장 구조 검토와 pose269 확보 준비
 
+## 2026-11-03 업로드 준비 경로 보완
+
+기존65a7244 pose269 notebook에서 큰 cache 업로드 중 연결 끊김이 보고됐다. 원인은 미확정이고 dataset 원본 prepare 실행 여부를 단정하지 않는다. 목표·cache pin·예산은 보존한 채 작은 두 ZIP만 업로드하고 확인된 Drive 파일에서 chunk staging하는 별도 notebook을 준비했다. Drive 경로는 확인 전 빈값이며 실제 Colab/OOM 해결은 미검증이다. [새 준비 순서·별도300초/256MiB 예산·부분 회수](POSE269_DRIVE_STAGING.md)를 따른다. 아래269 입력·목표·상한은 그대로다.
+
 2026-11-03 · g25의 정상 보관본을 원격 없이 분석하고 bounded local compact helper와 pose269 실행 준비를 구현했다. Compact 복사본을 공식 resume head로 승격하거나 snapshot export에 자동 연결하지 않는다. 이번 사용자 실측 대상은 pose269 한 건이며 새 RGB 인덱싱·학습은 실행하지 않는다.
 
 ## 직전 실제 g25 결과

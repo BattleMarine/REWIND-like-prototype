@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 pose269 cache 브라우저 업로드 중 연결 끊김 보고에 대응해, 작은 source/input 업로드를 유지하고 큰 cache만 명시 Drive 경로에서 bounded local copy+SHA/input_spec 검증하는 별도 notebook을 준비했습니다. 원인은 미확정이며 기존65a7244/목표/원본 pin/prepare 예산은 보존했습니다. 개발21개 검사와 local cache 복사/재사용은 통과했으나 실제 Drive 경로·Colab 안정성은 미확인입니다. [순서 변경·준비 예산·부분 회수·실행 전 조건](docs/POSE269_DRIVE_STAGING.md)을 따릅니다.
+
 2026-11-03 사전 인덱싱 job002는 g25/782member·stereo 관측371개를 정상 저장했고, 누적 snapshot/회수 예약이768MiB를 넘어 정상 중단했습니다. Pose 관측 대응102개 외269개는 미관측 목록이며 결측 판정이 아닙니다. G25 DB 복사본의 빈 페이지를 제거해55.4→28.3MB로 줄이는 별도 검증 helper와 기존235MiB cache를 재사용하는 고정 pose269 실행본을 준비했습니다. 개발40개·독립44개 검사가 통과했으며 compact는 공식 head가 아니고 새 RGB 원격/학습은 없습니다. [저장 구조·남은 상한·pose269 예산과 인계](docs/G25_STORAGE_AND_POSE269.md)를 따릅니다.
 
 2026-11-03 g16 후속 준비 당시 기록: 사전 인덱싱 job001에서 g9/270→g16/494member, stereo102→224개를 정상 저장했습니다. Pose 관측 대응102·validation RGB0·추출0은 그대로입니다. 8번째 scan의 checkpoint peak 예산 오용을 확인해 전체768MiB 안에서 DB·checkpoint·snapshot·회수 예약을 분리했고, 실제 g16 복사본의 오프라인 저장/회수 회귀를 통과했습니다. 승인된16MiB cache opt-in과 g16 job002 입력·CPU notebook을 준비했으며 후속 원격 실행은 아직 하지 않았습니다. [실제 결과·수정 준비·남은 상한](docs/ARCHVIS_PREINDEX.md)을 따릅니다.

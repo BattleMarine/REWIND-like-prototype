@@ -138,8 +138,8 @@ def read_manifest(bundle,policy=None):
     return doc
 
 
-def input_spec(path,policy=None):
-    stream,bundle=open_bundle(path,policy=policy)
+def input_spec(path,policy=None,read_callback=None):
+    stream,bundle=open_bundle(path,policy=policy,read_callback=read_callback)
     try:doc=read_manifest(bundle,policy);return {"path":str(Path(path).resolve()),"manifest_sha256":doc["content_sha256"]}
     finally:bundle.close();stream.close()
 
