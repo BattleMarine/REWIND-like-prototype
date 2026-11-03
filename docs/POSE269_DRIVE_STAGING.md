@@ -60,3 +60,9 @@ Mount/auth·작은 ZIP 업로드/해제·원본 dataset prepare192MiB·최종 ca
 Root 독립 검사27개가 failure/error/skip0으로 통과했다. 실제 local cache 복사·재사용과 metadata107044bytes 계측도 확인했으며 근거는 `outputs/g25_next_20261103/root/drive_stage_tests.txt`와 `stage_review/stage.json`이다. 실제 Drive 성능 측정은 아니다.
 
 사용자는 같은 cache를 기존 `REWIND-like prototype/reports`에 새 `pose_prefix235_f902b25a.zip`으로 보관하는 것을 승인했다. 연결 도구의100MiB 제한 및 Chrome 확장 프로그램의 파일 URL 접근 미설정으로 업로드는 완료되지 않았다. 파일 존재를 확인하기 전에는 경로를 고정하거나 실행 준비 완료로 표시하지 않는다.
+
+## 사용자 업로드 확인 (2026-11-03)
+
+사용자가 `reports/cache/pose_prefix235_f902b25a.zip`을 업로드했다. 폴더 화면과 파일 ID `1YbDRfa576EssySfyHJiZrE1DBWbT57MU` metadata 조회로 부모 cache 폴더 `1_34O03XngrcP_8JugV4ItbX6GEAIPY0L` 및246522402bytes를 확인했다. 검색 목록에는 아직 표시되지 않았으므로 빈 검색 결과를 파일 부재로 단정하지 않는다. 전체 원격 SHA는 이번 조회에서 제공되지 않았으며 Colab staging의 고정 SHA 검증은 유지한다. 앞의 경로 미확인 기록은 업로드 전 상태다.
+
+실행본의 명시 경로는 `/content/drive/MyDrive/REWIND-like prototype/reports/cache/pose_prefix235_f902b25a.zip`이다. 검토된 코드1212266의 source/input을 그대로 사용하고 경로만 채운 별도 ready notebook을 발급한다. 실제 mount·복사·pose269 실행은 아직 미검증이다. 향후 캐시 업로드는 사용자에게 정확한 파일과 목적지를 안내해 요청하며 에이전트가 직접 업로드하지 않는다.
