@@ -119,7 +119,7 @@ def stage_zip(archive,expected_sha256,target):
             raw=z.read(info)
             with output.open('xb') as f:f.write(raw)
 
-def recover(output,*,store=None,prepared_root=None,workspace=None,policy=None):
+def recover(output,*,store=None,prepared_root=None,workspace=None,policy=None,extra_files=None):
     """원본/pack store 전체를 복제하지 않는 metadata-only bounded ZIP."""
     started=time.monotonic();cap=doubled(RECOVERY_BASE);io_bytes=0;files={};skipped=[]
     def add(name,p):
@@ -132,6 +132,7 @@ def recover(output,*,store=None,prepared_root=None,workspace=None,policy=None):
             skipped.append(name);return
         raw=p.read_bytes();io_bytes+=len(raw);check(io_bytes<=cap['io_bytes']//2,'fleet_recovery_io')
         files[name]=raw
+    for name,p in (extra_files or {}).items():add(safe_path(name),p)
     if store:
         status=coverage(store,io_limit=8*1024**2);io_bytes+=status['artifact_logical_io']
         files['coverage.json']=canonical(status)+b'\n'

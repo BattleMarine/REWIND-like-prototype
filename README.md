@@ -1,5 +1,7 @@
 # REWIND-like prototype
 
+2026-11-03 실패 지점의 고정 재개 경로를 준비했다. 기존 PREPARED·원본·plan·46개 완료 quota를 보존하고 pending 예약 전액을 유지한 복구 후 같은 계획으로 이어간다. 새 코드 적용 기록·중간 실패 차단·진단 회수와 로컬 재개를 검증했으며, 실제 Drive 복구·재실행은 아직 하지 않았다. [재개 계약·실행본·검증 범위](docs/FLEET_SURVEY_RESUME.md).
+
 2026-11-03 실제 Drive survey는92구간/3,752파일을 기록한 뒤 test pose 요청의 연결 오류로 중단했다. 미탐색 archive 때문에 발생한 별도 상태 집계 오류를 수정하고 로컬 검증했으며, 기존 인덱스와 pending 예약은 보존한다. 전체 인덱싱·페어 확보·재개 완료는 아니다. [실제 결과와 수정 범위](docs/FLEET_DRIVE_SURVEY.md).
 
 2026-11-03 Drive 자동 조사 준비: 기존90archive/354파일의 현재 metadata를 대조해 파일명·크기·수정 시각 차이0을 확인했다. 전체 비용을 확정하기 전 각 archive 최대2개 정상 scan으로 측정하는 survey와 고정 실행 notebook을 구현·로컬 검토했다. 최신 사용자 결정에 따라 총 실행시간 상한 없이 비차단 타이머·사용자 stop을 제공하고, 시간 외 자원 상한은 유지한다. 실제 Drive 실행·전체 비용 확정은 아직 미완료다. [원본 확인·조사 예산·인계 상태](docs/FLEET_DRIVE_SURVEY.md).

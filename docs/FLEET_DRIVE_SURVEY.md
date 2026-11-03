@@ -90,3 +90,5 @@ Notebook 코드셀 문법, worker 비차단 시작·none 시간 인자·stop 연
 별도 `coverage` 오류는 미탐색44개 archive의 EOF 값이 없을 때 `None`을 합산하는 코드에서 발생했다. 미탐색을 false로 처리하고 빈 선택 목록을 완료로 판정하지 않도록 수정했다. 이는 조회 집계 수정이며 요청 실패 복구·학습 승인·원격 재개를 포함하지 않는다. 로컬 검증 결과는 아래에 기록한다.
 
 Root 독립 회귀8개가7.438초에 통과했다(실패0, skip0). 실제 coverage 함수에서 미탐색·부분진행·46완료/44미탐색과 pending·EOF·전체 quota·빈 선택을 검증하고, 기존 survey 실행 완료·시간 관측 경로도 확인했다. 로컬 fixture store의 조회 전후 파일 hash·HEAD·pending·usage 불변을 확인했다. 실제 Drive store 재조회나 원격 재개는 하지 않았다. 근거: `outputs/fleet_coverage_fix_20261103/root/tests.json`.
+
+후속 실패1건의 명시 재개 준비는 [고정 재개 계약](FLEET_SURVEY_RESUME.md)을 따른다. 원래 실행본으로 반복 재시도하거나 원 PREPARED의 source pin을 덮어쓰지 않는다.
