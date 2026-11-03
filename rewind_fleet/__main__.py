@@ -48,11 +48,12 @@ def main(argv=None):
     p=commands.add_parser('pin');p.add_argument('--inventory',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--output',required=True);p.add_argument('--max-requests',type=int,default=64);p.add_argument('--max-seconds',type=float,default=300)
     p=commands.add_parser('plan');p.add_argument('--inventory',required=True);p.add_argument('--estimates',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--scope',choices=('full','calibration'),default='full');p.add_argument('--verification',choices=('catalog_only','full_bounded'),default='catalog_only');p.add_argument('--storage-backend',choices=('local','mounted_remote'),default='mounted_remote');p.add_argument('--execution-profile',choices=('legacy',planning.AUTO_PROFILE),default='legacy');p.add_argument('--output',required=True)
     p=commands.add_parser('calibration-plan');p.add_argument('--inventory',required=True);p.add_argument('--select',required=True);p.add_argument('--output',required=True)
+    p=commands.add_parser('survey-plan');p.add_argument('--inventory',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--output',required=True)
     for command in ('status','coverage'):
         p=commands.add_parser(command);p.add_argument('--store',required=True)
     p=commands.add_parser('stop');p.add_argument('--store',required=True);p.add_argument('--plan-sha256',required=True)
     for command in ('run','auto-run','resume'):
-        p=commands.add_parser(command);p.add_argument('--inventory',required=True);p.add_argument('--plan',required=True);p.add_argument('--plan-sha256',required=True);p.add_argument('--store',required=True);p.add_argument('--workspace',required=True);p.add_argument('--owner',required=True);p.add_argument('--single-writer',action='store_true');p.add_argument('--max-segments',type=int,required=command=='run',default=1000000);p.add_argument('--session-seconds',type=float,required=True);p.add_argument('--output',required=True)
+        p=commands.add_parser(command);p.add_argument('--inventory',required=True);p.add_argument('--plan',required=True);p.add_argument('--plan-sha256',required=True);p.add_argument('--store',required=True);p.add_argument('--workspace',required=True);p.add_argument('--owner',required=True);p.add_argument('--single-writer',action='store_true');p.add_argument('--max-segments',type=int,required=command=='run',default=1000000);p.add_argument('--session-seconds',type=lambda v:None if v=='none' else float(v),required=command=='run',default=None);p.add_argument('--output',required=True)
     p=commands.add_parser('recover-pending');p.add_argument('--store',required=True);p.add_argument('--head',required=True);p.add_argument('--token',required=True);p.add_argument('--owner-confirmed-stopped',action='store_true')
     p=commands.add_parser('release-stale-lease');p.add_argument('--store',required=True);p.add_argument('--token',required=True);p.add_argument('--owner-confirmed-stopped',action='store_true')
     args=parser.parse_args(argv)
@@ -74,6 +75,7 @@ def main(argv=None):
     elif args.command=='plan':
         doc=planning.plan(load(args.inventory),load(args.estimates),args.select,scope=args.scope,verification=args.verification,storage_backend=args.storage_backend,execution_profile=args.execution_profile);save(args.output,doc)
     elif args.command=='calibration-plan':doc=planning.calibration_plan(load(args.inventory),args.select);save(args.output,doc)
+    elif args.command=='survey-plan':doc=planning.survey_plan(load(args.inventory),args.select);save(args.output,doc)
     elif args.command in ('status','coverage'):doc=coverage(args.store)
     elif args.command=='stop':doc=request_stop(args.store,args.plan_sha256)
     elif args.command in ('run','auto-run','resume'):

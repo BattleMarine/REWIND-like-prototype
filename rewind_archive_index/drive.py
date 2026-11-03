@@ -88,10 +88,14 @@ class DriveRuntime:
         self.body_start=getattr(getattr(self,'transfer',None),'transfer_bytes',0)
         self.media_start=getattr(getattr(self,'transfer',None),'media_requests',0)
         self.metadata_start=getattr(getattr(self,'transfer',None),'metadata_requests',0)
-        remaining=min(self.limits.max_seconds,budget.limits.max_seconds-(time.monotonic()-budget.start))
-        if remaining<=0:raise IndexFailure('elapsed_limit')
-        # 같은 runtime의 scan/extract는 하나의 phase 전송 예산을 공유한다.
-        if not hasattr(self,'transfer'):self.transfer=TransferBudget(self.limits.transport_limits(remaining))
+        if self.limits.max_seconds is None:
+            if budget.limits.max_seconds is not None:raise IndexFailure('drive_time_policy_mismatch')
+            if not hasattr(self,'transfer'):self.transfer=self.limits.new_transfer_budget()
+        else:
+            remaining=min(self.limits.max_seconds,budget.limits.max_seconds-(time.monotonic()-budget.start))
+            if remaining<=0:raise IndexFailure('elapsed_limit')
+            # 같은 runtime의 scan/extract는 하나의 phase 전송 예산을 공유한다.
+            if not hasattr(self,'transfer'):self.transfer=TransferBudget(self.limits.transport_limits(remaining))
         self.sources=[]
         for p in spec['parts']:
             self.sources.append(DriveSource({'size_bytes':p['size'],'source':{'file_id':p['file_id']},
@@ -121,7 +125,7 @@ class DriveRuntime:
         if self.transfer.ranges+3+len(self.sources)>self.transfer.limits.max_ranges:raise IndexFailure('ranges_limit')
         if self.transfer.transfer_bytes+size+(2+len(self.sources))*DriveSource.METADATA_RESPONSE_BYTES>self.transfer.limits.max_transfer_bytes:
             raise IndexFailure('transfer_bytes_limit')
-        if self.transfer.check_time()<=min(10.,self.limits.max_seconds/4):raise IndexFailure('elapsed_limit')
+        if self.limits.max_seconds is not None and self.transfer.check_time()<=min(10.,self.limits.max_seconds/4):raise IndexFailure('elapsed_limit')
         try:data=self.sources[part].read_range(start,start+size-1,self.transfer,lambda _:None)
         except PreparationError as exc:self._fail(exc)
         while self.cache_bytes+len(data)>self.limits.max_cache_bytes:

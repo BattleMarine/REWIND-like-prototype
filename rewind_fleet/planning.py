@@ -11,6 +11,9 @@ METRICS=('source_bytes','requests','seconds','artifact_io_bytes','storage_bytes'
 AUTO_PROFILE='bounded_auto_v1'
 AUTO_ENGINE={'buffer_size':MIB,'spacing':MIB,'readbuf_size':65536,'max_members':64,'max_pack_bytes':4*MIB,
              'ram_buffer_allowance_bytes':4*MIB,'strategy':'bounded_chunk_new_engine_per_segment'}
+SURVEY_POLICY='bounded_archive_survey_v1'
+SURVEY_BASE={'source_bytes':64*MIB,'requests':1000,'seconds':None,'artifact_io_bytes':16*MIB,
+             'storage_bytes':16*MIB,'ram_bytes':548*MIB,'disk_bytes':16*MIB}
 def seal(doc):return {**doc,'content_sha256':sha(canonical(doc))}
 def validate(doc,schema):
     check(doc.get('schema')==schema and doc.get('content_sha256')==sha(canonical({k:v for k,v in doc.items() if k!='content_sha256'})),'fleet_document_hash')
@@ -57,7 +60,7 @@ def official(inv,registry,expected_sha256):
     doc['official_registry_sha256']=expected_sha256;doc['official_registry_complete']=all(a['official_part_count']==len(a['parts']) for a in doc['archives'])
     return seal(doc)
 
-def pin(inv,session,selected,*,max_requests=64,max_seconds=300):
+def pin(inv,session,selected,*,max_requests=64,max_seconds=300,survey_allocation=False):
     """명시 archive의 metadata만 읽고 size/time을 대조한 뒤 version을 고정한다."""
     from rewind_archive.drive_metadata import validate_file,FIELDS
     from rewind_archive.sources import session_opener,read_metadata_body,close_response
@@ -65,10 +68,15 @@ def pin(inv,session,selected,*,max_requests=64,max_seconds=300):
     import json,sys
     import time
     validate(inv,'fleet_inventory_v1');doc=copy.deepcopy(inv);doc.pop('content_sha256');check(set(selected)<={a['key'] for a in doc['archives']},'fleet_unknown_archive')
-    check(type(max_requests) is int and 1<=max_requests<=512 and type(max_seconds) in (int,float) and 0<max_seconds<=1800,'fleet_pin_budget')
+    request_limit=min(1024,2*sum(len(a['parts']) for a in doc['archives'] if a['key'] in selected)) if survey_allocation is True else 512
+    time_valid=(survey_allocation is True and max_seconds is None) or (type(max_seconds) in (int,float) and 0<max_seconds<=1800)
+    check(type(max_requests) is int and 1<=max_requests<=request_limit and time_valid,'fleet_pin_budget')
     check(sum(len(a['parts']) for a in doc['archives'] if a['key'] in selected)<=max_requests,'fleet_pin_request_plan')
     started=time.monotonic();requests=body=0
-    budget=Budget(Limits(max_ranges=max_requests,max_transfer_bytes=2*MIB,max_elapsed_seconds=max_seconds,request_timeout_seconds=min(5,max_seconds)))
+    if max_seconds is None:
+        from .timing import ObservedTransferBudget,ObservedTransferLimits
+        budget=ObservedTransferBudget(ObservedTransferLimits(max_ranges=max_requests,max_transfer_bytes=2*MIB,request_timeout_seconds=5))
+    else:budget=Budget(Limits(max_ranges=max_requests,max_transfer_bytes=2*MIB,max_elapsed_seconds=max_seconds,request_timeout_seconds=min(5,max_seconds)))
     opener=session_opener(session,'metadata_initial')
     for a in doc['archives']:
         if a['key'] not in selected:continue
@@ -155,3 +163,29 @@ def calibration_plan(inv,key,*,storage_backend='mounted_remote'):
     doc=plan(inv,{key:estimate},[key],scope='calibration',storage_backend=storage_backend)
     doc.pop('content_sha256');doc['probe_policy']='bounded_probe_allocations_v1';doc['automatic_segments']=1
     return seal(doc)
+
+def survey_plan(inv,selected,*,storage_backend='mounted_remote'):
+    """전체 비용 예측이 아닌 archive당 두 bounded segment 측정 allocation."""
+    validate(inv,'fleet_inventory_v1')
+    check(storage_backend in ('local','mounted_remote'),'fleet_plan_policy')
+    indexed={a['key']:a for a in inv['archives']}
+    check(isinstance(selected,list) and selected and len(set(selected))==len(selected) and set(selected)<=indexed.keys(),'fleet_survey_selection')
+    rows=[];missing=[]
+    for key in selected:
+        a=indexed[key];check(a['classification']=='observed_contiguous_official_unknown' and a['parts'],'fleet_survey_source_order')
+        check([p['index'] for p in a['parts']]==list(range(len(a['parts']))),'fleet_part_order')
+        if not a.get('runtime_versions_verified') or any(not isinstance(p.get('version'),str) or not p['version'] for p in a['parts']):missing.append(key+':runtime_version')
+        base=dict(SURVEY_BASE)
+        rows.append({'key':key,'source_identity':sha(canonical(a)),'base':base,'cap':{k:2*v if v is not None else None for k,v in base.items()},
+            'estimates':None,'allocation_basis':'two scans: <=64MiB source/1000HTTP/16MiB artifact IO per reservation; time observed only'})
+    total={m:(None if m=='seconds' else max(r['base'][m] for r in rows) if m=='ram_bytes' else sum(r['base'][m] for r in rows)) for m in METRICS}
+    return seal({'schema':'fleet_cost_plan_v1','inventory_sha256':inv['content_sha256'],'selected':selected,'scope':'survey',
+        'verification_policy':'catalog_only','storage_backend':storage_backend,'policy':SURVEY_POLICY,
+        'execution_profile':AUTO_PROFILE,'engine':copy.deepcopy(AUTO_ENGINE),'segments_per_archive':2,
+        'archive_plans':rows,'base':total,'cap':{k:2*v if v is not None else None for k,v in total.items()},'missing':missing,
+        'time_policy':'observe_only','segment_yield_seconds':120,
+        'complete_estimate':not missing,'estimate_coverage':'bounded_measurement_allocations_only',
+        'whole_archive_estimate_complete':False,'training_allowed':False,
+        'notes':['cap = allocation base * 2; not a measured full cost estimate',
+                 'quota persists across sessions; survey completion never means archive/catalog/CRC completion',
+                 'unknown full decoded/member fields remain unfilled; no automatic transition to full run']})

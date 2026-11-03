@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-03 Drive 자동 조사 준비: 기존90archive/354파일의 현재 metadata를 대조해 파일명·크기·수정 시각 차이0을 확인했다. 전체 비용을 확정하기 전 각 archive 최대2개 정상 scan으로 측정하는 survey와 고정 실행 notebook을 구현·로컬 검토했다. 최신 사용자 결정에 따라 총 실행시간 상한 없이 비차단 타이머·사용자 stop을 제공하고, 시간 외 자원 상한은 유지한다. 실제 Drive 실행·전체 비용 확정은 아직 미완료다. [원본 확인·조사 예산·인계 상태](FLEET_DRIVE_SURVEY.md).
+
 2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬16segment·mock Drive14segment에서 각각800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](AUTOMATIC_FLEET_INDEXING.md).
 
 2026-11-03 사용자 우선순위 변경: 전체 데이터셋의 독립 자동 인덱싱 프로그램을 먼저 구현한다. 정상 구간마다 수동 검토를 요구하지 않고 고정 계획·누적 예산 안에서 자동 처리·저장·재개·다음 archive 진행을 제공한다. 미니 모델용 데이터는1,000~10,000쌍 규모를 지향하며 기존371쌍을 최종 목표로 삼지 않는다. 실제 원격 전체 실행과 확보 완료를 의미하지 않는다. [자동 인덱싱 목표·구현 경계](AUTOMATIC_FLEET_INDEXING.md).

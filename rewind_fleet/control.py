@@ -1,5 +1,5 @@
 """원본 요청 없는 협력 stop과 bounded coverage 조회."""
-import json,os,uuid
+import json,os,time,uuid
 from .storage import Store,path,status
 from .window import check
 from rewind_archive.contracts import canonical
@@ -22,27 +22,37 @@ def request_stop(root,expected_plan_sha256):
     os.replace(temp,store.root/'STOP.json')
     check(stop_request(store,expected_plan_sha256)==doc,'fleet_stop_readback');return doc
 
-def coverage(root):
+def coverage(root,*,io_limit=16*1024**2):
     """최신 archive commit만 조회. 전체 catalog/pack/원본은 읽지 않는다."""
-    report=status(root);report.update(archives=[],catalog_complete=False,full_integrity_complete=False,
+    report=status(root,io_limit=io_limit);prior_io=report['artifact_logical_io'];store=None
+    report.update(archives=[],catalog_complete=False,full_integrity_complete=False,
         pair_count=None,pair_count_reason='requires_sequence_frame_rgb_pose_join',current_archive=None)
     if not report.get('head'):return report
     try:
-        store=Store(root)
+        store=Store(root);store.read_limit=max(0,io_limit-prior_io)
         def guard():check(store.io_bytes<=16*1024**2,'fleet_coverage_io_limit')
         store.guard=guard;ledger=store.committed(report['head'])
         report['current_archive']=ledger.get('last_archive')
         report['progress']=ledger.get('progress')
+        if 'survey_segments' in ledger:
+            report.update(scope='survey',survey_segments=ledger['survey_segments'],survey_quota=ledger.get('survey_quota'),whole_archive_estimate_complete=False)
+            quota=ledger.get('survey_quota',2)
+            report['survey_complete']=all(ledger['survey_segments'].get(k,0)>=quota or ledger['statuses'].get(k,{}).get('eof') for k in ledger.get('selected_archives',[]))
+            report['survey_archives_finished']=sum(ledger['survey_segments'].get(k,0)>=quota or ledger['statuses'].get(k,{}).get('eof') for k in ledger.get('selected_archives',[]))
         report['usage_reserved_or_charged']=ledger['usage']
         from .runner import reconcile
         report['usage_reconciled']=reconcile(store,ledger,report['head'])['usage']
-        if ledger.get('plan_cap'):report['remaining']={k:ledger['plan_cap'][k]-report['usage_reconciled'][k] for k in ledger['usage']}
+        report['time_policy']=ledger.get('time_policy','bounded')
+        report['observed_seconds']=reconcile(store,ledger,report['head']).get('observed_seconds')
+        if report.get('lease'):report['live_worker_wall_seconds']=max(0,time.time()-report['lease']['created'])
+        if ledger.get('plan_cap'):report['remaining']={k:None if ledger['plan_cap'][k] is None else ledger['plan_cap'][k]-report['usage_reconciled'][k] for k in ledger['usage']}
         for key,ref in ledger['archives'].items():
             check(len(report['archives'])<128,'fleet_coverage_archive_limit')
             doc=store.committed(ref);s=doc['state']
             report['archives'].append({'archive':key,'head':ref,'members':s['ordinal'],'files':s.get('files'),
                 'directories':s.get('directories'),'decoded_cursor':s['cursor'],'restart_point':s.get('restart_point'),
                 'source_read_max_end':s.get('source_read_max_end'),'catalog_eof':s['eof'],
+                'survey_segments':ledger.get('survey_segments',{}).get(key),
                 'rolling_trailer_match':s['trailer_crc_match'],'full_integrity_complete':s['complete'],
                 'completion_level':'full_integrity_verified' if s['complete'] else 'catalog_eof_crc_pending' if s['eof'] else 'partial'})
         selected=ledger.get('selected_archives')
@@ -59,5 +69,8 @@ def coverage(root):
             if summary.get('schema')=='fleet_run_summary_v1' and summary.get('head')==report['head'] and summary.get('plan_sha256')==ledger['plan_sha256']:
                 report['last_run']=summary
                 if not ledger['pending'] and not report.get('lease') and not active_stop:report['next_action']=summary['stop_reason']
+        if report.get('survey_complete') and not ledger['pending'] and not report.get('lease'):
+            report['next_action']='survey_finished_review_measurements_for_full_plan'
     except Exception as exc:report['errors'].append({'stage':'coverage','type':type(exc).__name__,'reason':getattr(exc,'reason','unreadable')})
+    if store is not None:report['artifact_logical_io']=prior_io+store.io_bytes
     return report

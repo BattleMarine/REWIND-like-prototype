@@ -16,13 +16,13 @@ def path(value):
     check(not any(x.is_symlink() or getattr(x,'is_junction',lambda:False)() for x in (p,*p.parents)),'fleet_link')
     return p
 
-def status(root):
+def status(root,*,io_limit=None):
     """원본 네트워크·mount 시도 없이 작은 HEAD/lease/pending 상태만 회수한다."""
-    report={'archive_network_requested':False,'errors':[],'head':None,'pending':None,'lease':None}
+    report={'archive_network_requested':False,'errors':[],'head':None,'pending':None,'lease':None,'artifact_logical_io':0};store=None
     try:
         p=path(root);report['store_exists']=p.is_dir()
         if not p.is_dir():return report
-        store=Store(p)
+        store=Store(p);store.read_limit=io_limit
         try:
             key=store.head();report['head']=key
             if key:
@@ -33,17 +33,19 @@ def status(root):
             try:report['lease']=json.loads(store.read('WRITER.lease',4096))
             except Exception as exc:report['errors'].append({'stage':'lease','type':type(exc).__name__,'reason':getattr(exc,'reason','unreadable')})
     except Exception as exc:report['errors'].append({'stage':'store','type':type(exc).__name__,'reason':getattr(exc,'reason','unreadable')})
+    if store is not None:report['artifact_logical_io']=store.io_bytes
     return report
 
 class Store:
     def __init__(self,root,guard=lambda:None):
-        self.root=path(root);self.root.mkdir(parents=True,exist_ok=True);self.guard=guard;self.io_bytes=0;self.written_bytes=0;self.write_check=lambda n:None
+        self.root=path(root);self.root.mkdir(parents=True,exist_ok=True);self.guard=guard;self.io_bytes=0;self.written_bytes=0;self.write_check=lambda n:None;self.read_limit=None
     def read(self,name,maximum):
         check(isinstance(name,str) and bool(name) and '\\' not in name and ':' not in name and
             not PurePosixPath(name).is_absolute() and '..' not in PurePosixPath(name).parts and
             name==PurePosixPath(name).as_posix() and name!='.','fleet_relative_object_name')
         self.guard();p=path(self.root/name)
         check(p.is_relative_to(self.root) and p.is_file() and p.stat().st_size<=maximum,'fleet_object_path_or_size')
+        if self.read_limit is not None:check(self.io_bytes+p.stat().st_size<=self.read_limit,'fleet_store_read_io_limit')
         with p.open('rb') as f:raw=f.read(maximum+1)
         self.io_bytes+=len(raw);check(len(raw)<=maximum,'fleet_object_size');self.guard();return raw
     def put(self,raw):
