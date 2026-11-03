@@ -6,7 +6,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬 및 mock Drive에서14segment/800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](docs/AUTOMATIC_FLEET_INDEXING.md).
+2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬16segment·mock Drive14segment에서 각각800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](docs/AUTOMATIC_FLEET_INDEXING.md).
 
 2026-11-03 사용자 우선순위 변경: 전체 데이터셋의 독립 자동 인덱싱 프로그램을 먼저 구현한다. 정상 구간마다 수동 검토를 요구하지 않고 고정 계획·누적 예산 안에서 자동 처리·저장·재개·다음 archive 진행을 제공한다. 미니 모델용 데이터는1,000~10,000쌍 규모를 지향하며 기존371쌍을 최종 목표로 삼지 않는다. 실제 원격 전체 실행과 확보 완료를 의미하지 않는다. [자동 인덱싱 목표·구현 경계](docs/AUTOMATIC_FLEET_INDEXING.md).
 

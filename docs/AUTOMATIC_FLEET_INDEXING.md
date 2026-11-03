@@ -47,7 +47,7 @@ Catalog 항목 수는 RGB/pose pair 수가 아니다. Pair 확보는 sequence/fr
 
 ## 로컬 검증 결과와 남은 경계
 
-- 한 호출에서 두 합성 archive의800파일을14segment로 자동 처리했다. 최초·중간·마지막 파일 총6개 SHA를 확인했다. 이 파일 수는 실제 RGB/pose 페어 수가 아니다.
+- 한 호출에서 두 합성 archive의800파일을 로컬16segment로 자동 처리했다. 최초·중간·마지막 파일 총6개 SHA를 확인했다. 이 파일 수는 실제 RGB/pose 페어 수가 아니다.
 - 3segment 뒤 stop, stop 상태에서 추가 source 읽기 없이 유지, 같은 store/plan과 새 workspace의 resume을 검증했다. 원본 bytes/요청 누적 정산은 이전 사용량에 후속 실소비를 더한 값이다.
 - Mock Drive에서도14segment/800파일과 body/HTTP 실제 합계 정산을 확인했다. 실제 Drive 요청이 아니다.
 - 65개 성공 뒤66번째 실패를 주입해 최근 이벤트64개·누적진전65·실패 예약 보존을 확인했다. 이 항목은 fake scan의 운영 계약 검사로 실제 인덱싱 처리량 증거가 아니다.
