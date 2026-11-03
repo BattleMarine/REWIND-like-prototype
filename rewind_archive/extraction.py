@@ -13,6 +13,7 @@ from . import __version__
 from .contracts import Budget, Limits, PreparationError, canonical, digest, safe_path, validate_manifest, validate_includes, validate_exact_targets, target_summary
 from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits, TARGET67_PROFILE, validate_target67, validate_target67_cache
 from .profiles import TARGET269_PROFILE,validate_target269,validate_target269_cache
+from .profiles import TARGET8_PROFILE,validate_target8,validate_target8_cache
 from .sources import SplitStream, CachedDriveSource
 from .diagnostics import safe_request_failure
 from .request_policy import validate_request_policy, retry_summary, validate_no_hidden_retries
@@ -159,6 +160,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     exact_targets = validate_exact_targets(exact_targets,includes,limits,mode,maximum=maximum)
     validate_target67(profile,exact_targets,mode)
     validate_target269(profile,exact_targets,mode)
+    validate_target8(profile,exact_targets,mode)
     if persistent_index is not None:
         if mode!="extract" or not exact_targets or any(value is not None for value in
                 (profile,request_policy,cache_input,cache_expectation,clock,sleeper)):
@@ -169,7 +171,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
     if persistent_context is not None:raise PreparationError("persistent_index_options_required")
     validate_request_policy(request_policy)
     if request_policy and (profile not in POSE_PROFILES or mode!="extract" or
-            (len(exact_targets)!=2 and profile not in (TARGET67_PROFILE,TARGET269_PROFILE))):
+            (len(exact_targets)!=2 and profile not in (TARGET67_PROFILE,TARGET269_PROFILE,TARGET8_PROFILE))):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
     if profile is not None:
         validate_profile_limits(profile,limits)
@@ -184,6 +186,7 @@ def prepare(manifest, output, includes, limits, base=".", authorized_session=Non
         **({"policy":cache_policy} if cache_policy else {}))
     validate_target67_cache(profile,expectation)
     validate_target269_cache(profile,expectation)
+    validate_target8_cache(profile,expectation)
     if cache_policy and cache_input is None:raise PreparationError("warm_cache_required")
     if expectation and cache_policy is None:raise PreparationError("warm_profile_required")
     if expectation and cache_input["manifest_sha256"]!=expectation["manifest_sha256"]:raise PreparationError("cache_expected_manifest_mismatch")

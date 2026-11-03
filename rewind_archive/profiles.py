@@ -14,6 +14,12 @@ WARM192_PROFILE = "posePrefixWarm192MiB_v3"
 TAIL352_PROFILE = "posePrefixTail352MiB_v4"
 TARGET67_PROFILE = "posePrefixTargets67_v1"
 TARGET269_PROFILE = "posePrefixTargets269_v1"
+TARGET8_PROFILE = "posePrefixTargets8_v1"
+TARGET8_CACHE_EXPECTATION = MappingProxyType({
+    "manifest_sha256":"04cf05af85d707193e48445de896f05ccbf0d929262fcd3f0b03342def1e8b87",
+    "prefix_sha256":"47390666a932805d9a156e69393a4b28a2b5ace433eb9af0432e3debb753a12d",
+    "prefix_bytes":250609664,
+})
 TARGET67_CACHE_EXPECTATION = MappingProxyType({
     "manifest_sha256":"b7bcb31af4be74514615c48f551ef7f0a0449428c8260b79ce9abe0df88c05ab",
     "prefix_sha256":"dd3452a2b1a159419b8e0a247f38010752caeb1a29c92c4e24024cda5ab48306",
@@ -24,9 +30,9 @@ TARGET269_CACHE_EXPECTATION = MappingProxyType({
     "prefix_sha256":"822252bfc667956aa9791423d0e86da80fac33be21d3a26b2b150ff8ff7cb756",
     "prefix_bytes":246415360,
 })
-CACHE_PROFILES = (CACHE_PROFILE,WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE,TARGET67_PROFILE,TARGET269_PROFILE)
+CACHE_PROFILES = (CACHE_PROFILE,WARM128_PROFILE,WARM192_PROFILE,TAIL352_PROFILE,TARGET67_PROFILE,TARGET269_PROFILE,TARGET8_PROFILE)
 POSE_PROFILES = (POSE_COUNTERPART_PROFILE,*CACHE_PROFILES)
-TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, *(p for p in POSE_PROFILES if p not in (TARGET67_PROFILE,TARGET269_PROFILE)))
+TARGET_PAIR_PROFILES = (COUNTERPART_PROFILE, *(p for p in POSE_PROFILES if p not in (TARGET67_PROFILE,TARGET269_PROFILE,TARGET8_PROFILE)))
 
 
 def target67_names():
@@ -65,6 +71,22 @@ def validate_target269_cache(profile,expectation):
         raise PreparationError("pose269_requires_pinned_235MiB_cache")
 
 
+def target8_names():
+    prefix="ArchVisInterior_ArchVis_RT/Day/rp_serena_rigged_004_ue4/SKM_MenReadingGlasses_Shape_01/004/Pulling_A_Rope__9_"
+    return [f"{prefix}/json/frame_{frame}.json" for frame in (0,11,38,42,73,82,116,145)]
+
+
+def validate_target8(profile,targets,mode,purpose="targeted"):
+    if profile==TARGET8_PROFILE and (mode not in ("extract","review") or purpose not in ("targeted","review") or
+            len(targets)!=8 or set(targets)!=set(target8_names())):
+        raise PreparationError("pose8_requires_fixed_target_set")
+
+
+def validate_target8_cache(profile,expectation):
+    if profile==TARGET8_PROFILE and expectation!=dict(TARGET8_CACHE_EXPECTATION):
+        raise PreparationError("pose8_requires_pinned_239MiB_cache")
+
+
 PROFILES = MappingProxyType({
     SMOKE_PROFILE:Limits(),
     COUNTERPART_PROFILE:Limits(max_transfer_bytes=64*1024**2,max_elapsed_seconds=300.0,
@@ -90,6 +112,9 @@ PROFILES = MappingProxyType({
     TARGET269_PROFILE:Limits(max_transfer_bytes=192*1024**2,max_elapsed_seconds=1200.0,
         max_ranges=1916,max_decompressed_bytes=2400*1024**2,max_files=269,
         max_members=60000,max_metadata_bytes=4*1024**2,max_disk_bytes=32*1024**2),
+    TARGET8_PROFILE:Limits(max_transfer_bytes=192*1024**2,max_elapsed_seconds=1200.0,
+        max_ranges=1916,max_decompressed_bytes=2400*1024**2,max_files=8,
+        max_members=60000,max_metadata_bytes=4*1024**2,max_disk_bytes=40*1024**2),
 })
 
 

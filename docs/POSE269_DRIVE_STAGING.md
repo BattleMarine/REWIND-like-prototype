@@ -1,5 +1,7 @@
 # Pose269의 Drive cache 준비 경로
 
+2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](POSE8_RECOVERY.md)을 따릅니다.
+
 2026-11-03 · 기존65a7244 notebook의 약247MB cache `files.upload` 중40% 부근에서 연결 중·위젯 비활성·반복 연결 끊김이 보고됐다. Traceback이나 OOM 근거가 없어 원인을 확정하지 않는다. 이번 변경은 큰 cache의 브라우저 업로드를 피하는 별도 준비 경로이며 실제 연결 끊김/OOM 해결을 입증한 것은 아니다.
 
 기존 [pose269 notebook](../notebooks/pose_missing269.ipynb)과 입력·자료는 보존한다. 새 [pose_missing269_drive.ipynb](../notebooks/pose_missing269_drive.ipynb)는 source/input의 작은 두 ZIP 업로드만 유지하고 cache는 명시한 Drive 파일에서 local staging한다. **실제 Drive 경로는 아직 확인되지 않았으며 `CACHE_DRIVE_PATH`는 빈값이다. 확인된 파일 경로와 새 source/ready pin을 root가 고정하기 전에는 실행하지 않는다.** 자동 검색·추측·다른 cache·cold fallback은 없다.

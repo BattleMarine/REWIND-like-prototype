@@ -11,6 +11,8 @@ from .contracts import PreparationError,canonical
 
 CHUNK_BYTES=1024**2
 CACHE_BYTES=246522402
+TARGET8_CACHE_BYTES=250718584
+TARGET8_CACHE_SHA256='e8516bf6214bac6253551ec778dad6a57a3c6d6657af4200cab12994713f996f'
 CACHE_SHA256='f902b25aadb1932c4c734795592e122061f8d30410bdeed5bb3866528ebff437'
 DISK_BYTES=256*1024**2
 REPORT_BYTES=65536
@@ -27,9 +29,11 @@ def checked(path):
 
 
 def stage_file(source,target,*,expected_bytes,expected_sha256,readonly_root,local_root,forbidden_roots,
-               consumed_job,report_path,validator,clock=time.monotonic,seconds=SECONDS):
+               consumed_job,report_path,validator,clock=time.monotonic,seconds=SECONDS,max_bytes=CACHE_BYTES):
     """새 partial만 xb로 복사한다. 이미 있는 exact target은 검증 후 읽기 재사용한다."""
-    if type(expected_bytes) is not int or not 0<expected_bytes<=CACHE_BYTES or not re.fullmatch('[a-f0-9]{64}',expected_sha256):
+    if type(max_bytes) is not int or max_bytes not in (CACHE_BYTES,TARGET8_CACHE_BYTES):
+        raise PreparationError('cache_stage_size_scope')
+    if type(expected_bytes) is not int or not 0<expected_bytes<=max_bytes or not re.fullmatch('[a-f0-9]{64}',expected_sha256):
         raise PreparationError('cache_stage_expected_pin')
     if type(seconds) not in (int,float) or not 0<seconds<=SECONDS:
         raise PreparationError('cache_stage_time_config')
@@ -159,5 +163,25 @@ def stage_pose269_cache(source,target,*,source_root,input_root,workspace,report_
                 raise PreparationError('cache_stage_manifest_pin')
             return spec
     return stage_file(source,target,expected_bytes=CACHE_BYTES,expected_sha256=CACHE_SHA256,
+        readonly_root=readonly_root,local_root=local_root,forbidden_roots=(source_root,input_root),
+        consumed_job=workspace,report_path=report_path,validator=Validator())
+
+
+def stage_pose8_cache(source,target,*,source_root,input_root,workspace,report_path,readonly_root,local_root):
+    from .prefix_cache import input_spec
+    from .cache_policy import TAIL352_POLICY
+    from .profiles import TARGET8_CACHE_EXPECTATION
+    class Validator:
+        metadata_read_bytes=0
+        def read(self,stream,size):
+            raw=stream.read(size);self.metadata_read_bytes+=len(raw)
+            if self.metadata_read_bytes>VALIDATOR_METADATA_BYTES:raise PreparationError('cache_stage_validator_read_limit')
+            return raw
+        def __call__(self,path):
+            spec=input_spec(path,policy=TAIL352_POLICY,read_callback=self.read)
+            if spec['manifest_sha256']!=TARGET8_CACHE_EXPECTATION['manifest_sha256']:
+                raise PreparationError('cache_stage_manifest_pin')
+            return spec
+    return stage_file(source,target,expected_bytes=TARGET8_CACHE_BYTES,expected_sha256=TARGET8_CACHE_SHA256,max_bytes=TARGET8_CACHE_BYTES,
         readonly_root=readonly_root,local_root=local_root,forbidden_roots=(source_root,input_root),
         consumed_job=workspace,report_path=report_path,validator=Validator())

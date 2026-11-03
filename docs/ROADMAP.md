@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](POSE8_RECOVERY.md)을 따릅니다.
+
 검토 초안 v0.2   |   2026년 10월 28일 합성 Colab CPU 통합 결과·RGB manifest·입력 검토 도구 반영
 
 2026-11-03 pose269 준비 경로 보완: 약247MB cache files.upload 중 연결 끊김이 보고됐으나 traceback/OOM 근거는 없어 원인을 확정하지 않는다. 기존 notebook/269목표/235MiB cache pin/원본 prepare 예산을 보존하고, 작은 source/input 두 ZIP 준비 후 auth/mount→명시 Drive 파일의1MiB chunk copy→local hash/input_spec→기존 preflight/run 순서의 별도 경로를 구현했다. Source read246522402+local hash같은크기/300초 협력/disk256MiB·metadata별도2MiB로 준비 비용을 분리하고 partial/최신 report 회수를 검증했다. 개발21개 및 local 실제cache 검증 통과, 원격/실제Colab0·Drive경로미확인으로 확인 전 실행하지 않는다. [범위·실측·한계](POSE269_DRIVE_STAGING.md)를 따른다.

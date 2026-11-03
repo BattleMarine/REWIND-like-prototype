@@ -1,5 +1,7 @@
 # g25 저장 구조 검토와 pose269 확보 준비
 
+2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](POSE8_RECOVERY.md)을 따릅니다.
+
 ## 2026-11-03 업로드 준비 경로 보완
 
 기존65a7244 pose269 notebook에서 큰 cache 업로드 중 연결 끊김이 보고됐다. 원인은 미확정이고 dataset 원본 prepare 실행 여부를 단정하지 않는다. 목표·cache pin·예산은 보존한 채 작은 두 ZIP만 업로드하고 확인된 Drive 파일에서 chunk staging하는 별도 notebook을 준비했다. Drive 경로는 확인 전 빈값이며 실제 Colab/OOM 해결은 미검증이다. [새 준비 순서·별도300초/256MiB 예산·부분 회수](POSE269_DRIVE_STAGING.md)를 따른다. 아래269 입력·목표·상한은 그대로다.
