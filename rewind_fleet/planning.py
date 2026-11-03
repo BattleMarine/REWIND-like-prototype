@@ -8,6 +8,9 @@ from .window import check,MAX_PACK
 
 MIB=1024**2
 METRICS=('source_bytes','requests','seconds','artifact_io_bytes','storage_bytes','ram_bytes','disk_bytes')
+AUTO_PROFILE='bounded_auto_v1'
+AUTO_ENGINE={'buffer_size':MIB,'spacing':MIB,'readbuf_size':65536,'max_members':64,'max_pack_bytes':4*MIB,
+             'ram_buffer_allowance_bytes':4*MIB,'strategy':'bounded_chunk_new_engine_per_segment'}
 def seal(doc):return {**doc,'content_sha256':sha(canonical(doc))}
 def validate(doc,schema):
     check(doc.get('schema')==schema and doc.get('content_sha256')==sha(canonical({k:v for k,v in doc.items() if k!='content_sha256'})),'fleet_document_hash')
@@ -84,9 +87,10 @@ def pin(inv,session,selected,*,max_requests=64,max_seconds=300):
         'request_limit':max_requests,'seconds_limit':max_seconds}
     return seal(doc)
 
-def plan(inv,estimates,selected,*,verification='catalog_only',scope='full',storage_backend='mounted_remote'):
+def plan(inv,estimates,selected,*,verification='catalog_only',scope='full',storage_backend='mounted_remote',execution_profile='legacy'):
     validate(inv,'fleet_inventory_v1')
     check(verification in ('catalog_only','full_bounded') and scope in ('full','calibration') and storage_backend in ('local','mounted_remote'),'fleet_plan_policy')
+    check(execution_profile in ('legacy',AUTO_PROFILE) and (execution_profile=='legacy' or scope=='full'),'fleet_execution_profile')
     check(selected and len(selected)==len(set(selected)),'fleet_plan_selection')
     indexed={a['key']:a for a in inv['archives']};check(set(selected)<=set(indexed),'fleet_unknown_archive')
     rows=[];all_missing=[]
@@ -130,12 +134,16 @@ def plan(inv,estimates,selected,*,verification='catalog_only',scope='full',stora
     total=None
     if all(r['base'] is not None for r in rows):
         total={m:(max(r['base'][m] for r in rows) if m=='ram_bytes' else sum(r['base'][m] for r in rows)) for m in METRICS}
-    return seal({'schema':'fleet_cost_plan_v1','inventory_sha256':inv['content_sha256'],'selected':selected,'scope':scope,
+    doc={'schema':'fleet_cost_plan_v1','inventory_sha256':inv['content_sha256'],'selected':selected,'scope':scope,
         'verification_policy':verification,'storage_backend':storage_backend,'policy':'explicit_estimate_times_two',
         'archive_plans':rows,'base':total,'cap':{k:2*v for k,v in total.items()} if total else None,
         'complete_estimate':not all_missing,'missing':all_missing,'training_allowed':False,
         'notes':['gzip ISIZE is modulo2^32, never decoded-size estimate','artifact IO is logical read/write, not FUSE wire bytes',
-            'catalog_only has no automatic full CRC second pass','retention: no automatic deletion; storage includes old+new and failure residue']})
+            'catalog_only has no automatic full CRC second pass','retention: no automatic deletion; storage includes old+new and failure residue']}
+    if execution_profile==AUTO_PROFILE:
+        doc.update(execution_profile=AUTO_PROFILE,engine=copy.deepcopy(AUTO_ENGINE))
+        doc['notes'].append('1MiB output chunk fits existing 4MiB buffer RAM allowance; unchanged spacing/cost formula, estimates still require evidence')
+    return seal(doc)
 
 def calibration_plan(inv,key,*,storage_backend='mounted_remote'):
     # 첫 probe를 위한 명시 계획 가정이다. 전체 archive의 해제 크기/처리량 실측으로 사용하지 않는다.

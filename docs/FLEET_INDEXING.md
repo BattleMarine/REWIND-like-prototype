@@ -1,5 +1,7 @@
 # 전체 데이터셋의 독립 사전 인덱싱
 
+2026-11-03 최신 구현: 새 `bounded_auto_v1` profile의 자동 실행·중단·재개·coverage와 CPU worker notebook을 추가했다. 기존 calibration/legacy 계약은 유지하며, 정상 구간별 사용자 승인은 요구하지 않는다. [자동 프로그램의 검증 결과와 운영 경계](AUTOMATIC_FLEET_INDEXING.md)를 따른다. 아래 실험·실패 기록은 당시 조건의 근거로 보존한다.
+
 ## 버퍼·인덱스 간격의 격리 비교 (2026-11-03)
 
 기준49e5a3c production을 변경하지 않고 한 번에 한 변수만 바꿨다. 압축 입력 readbuf_size64KiB, 첫 scan 논리 read soft4MiB/hard8MiB, decode32MiB, mock Drive cache4MiB와 고정 plan은 유지했다. buffer_size는 해제 출력 BufferedReader 용량이며 압축 Range cache와 다르다. 두 번째 scan은 같은 store/plan, 새 workspace를 사용한다. 누적 잔여 예산에 따라 예약과 유효 soft/hard 한도가 감소한다(예: Lab 기본 두 번째 soft3,741,404/hard7,482,807bytes). 후보별 첫 소비량 때문에 두 번째 유효 한도도 다르므로, 첫 scan은 고정 한도 비교이고 두 scan 결과는 실제 누적 계획의 운영 비교다. 두 번째 한도가 모두4/8MiB로 고정됐다고 해석하지 않는다. 과거 파일 추출은 별도의 논리8MiB/body16MiB/158HTTP 예산이다.

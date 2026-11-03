@@ -58,9 +58,11 @@ def cache(store,head,workspace,key,*,cold_rebuild=False):
         except BaseException:db.rollback();db.close();raise
     return db
 
-def scan(state,pack,source,budget,spacing,db,max_members=64):
+def scan(state,pack,source,budget,spacing,db,max_members=64,*,buffer_size=65536,should_stop=None):
     check(hashlib.sha256(canonical(source.spec)).hexdigest()==state['source_sha256'],'fleet_source_identity')
     state=dict(state);rows=[];before=state['cursor'];gz=None;reason=None;primary=None;handled=False
+    def opened(*args):
+        return open_engine(*args,**({'buffer_size':buffer_size} if buffer_size!=65536 else {}))
     def engine_call(call):
         # C 확장에 감싸진 이번 호출의 source 오류만 복원한다.
         budget.last_source_failure=None
@@ -69,7 +71,7 @@ def scan(state,pack,source,budget,spacing,db,max_members=64):
             if budget.last_source_failure:raise IndexFailure(budget.last_source_failure) from exc
             raise
     try:
-        gz=engine_call(lambda:open_engine(source,spacing,pack,state['cursor']));crc=state['crc32']
+        gz=engine_call(lambda:opened(source,spacing,pack,state['cursor']));crc=state['crc32']
         def read(n):
             nonlocal crc
             budget.check();check(budget.decoded_bytes+n<=budget.limits.max_decoded_bytes,'decoded_bytes_limit')
@@ -92,6 +94,7 @@ def scan(state,pack,source,budget,spacing,db,max_members=64):
             if not state['eof']:tail()
         else:
             while len(rows)<max_members:
+                if rows and should_stop and should_stop():reason='segment_time_boundary';break
                 chain=state['boundary'];pending=None;pax={}
                 while True:
                     header=exact(512)
@@ -135,8 +138,13 @@ def scan(state,pack,source,budget,spacing,db,max_members=64):
                 if not points or max(h[1],points[-1][0][1])<state['cursor']:
                     budget.active_read_limit=budget.limits.max_read_bytes
                     if not points and 0<h[1]<=spacing:
-                        gz=engine_call(lambda:open_engine(source,spacing,None,0));engine_call(gz.build_full_index)
-                    else:gz=engine_call(lambda:open_engine(source,spacing,newpack,state['cursor']))
+                        gz=engine_call(lambda:opened(source,spacing,None,0));engine_call(gz.build_full_index)
+                    else:gz=engine_call(lambda:opened(source,spacing,newpack,state['cursor']))
+                    if buffer_size!=65536 and not points and h[1]==0:
+                        # lazy seek만으로 n0가 남는 작은 member 구간: 한 번의
+                        # bounded buffer fill로 restart point를 생성한다.
+                        budget.check();check(budget.decoded_bytes<budget.limits.max_decoded_bytes,'decoded_bytes_limit')
+                        raw=engine_call(lambda:gz.read(1));budget.decoded_bytes+=len(raw);budget.check()
                     newpack=export(gz)
         except BaseException as secondary:
             secondary.fleet_checkpoint_failure=True

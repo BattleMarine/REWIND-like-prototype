@@ -6,6 +6,7 @@ from rewind_archive.contracts import canonical
 from . import planning
 from .storage import sha,Store,status
 from .runner import run,recover_pending,release_stale_lease
+from .control import coverage,request_stop
 
 def load(p):
     p=Path(p)
@@ -45,10 +46,13 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__);commands=parser.add_subparsers(dest='command',required=True)
     p=commands.add_parser('inventory');p.add_argument('--observed',required=True);p.add_argument('--official');p.add_argument('--official-file-sha256');p.add_argument('--output',required=True)
     p=commands.add_parser('pin');p.add_argument('--inventory',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--output',required=True);p.add_argument('--max-requests',type=int,default=64);p.add_argument('--max-seconds',type=float,default=300)
-    p=commands.add_parser('plan');p.add_argument('--inventory',required=True);p.add_argument('--estimates',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--scope',choices=('full','calibration'),default='full');p.add_argument('--verification',choices=('catalog_only','full_bounded'),default='catalog_only');p.add_argument('--storage-backend',choices=('local','mounted_remote'),default='mounted_remote');p.add_argument('--output',required=True)
+    p=commands.add_parser('plan');p.add_argument('--inventory',required=True);p.add_argument('--estimates',required=True);p.add_argument('--select',nargs='+',required=True);p.add_argument('--scope',choices=('full','calibration'),default='full');p.add_argument('--verification',choices=('catalog_only','full_bounded'),default='catalog_only');p.add_argument('--storage-backend',choices=('local','mounted_remote'),default='mounted_remote');p.add_argument('--execution-profile',choices=('legacy',planning.AUTO_PROFILE),default='legacy');p.add_argument('--output',required=True)
     p=commands.add_parser('calibration-plan');p.add_argument('--inventory',required=True);p.add_argument('--select',required=True);p.add_argument('--output',required=True)
-    p=commands.add_parser('status');p.add_argument('--store',required=True)
-    p=commands.add_parser('run');p.add_argument('--inventory',required=True);p.add_argument('--plan',required=True);p.add_argument('--plan-sha256',required=True);p.add_argument('--store',required=True);p.add_argument('--workspace',required=True);p.add_argument('--owner',required=True);p.add_argument('--single-writer',action='store_true');p.add_argument('--max-segments',type=int,required=True);p.add_argument('--session-seconds',type=float,required=True);p.add_argument('--output',required=True)
+    for command in ('status','coverage'):
+        p=commands.add_parser(command);p.add_argument('--store',required=True)
+    p=commands.add_parser('stop');p.add_argument('--store',required=True);p.add_argument('--plan-sha256',required=True)
+    for command in ('run','auto-run','resume'):
+        p=commands.add_parser(command);p.add_argument('--inventory',required=True);p.add_argument('--plan',required=True);p.add_argument('--plan-sha256',required=True);p.add_argument('--store',required=True);p.add_argument('--workspace',required=True);p.add_argument('--owner',required=True);p.add_argument('--single-writer',action='store_true');p.add_argument('--max-segments',type=int,required=command=='run',default=1000000);p.add_argument('--session-seconds',type=float,required=True);p.add_argument('--output',required=True)
     p=commands.add_parser('recover-pending');p.add_argument('--store',required=True);p.add_argument('--head',required=True);p.add_argument('--token',required=True);p.add_argument('--owner-confirmed-stopped',action='store_true')
     p=commands.add_parser('release-stale-lease');p.add_argument('--store',required=True);p.add_argument('--token',required=True);p.add_argument('--owner-confirmed-stopped',action='store_true')
     args=parser.parse_args(argv)
@@ -68,18 +72,19 @@ def main(argv=None):
         finally:session.close()
         save(args.output,doc)
     elif args.command=='plan':
-        doc=planning.plan(load(args.inventory),load(args.estimates),args.select,scope=args.scope,verification=args.verification,storage_backend=args.storage_backend);save(args.output,doc)
+        doc=planning.plan(load(args.inventory),load(args.estimates),args.select,scope=args.scope,verification=args.verification,storage_backend=args.storage_backend,execution_profile=args.execution_profile);save(args.output,doc)
     elif args.command=='calibration-plan':doc=planning.calibration_plan(load(args.inventory),args.select);save(args.output,doc)
-    elif args.command=='status':
-        doc=status(args.store)
-    elif args.command=='run':
+    elif args.command in ('status','coverage'):doc=coverage(args.store)
+    elif args.command=='stop':doc=request_stop(args.store,args.plan_sha256)
+    elif args.command in ('run','auto-run','resume'):
         inv,plan=load(args.inventory),load(args.plan)
         if plan.get('content_sha256')!=args.plan_sha256:raise ValueError('fleet_external_plan_pin')
         # Incomplete/tampered plan is rejected before a credential/session is constructed.
         planning.validate(plan,'fleet_cost_plan_v1')
         if not plan['complete_estimate']:raise ValueError('fleet_incomplete_plan')
+        if args.command!='run' and plan.get('execution_profile')!=planning.AUTO_PROFILE:raise ValueError('fleet_auto_profile_required')
         doc=run(inv,plan,args.store,args.workspace,owner=args.owner,single_writer=args.single_writer,max_segments=args.max_segments,
-            session_seconds=args.session_seconds,session_factory=lambda:authorized_factory()());save(args.output,doc)
+            session_seconds=args.session_seconds,session_factory=lambda:authorized_factory()(),resume_stopped=args.command=='resume');save(args.output,doc)
     elif args.command=='recover-pending':doc={'head':recover_pending(Store(args.store),args.head,args.token,owner_confirmed_stopped=args.owner_confirmed_stopped)}
     else:release_stale_lease(args.store,args.token,owner_confirmed_stopped=args.owner_confirmed_stopped);doc={'lease_released':True}
     print(json.dumps(doc if args.command not in ('inventory','plan','pin') else {k:doc[k] for k in ('schema','content_sha256')},ensure_ascii=False,indent=2))

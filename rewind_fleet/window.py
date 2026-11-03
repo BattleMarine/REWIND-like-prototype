@@ -39,11 +39,12 @@ def export(gz):
     check(len(list(gz.seek_points()))<=120,'fleet_window_capacity')
     f=io.BytesIO();gz.export_index(fileobj=f);raw=f.getvalue();decode(raw,allow_empty=True);return raw
 
-def open_engine(source,spacing,pack=None,cursor=0):
+def open_engine(source,spacing,pack=None,cursor=0,*,buffer_size=65536):
     import indexed_gzip
     check(indexed_gzip.__version__=='1.10.3','fleet_engine_version')
     # 작은 read도 C handle을 진행시켜 큰 BufferedReader의 lazy index0 상태를 줄인다.
-    gz=indexed_gzip.IndexedGzipFile(fileobj=source,spacing=spacing,buffer_size=65536,readbuf_size=65536,drop_handles=False)
+    check(buffer_size in (65536,1024**2),'fleet_engine_buffer')
+    gz=indexed_gzip.IndexedGzipFile(fileobj=source,spacing=spacing,buffer_size=buffer_size,readbuf_size=65536,drop_handles=False)
     try:
         if pack:
             header,rows=decode(pack,allow_empty=True)

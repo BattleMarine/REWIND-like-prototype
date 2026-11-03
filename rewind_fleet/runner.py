@@ -4,16 +4,18 @@ import json
 import time
 import zlib
 import re
+import os
 from dataclasses import asdict
 from pathlib import Path
 import psutil
 from rewind_archive.contracts import canonical
 from rewind_archive_index.source import IndexLimits,Budget,SplitSource,_validate_source,IndexFailure
 from rewind_archive_index.drive import DriveRuntime,DriveLimits
-from .planning import validate,source as drive_source,plan as make_plan,seal,calibration_plan
+from .planning import validate,source as drive_source,plan as make_plan,seal,calibration_plan,AUTO_PROFILE
 from .storage import Store,sha,path
 from .window import check
 from .scanner import initial,cache,scan
+from .control import stop_request
 
 MIB=1024**2
 COUNTERS=('source_bytes','requests','seconds','artifact_io_bytes')
@@ -84,12 +86,13 @@ def recover_pending(store,expected_head,token,*,owner_confirmed_stopped=False):
         doc=copy.deepcopy(doc);doc.update(parent=expected_head,pending=None,recovery='unknown_consumption_charged_full_reservation')
         key=store.commit(doc);store.publish(key,expected_head);return key
 
-def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8,session_seconds=900,session_factory=None,local_sources=None):
+def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8,session_seconds=900,session_factory=None,local_sources=None,resume_stopped=False):
     validate(inv,'fleet_inventory_v1');validate(plan,'fleet_cost_plan_v1')
     recomputed=(calibration_plan(inv,plan['selected'][0],storage_backend=plan['storage_backend']) if plan['scope']=='calibration' else
         make_plan(inv,{r['key']:r['estimates'] for r in plan['archive_plans']},plan['selected'],
-        verification=plan['verification_policy'],scope=plan['scope'],storage_backend=plan['storage_backend']))
+        verification=plan['verification_policy'],scope=plan['scope'],storage_backend=plan['storage_backend'],execution_profile=plan.get('execution_profile','legacy')))
     check(recomputed==plan,'fleet_plan_recalculation')
+    automatic=plan.get('execution_profile')==AUTO_PROFILE
     check(single_writer is True and plan['complete_estimate'] and plan['inventory_sha256']==inv['content_sha256'],'fleet_incomplete_plan_or_writer')
     if plan['scope']=='calibration':check(max_segments==1,'fleet_calibration_one_segment')
     check(type(max_segments) is int and 1<=max_segments<=(16 if plan['scope']=='calibration' else 1000000) and
@@ -120,7 +123,17 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
             ledger={'schema':'fleet_ledger_v1','plan_sha256':plan['content_sha256'],'parent':None,'archives':{},'statuses':{},
                 'usage':{k:0 for k in COUNTERS},'archive_usage':{},'pending':None,'complete':False,'train_ready':False}
             head=store.commit(ledger);store.publish(head,None)
+        if automatic:
+            ledger=copy.deepcopy(ledger);ledger.setdefault('selected_archives',plan['selected'])
+            ledger.setdefault('plan_cap',plan['cap'])
+            ledger.setdefault('progress',{'segments':0,'files':0,'directories':0,'decoded_advanced':0})
+            request=stop_request(store,plan['content_sha256'])
+            if resume_stopped and request:ledger['stop_acknowledged']=request['token']
         for _ in range(max_segments):
+            if automatic:
+                request=stop_request(store,plan['content_sha256'])
+                if request and request['token']!=ledger.get('stop_acknowledged'):stop='stop_requested';break
+                if time.monotonic()+15>=deadline:stop='session_time_boundary';break
             guard();prior_ledger=ledger;ledger=reconcile(store,ledger,head);selected=None
             for name in plan['selected']:
                 state=ledger['statuses'].get(name)
@@ -141,6 +154,7 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                 stop='full_crc_requires_separate_large_verifier';break
             archive_used=ledger['archive_usage'].get(selected,{k:0 for k in COUNTERS})
             reserve={k:min(step[k],plan['cap'][k]-ledger['usage'][k],ap['cap'][k]-archive_used[k]) for k in COUNTERS}
+            if automatic:reserve['seconds']=min(reserve['seconds'],max(0,deadline-time.monotonic()-5))
             if reserve['source_bytes']<65536 or reserve['requests']<2*len(spec['parts'])+6 or reserve['seconds']<15 or reserve['artifact_io_bytes']<MIB:
                 stop='global_or_archive_budget_exhausted';break
             import uuid
@@ -171,12 +185,22 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                     phase='full_verify' if verify else 'scan'
                     if verify:
                         decoded=full_verify(reader,budget,state['tar_end']);state={**state,'complete':True,'status':'complete','verified_decoded_bytes':decoded};rows=[];newpack=pack;event={'verification':'full_single_gzip','stats':budget.stats()}
-                    else:state,rows,newpack,event=scan(state,pack,reader,budget,1024**2,db,max_members=64)
+                    else:state,rows,newpack,event=scan(state,pack,reader,budget,1024**2,db,max_members=64,
+                        **({'buffer_size':plan['engine']['buffer_size'],
+                            'should_stop':lambda:time.monotonic()-segment_started>=max(1,reserve['seconds']-15)} if automatic else {}))
                 phase='source_finish';_validate_source(spec)
                 if runtime:runtime.finish(budget)
                 else:_validate_source(spec)
                 stats=event.get('stats',{});trace=stats.pop('source_read_trace',[])
                 stats['source_read_trace_summary']={'reads':len(trace),'first':trace[:2],'last':trace[-2:]}
+                if automatic and not restoring:
+                    state={**state,'files':(old['state'].get('files',0) if old else 0)+sum(r['type']=='file' for r in rows),
+                        'directories':(old['state'].get('directories',0) if old else 0)+sum(r['type']=='directory' for r in rows),
+                        'source_read_max_end':max([r['start']+r['bytes'] for r in trace]+[old['state'].get('source_read_max_end',0) if old else 0])}
+                    if newpack:
+                        from .window import decode
+                        _,points=decode(newpack)
+                        state['restart_point']=list([p[0] for p in points if p[0][1]<=state['cursor']][-1])
                 phase='archive_commit'
                 if restoring or (not rows and state['cursor']==(old['state']['cursor'] if old else 0) and not verify and not state['eof']):archive_head=old_ref
                 else:
@@ -191,6 +215,13 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                 if archive_head is not None:settled['archives'][selected]=archive_head
                 settled['settlement']={'token':token,'archive':selected,'reserved':reserve}
                 settled['statuses'][selected]={'eof':state['eof'],'complete':state['complete']}
+                if automatic:
+                    settled['last_archive']=selected
+                    settled['last_stop_reason']='incomplete_source' if state['status']=='incomplete_source' else (
+                        'no_committed_progress' if not rows and not state['eof'] and not verify and not restoring else 'resume_same_plan_within_remaining_budget')
+                    progress=settled['progress'];progress['segments']+=1
+                    progress['files']+=sum(r['type']=='file' for r in rows);progress['directories']+=sum(r['type']=='directory' for r in rows)
+                    progress['decoded_advanced']+=state['cursor']-(old['state']['cursor'] if old else 0)
                 settled['complete']=all(settled['statuses'].get(n,{}).get('complete') for n in plan['selected']) and inv['official_registry_complete']
                 newhead=store.commit(settled);store.publish(newhead,head);head=newhead;ledger=settled
                 phase='settlement_receipt'
@@ -204,7 +235,7 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                 check(store.read(receipt_name,4096)==receipt_raw,'fleet_settlement_readback')
                 events.append({'archive':selected,'state':state,'event':event,'reservation':reserve,'actual_source_bytes':actual_source,
                     'actual_requests':actual_requests,'artifact_logical_io':store.io_bytes-io_start})
-                if len(events)>64:events.pop(0)
+                if automatic and len(events)>64:events.pop(0)
                 if state['status']=='incomplete_source':stop='incomplete_source';break
                 if not rows and not state['eof'] and not verify and not restoring:stop='no_committed_progress';break
             except BaseException as exc:
@@ -219,7 +250,9 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                     'limits':asdict(budget.limits) if budget else None,
                     'active_read_limit':getattr(budget,'active_read_limit',None),
                     'segment_seconds':time.monotonic()-segment_started,'artifact_logical_io':store.io_bytes-io_start,
-                    'pending_reservation_kept':ledger['pending'] is not None,'unknown_consumption_refunded':False});break
+                    'pending_reservation_kept':ledger['pending'] is not None,'unknown_consumption_refunded':False})
+                if automatic and len(events)>64:events.pop(0)
+                break
             finally:
                 for resource in (db,session):
                     if resource is not None:
@@ -237,6 +270,26 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
         'plan_sha256':plan['content_sha256'],'train_ready':False,
         'seconds':time.monotonic()-started,'artifact_logical_io':store.io_bytes,'durability_new_runtime_verified':False,
         'mount_atomicity_or_distributed_lock_claimed':False}
+    if automatic:report.update(execution_profile=AUTO_PROFILE,progress=ledger['progress'],recent_events_limit=64,
+        stop_latency='cooperative: at most one bounded segment; hard kill retains unknown reservation')
+    if automatic:
+        # 마지막 정상 정산의 256KiB IO/5초 tail 안에서 작은 head-bound 요약만 남긴다.
+        summary={'schema':'fleet_run_summary_v1','head':head,'plan_sha256':plan['content_sha256'],'stop_reason':stop,
+            'progress':ledger['progress'],'last_archive':ledger.get('last_archive'),'pending':ledger['pending'] is not None,
+            'last_failure':{k:events[-1].get(k) for k in ('phase','reason','exception_chain')} if events and events[-1].get('status') else None}
+        raw=canonical(summary)+b'\n';report['summary_persisted']=False
+        try:
+            check(len(raw)<=8192 and time.monotonic()<deadline,'fleet_summary_budget')
+            # 0 segment 재조회는 새 reservation 없이 저장하지 않는다.
+            check(segment_started is not None and time.monotonic()-segment_started<reserve['seconds'],'fleet_summary_budget')
+            check(store.io_bytes-io_start+3*len(raw)<=reserve['artifact_io_bytes'],'fleet_summary_budget')
+            store.write_check(len(raw));temp=store.root/('.run-'+token)
+            with temp.open('xb') as f:f.write(raw)
+            store.io_bytes+=len(raw);store.written_bytes+=len(raw)
+            os.replace(temp,store.root/'RUN.json')
+            check(store.read('RUN.json',8192)==raw,'fleet_summary_readback');report['summary_persisted']=True
+        except Exception as exc:report['summary_error']=failure_chain(exc)
+        report.update(artifact_logical_io=store.io_bytes,seconds=time.monotonic()-started)
     import uuid
     report_file=workspace/('report-'+owner+'-'+uuid.uuid4().hex+'.json');report['local_report']=str(report_file)
     with report_file.open('xb') as f:f.write(canonical(report)+b'\n')
