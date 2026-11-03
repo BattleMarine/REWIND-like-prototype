@@ -68,6 +68,6 @@ Root 독립36개 검사(14.627초, failure/error/skip0)와 실제 cache/input ZI
 
 2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다.
 
-고정 코드 acc7696의 실행 결과를 `outputs/test_pose_missing8_001_20261103/`에 보존했다. 결과 ZIP SHA는 `fc31bd09f0c46e70a0ccabff98d71a25db9e7a78491e3ae34b48c3a8b8361e13`, 확장 cache SHA는 `607844afd56dd5baa231c26f838fb8cfa38fe1635a283934ee80de1afcd16fef`다. Cache SHA는 내부 export report와 일치한다. 결과 ZIP의 Colab 출력 SHA는 미제공이므로 다운로드 전후 SHA 일치는 주장하지 않는다. 로컬 ZIP CRC와 개별 payload hash 검증은 통과했다. Root 근거는 같은 폴더 `root_review.json`이다.
+고정 코드 acc7696의 실행 결과를 `outputs/test_pose_missing8_001_20261103/`에 보존했다. 결과 ZIP SHA는 `fc31bd09f0c46e70a0ccabff98d71a25db9e7a78491e3ae34b48c3a8b8361e13`, 확장 cache SHA는 `607844afd56dd5baa231c26f838fb8cfa38fe1635a283934ee80de1afcd16fef`다. Cache SHA는 내부 export report와 일치한다. 2026-11-03 사용자가 탐색 세션에 추가 제공한 Colab 회수 SHA를 보관본과 대조하여 결과 ZIP과 확장 cache 모두 일치함을 확인했다. 최초 검토의 결과 ZIP Colab SHA 미제공 제한은 해소됐다. 로컬 ZIP CRC와 개별 payload hash 검증은 통과했다. Root 근거는 같은 폴더 `root_review.json`이다.
 
 Drive staging은 고정239MiB cache SHA를 통과했고, 이번 실제 성공은 이 한 번의 실행에 대한 결과다. 전체 원본 gzip EOF/CRC, 모든 archive 무결성, 새 RGB269쌍 실제 확보와 의미/좌표/시간 정합, validation·학습 release는 미완료다. 다음 작업은 새 pose269의 내용 감사와 g25 인덱스를 이용한 대응 RGB 추출 준비이며, 이번 검토에서 추가 원격 실행이나 학습을 시작하지 않았다.
