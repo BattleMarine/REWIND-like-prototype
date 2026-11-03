@@ -39,6 +39,34 @@ class PairLimits:
             raise IndexFailure('pair_limits')
 
 
+RGB269_PROFILE = 'indexed_stereo_pairs269_v1'
+RGB269_SOURCE_SHA = '73b7007fc0586e72ddc0109290c79af93b7e6954c2f65a3e708bd6e8917b2c37'
+RGB269_SNAPSHOT_SHA = '24686a9c3e1ec63347198778005ea0eabc81753e687c69653aca356876b4250e'
+RGB269_RECEIPT_SHA = 'd17c09fe12912fe6e9ebf66d84154cb0c42793b44a5c0bd23eb1a8d0afd2f70d'
+RGB269_GENERATION = 25
+
+
+@dataclass(frozen=True)
+class RGB269Limits(PairLimits):
+    body_bytes: int = 896*MIB
+    requests: int = 4096
+    seconds: int = 1800
+    read_bytes: int = 2048*MIB
+    decoded_bytes: int = 768*MIB
+    work_bytes: int = 896*MIB
+    zip_bytes: int = 768*MIB
+
+    def __post_init__(self):
+        expected = dict(body_bytes=896*MIB, requests=4096, seconds=1800, read_bytes=2048*MIB,
+            decoded_bytes=768*MIB, rss_bytes=1024*MIB, work_bytes=896*MIB, zip_bytes=768*MIB, batch_files=32)
+        if any(type(v) is not int or v != expected[k] for k, v in asdict(self).items()):
+            raise IndexFailure('pair269_fixed_limits')
+
+
+def config_limits(config):
+    return (RGB269Limits if config.get('schema') == RGB269_PROFILE else PairLimits)(**config['limits'])
+
+
 def check(value, reason):
     if not value:
         raise IndexFailure(reason)
@@ -61,17 +89,18 @@ def read(path, maximum):
 def preflight(input_root):
     root = _path(input_root)
     pins = read(root/'input_manifest.json', MIB)
-    check(pins.get('schema') == 'pinned_pair_inputs_v1' and len(pins['files']) <= 128, 'pair_input_manifest')
+    config = read(root/'config.json', MIB)
+    expanded = config.get('schema') == RGB269_PROFILE
+    check(pins.get('schema') == 'pinned_pair_inputs_v1' and len(pins['files']) <= (512 if expanded else 128), 'pair_input_manifest')
     actual = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     check(actual == set(pins['files']) | {'input_manifest.json'}, 'pair_input_file_set')
     for name, row in pins['files'].items():
         path = _path(root/name)
         check(path.is_relative_to(root) and path.is_file() and path.stat().st_size == row['bytes'] <= 72*MIB
               and sha_file(path) == row['sha256'], 'pair_input_pin')
-    config = read(root/'config.json', MIB)
-    check(config.get('schema') == 'indexed_stereo_pairs_v1' and config.get('train_ready') is False, 'pair_config')
+    check(config.get('schema') in ('indexed_stereo_pairs_v1', RGB269_PROFILE) and config.get('train_ready') is False, 'pair_config')
     check(isinstance(config['job_id'], str) and re.fullmatch('[A-Za-z0-9_-]{1,64}', config['job_id']), 'pair_job_id')
-    limits = PairLimits(**config['limits'])
+    limits = config_limits(config)
     manifest = validate_manifest(config['rgb_manifest'])
     check(manifest['kind'] == 'rgb' and digest(make_drive_source(manifest)) == config['source_sha256'], 'pair_rgb_source')
     candidate = read(root/'pose/candidate.json', 64*MIB)
@@ -80,7 +109,7 @@ def preflight(input_root):
           'pair_pose_candidate')
     pose_rows = {(r['sequence_id'], r['frame_index']): r for r in candidate['records']}
     keys, names = set(), set()
-    check(isinstance(config['pairs'], list) and 1 <= len(config['pairs']) <= 102, 'pair_count')
+    check(isinstance(config['pairs'], list) and (len(config['pairs']) == 269 if expanded else 1 <= len(config['pairs']) <= 102), 'pair_count')
     for pair in config['pairs']:
         key = (pair['sequence'], pair['frame'])
         check(key not in keys and key in pose_rows and set(pair['rgb']) == {'left', 'right'}, 'pair_unique_pose_key')
@@ -91,6 +120,14 @@ def preflight(input_root):
                   'pair_unique_rgb_key_view')
             names.add(row['name'])
     check(keys == set(pose_rows), 'pair_exact_pose_coverage')
+    if expanded:
+        from rewind_archive.profiles import target269_names
+        expected = {identify(name, 'pose')[:2] for name in target269_names()}
+        check(keys == expected and all(row['split'] == 'train' for row in pose_rows.values()), 'pair269_fixed_target_keys')
+        check(config['job_id'] == 'rgb269_pairs_001' and config['source_sha256'] == RGB269_SOURCE_SHA and
+            config['snapshot_receipt']['snapshot_id'] == RGB269_SNAPSHOT_SHA and
+            config['snapshot_receipt']['generation'] == RGB269_GENERATION and config['receipt_file_sha256'] == RGB269_RECEIPT_SHA,
+            'pair269_fixed_g25_identity')
     check(sum(v['size'] for p in config['pairs'] for v in p['rgb'].values())+96*MIB <= limits.work_bytes, 'pair_payload_disk_plan')
     return config, digest(config)
 
@@ -111,7 +148,7 @@ def run(input_root, workspace, session_factory):
     """한 번의 job. 실패 chunk도 보존하며 누적 예산을 재설정하지 않는다."""
     root, work = _path(input_root), _path(workspace)
     config, config_sha = preflight(root)
-    limits = PairLimits(**config['limits'])
+    limits = config_limits(config)
     check(not work.is_relative_to(root) and not root.is_relative_to(work), 'pair_separate_workspace')
     check(not str(work).replace('\\', '/').startswith('/content/drive/'), 'pair_live_local_only')
     work.mkdir(parents=True, exist_ok=False)
@@ -304,7 +341,7 @@ def recover(input_root, workspace, output, *, expected_config_sha256):
     config, pin = preflight(root)
     check(pin == expected_config_sha256, 'pair_recovery_config_pin')
     check(not output.exists() and not output.is_relative_to(root) and not output.is_relative_to(work), 'pair_recovery_new_output')
-    limits = PairLimits(**config['limits'])
+    limits = config_limits(config)
     selected = []
     report = {'status': 'report_missing_execution_state_unknown'}
     if (work/'report.json').is_file():

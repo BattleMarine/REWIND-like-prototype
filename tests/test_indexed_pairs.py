@@ -38,7 +38,9 @@ class IndexedPairsTests(unittest.TestCase):
         self.template = helper.prepare()[0]
         self.seq = helper.seq
 
-    def build(self, count=4, *, bad_png=False, limit_changes=None):
+    def build(self, count=4, *, bad_png=False, limit_changes=None, keys=None):
+        keys = keys or [(self.seq, frame) for frame in range(count)]
+        assert len(keys) == count
         self.inputs = self.base/'inputs'
         self.inputs.mkdir()
         self.work = self.base/'work'
@@ -47,8 +49,8 @@ class IndexedPairsTests(unittest.TestCase):
         self.png = buffer.getvalue()
         rows = []
         for side in ('left', 'right'):
-            for frame in range(count):
-                name = f'{self.seq}/fisheye_final_image/camera_{side}/final_{frame}.png'
+            for seq, frame in keys:
+                name = f'{seq}/fisheye_final_image/camera_{side}/final_{frame}.png'
                 rows.append((name, b'bad PNG payload' if bad_png and side == 'left' and frame == 1 else self.png))
         self.compressed = fixture(rows)
         selection = {'parts': [{'index': 0, 'name': 'rgb.tar.gz000', 'file_id': 'fake'}]}
@@ -71,12 +73,13 @@ class IndexedPairsTests(unittest.TestCase):
         candidate = copy.deepcopy(self.template)
         candidate['records'] = []
         config_pairs = []
-        for frame in range(count):
+        for seq, frame in keys:
             pose = copy.deepcopy(self.template['records'][0])
+            pose['sequence_id'] = seq
             pose['frame_index'] = frame
             candidate['records'].append(pose)
-            config_pairs.append({'sequence': self.seq, 'frame': frame, 'rgb': {
-                side: next(r for r in state['members'] if r['name'] == f'{self.seq}/fisheye_final_image/camera_{side}/final_{frame}.png')
+            config_pairs.append({'sequence': seq, 'frame': frame, 'rgb': {
+                side: next(r for r in state['members'] if r['name'] == f'{seq}/fisheye_final_image/camera_{side}/final_{frame}.png')
                 for side in ('left', 'right')}})
         candidate['content_sha256'] = digest({k: v for k, v in candidate.items() if k != 'content_sha256'})
         (self.inputs/'pose').mkdir()

@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 새 pose257+4+8의269개와 기존102개를 기존62관절 spec·좌표/mm·mask·재투영으로 감사했고 전체371 train key가 g25 stereo와 대응했습니다. 기존102 records/contract/blockers는 같고 재투영 최대7.62e-5px로 내부 annotation 수치 검사를 통과했습니다. 신규 RGB269쌍/538PNG의617.44MiB payload를 확인하고 정확 목표·g25 identity·명시 예산에 묶인 runner/입력/notebook을 준비했습니다. 기존102 RGB 재다운로드·일반 gate 수정·신규 RGB 원격 실행·371 학습은 하지 않았습니다. [실제 pose 감사·RGB 추출 예산·인계와 후속 경계](docs/RGB269_PAIRS.md)를 따릅니다.
+
 2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다. [실제 결과와 검증 한계](docs/POSE8_RECOVERY.md).
 
 2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](docs/POSE8_RECOVERY.md)을 따릅니다.
