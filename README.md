@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 첫 fleet 비용 측정은 metadata pin 후 ZranError로 중단했다. Root는 회수본 무결성과 계획을 확인하고 로컬 합성 archive에서 읽기 한도 예외가 ZranError로 감싸지는 결함과 초반 반복 읽기를 재현했다. 실제 Colab 원인 chain·소비량은 미수집이므로 동일 원인 확정이나 비용 측정 성공으로 보지 않는다. Pending/예약을 보존하고 원격 재실행 없이 조사 중이다. [실패 근거·예산 상태·후속 검증](docs/FLEET_INDEXING.md).
+
 2026-11-03 실제 RGB269 추출 완료: 사용자 재실행에서 269쌍/538PNG를 17묶음으로 확보했다. Root는 결과 ZIP 전체 CRC·SHA, 고정 입력285파일 바이트 동일성, 538개 index SHA/크기/native1024 RGB decode와 pose key 대응을 독립 검증했고 기존102와 중복 없는 총371쌍을 확인했다. 실제 body683808609bytes/2131HTTP/580.226초로 상한 이내이며 대표 overlay4장만 제한 시각 검토했다. 최초 중단 원인·소비량은 미확정, validation0/train_ready=false이며371 학습은 아직 시작하지 않았다. [실제 결과·검토·후속 경계](docs/RGB269_PAIRS.md).
 
 2026-11-03 전체 사전 인덱싱 준비: 공식 조각 수와 대조한 90개 archive/354개 파일/3,094,462,001,717bytes inventory를 만들고, 기존 v1/g25와 분리된 `rewind_fleet`의 bounded gzip pack·불변 catalog·누적 예산·재개·CLI/CPU notebook을 구현했다. 사용자 결정에 따라 근거 있는 비용 추정의 각 항목에 2배 상한을 적용하며 unknown 전체 계획은 실행하지 않는다. 소량 calibration 후 실제 시간·저장 비용을 확정할 예정이며 실제 전체 인덱싱·Drive 새 runtime 복원·전체 CRC·학습 adapter는 미완료다. [구현 범위·비용·측정 절차와 남은 경계](docs/FLEET_INDEXING.md)를 따른다.

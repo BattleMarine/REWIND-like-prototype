@@ -1,5 +1,23 @@
 # 전체 데이터셋의 독립 사전 인덱싱
 
+## 첫 calibration 실패와 조사 (2026-11-03)
+
+고정 `72a9ce1` 실행에서 metadata pin은 5HTTP/1483bytes/약0.87초로 성공했다. Runtime inventory와 calibration 계획의 hash·재계산·상한 일치를 root가 확인했다. 이후 한 segment는 보고서 경과4.183초에 `ZranError`로 실패했다. Archive 상태 목록은 비어 있고 pending 예약은 남았으며 lease와 settlement는 없다. 저장된 인덱스 진전이나 비용 측정 성공으로 해석하지 않는다.
+
+회수 ZIP은 `outputs/test_fleet_calibration_001_20261103/fleet_recovery_20630a6d092c49fe82f56440b9d31d5d.zip`, SHA256 `8d46060d89e79cba9a03b2bdb1831f8841f9121b2200cb9d65d907ac2034e0b9`다. ZIP CRC도 통과했다. Plan SHA는 `63510a1b4e24b7a8931d1ed0d3bf2c42590f6e5e6891b34e6829996697f03515`, 마지막 HEAD는 `de1219c5dfcbef0de01cbac695a0b9df2dc2238c5ebdd6ac6917e6b855055a57`이다. 회수본에 run report는1개이며 출력이 두 번 보였다는 사실만으로 실제 이중 실행을 단정하지 않는다.
+
+Source16MiB/158HTTP/120초/artifact 논리 I/O13,521,408bytes는 **실측이 아니라 소비량을 확인할 수 없어 전액 유지한 예약**이다. 이 정책에서 HTTP와 artifact 잔여 예산은0이다. Pending을 지우거나 새 store/job을 만들어 같은 실행을 반복하는 방식으로 예산을 초기화하지 않는다. Drive 상태와 기존 결과를 보존한다.
+
+Root는 원격 요청 없이 보존된4.8MB/두 조각 합성 archive에 동일 calibration runner를 적용해 같은 `ZranError`를 재현했다. 이 재현의 원인 예외는 `IndexFailure(read_bytes_limit)`이고, 논리 source read4,194,304bytes에서 중단되었다. 반환 decoded bytes는532,480으로 초반 구간을 반복해서 읽는 trace가 확인됐다. 이는 논리 읽기이며 네트워크 재전송량이 아니다. 근거는 위 디렉터리의 `root_repro.py`와 `root_repro/proof.json`이다.
+
+기존 `rewind_archive_index`는 `budget.last_source_failure`로 엔진 wrapper의 실제 중단 사유를 복원하지만, 새 scanner는 `EOFError/IndexFailure`만 처리하고 runner는 예외 타입명만 기록한다. 그 때문에 원래 사유·실패 단계·실제 관측량을 잃는 결함을 확인했다. 실제 Colab 회수본에는 원인 chain/read trace가 없어 동일한 읽기 한도가 직접 원인이었다고 확정하지 않는다. 압축 원본 손상, Drive 결측 또는 이중 실행으로도 단정하지 않는다.
+
+현재는 원인 조사 단계다. 코드 수정, Drive pending 복구, 원격 재실행, 상한 증액은 하지 않았다. 후속 보완은 순차 읽기 중 반복 비용, 원인 예외/실패 관측치 보존, 정상 예산 중단과 손상 구분, 완전한 member의 checkpoint 여부를 함께 검증해야 한다. 작은 합성 archive21개 검사 통과가 실제 source 한도 경계 동작을 보장하지 못했으므로 그 경계의 회귀 검사가 필요하다.
+
+재개 후 개발 측 독립 조사에서도 같은 scanner가 local/mock Drive 양쪽에서 동일한 chain으로 실패했다.64회 논리 read 중 같은 구간 반복38회였으며, 이미 두 restart point가 있어도 현재 decoded 위치가 두 번째 point 앞이면 원점 point에서 반복 inflate/discard가 일어났다. 첫 point가 없는 경우에만 한정된 문제가 아니다. 모의 Drive의8호출/body1,701,185bytes/cache hit62회는 실제 Colab 사용량이 아니다.
+
+같은4MiB 논리 읽기 한도로 직접 engine buffer를 비교하면64KiB와1MiB는 각각 반환 decoded589,824/1,048,576bytes에서 실패했고,4MiB buffer는1.5MiB 목표 읽기를 통과했다. 그러나 마지막 경우 export point가0인 lazy index 상태여서 checkpoint·재개 해결로 판정하지 않았다. 정확 scanner 재현에서는 finally export가 정상 완료하고 재seek하지 않아 원래 `gz.read` 오류가 가려진 경우는 아니었다. 다른 경계에서의 원예외 보존은 별도 검증이 필요하다. 이 조사에서는 코드 변경 없이6개 오프라인 probe를1.437초에 수행했다. 근거는 `outputs/test_fleet_calibration_001_20261103/developer_diagnosis/FINDINGS.md`, `proof.json`, `investigate.py`다.
+
 ## 현재 범위와 결정
 
 2026-11-03 사용자는 학습과 별도로 전체 데이터셋 인덱싱 코드를 준비하고, **산출한 비용의 2배를 상한**으로 사용하기로 했다. `rewind_fleet`는 이 목적의 별도 구현이다. 기존 v1 인덱스·g25·RGB102/269 실행 계약과 학습 gate를 수정하지 않는다. 전체 원본 다운로드·결합·추출, 전체 학습을 자동 시작하지 않는다.
