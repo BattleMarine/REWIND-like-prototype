@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-03 전체 사전 인덱싱 준비: 공식 조각 수와 대조한 90개 archive/354개 파일/3,094,462,001,717bytes inventory를 만들고, 기존 v1/g25와 분리된 `rewind_fleet`의 bounded gzip pack·불변 catalog·누적 예산·재개·CLI/CPU notebook을 구현했다. 사용자 결정에 따라 근거 있는 비용 추정의 각 항목에 2배 상한을 적용하며 unknown 전체 계획은 실행하지 않는다. 소량 calibration 후 실제 시간·저장 비용을 확정할 예정이며 실제 전체 인덱싱·Drive 새 runtime 복원·전체 CRC·학습 adapter는 미완료다. [구현 범위·비용·측정 절차와 남은 경계](FLEET_INDEXING.md)를 따른다.
+
 2026-11-03 새 pose257+4+8의269개와 기존102개를 기존62관절 spec·좌표/mm·mask·재투영으로 감사했고 전체371 train key가 g25 stereo와 대응했습니다. 기존102 records/contract/blockers는 같고 재투영 최대7.62e-5px로 내부 annotation 수치 검사를 통과했습니다. 신규 RGB269쌍/538PNG의617.44MiB payload를 확인하고 정확 목표·g25 identity·명시 예산에 묶인 runner/입력/notebook을 준비했습니다. 기존102 RGB 재다운로드·일반 gate 수정·신규 RGB 원격 실행·371 학습은 하지 않았습니다. [실제 pose 감사·RGB 추출 예산·인계와 후속 경계](RGB269_PAIRS.md)를 따릅니다.
 
 2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다. [실제 결과와 검증 한계](POSE8_RECOVERY.md).
