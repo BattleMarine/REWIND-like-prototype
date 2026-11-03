@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 반복 읽기 비용의 격리 비교에서 해제 버퍼1MiB 또는 인덱스 간격256KiB가 같은 예산으로 실제 Lab PNG를 첫 scan1개→두 번째 누적2개 확보했다. 개발14조건 중 핵심6조건을 root가 독립 재현하고 표준 tar SHA·PNG decode를 확인했다. 기본 설정과 원격 실행은 변경하지 않았으며, 두 scan의 국소 개선을 장시간 인덱싱 성공으로 해석하지 않는다. [비교 결과·후속 검증](docs/FLEET_INDEXING.md).
+
 2026-11-03 fleet 읽기 한도 예외 복원을 production에 반영했다. 같은 예산의 mock Drive runner에서 완전한 합성 파일1개 저장·실측 정산·새 workspace 복원·과거 파일 재추출을 확인했고 개발/root 각각31개 검사가 통과했다. 다음 scan은 반복 읽기로 전진하지 못했으며, 보존된 실제 Lab RGB도 디렉터리8개/PNG0개에서 멈췄다. 예외 처리 개선과 실제 인덱싱 처리량 개선을 구분한다. 기존 Drive pending/예약은 보존하며 원격 재실행은 하지 않았다. [검증 결과·남은 반복 읽기 문제](docs/FLEET_INDEXING.md).
 
 2026-11-03 실제 RGB269 추출 완료: 사용자 재실행에서 269쌍/538PNG를 17묶음으로 확보했다. Root는 결과 ZIP 전체 CRC·SHA, 고정 입력285파일 바이트 동일성, 538개 index SHA/크기/native1024 RGB decode와 pose key 대응을 독립 검증했고 기존102와 중복 없는 총371쌍을 확인했다. 실제 body683808609bytes/2131HTTP/580.226초로 상한 이내이며 대표 overlay4장만 제한 시각 검토했다. 최초 중단 원인·소비량은 미확정, validation0/train_ready=false이며371 학습은 아직 시작하지 않았다. [실제 결과·검토·후속 경계](docs/RGB269_PAIRS.md).

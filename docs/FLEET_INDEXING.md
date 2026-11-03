@@ -1,5 +1,31 @@
 # 전체 데이터셋의 독립 사전 인덱싱
 
+## 버퍼·인덱스 간격의 격리 비교 (2026-11-03)
+
+기준49e5a3c production을 변경하지 않고 한 번에 한 변수만 바꿨다. 압축 입력 readbuf_size64KiB, 첫 scan 논리 read soft4MiB/hard8MiB, decode32MiB, mock Drive cache4MiB와 고정 plan은 유지했다. buffer_size는 해제 출력 BufferedReader 용량이며 압축 Range cache와 다르다. 두 번째 scan은 같은 store/plan, 새 workspace를 사용한다. 누적 잔여 예산에 따라 예약과 유효 soft/hard 한도가 감소한다(예: Lab 기본 두 번째 soft3,741,404/hard7,482,807bytes). 후보별 첫 소비량 때문에 두 번째 유효 한도도 다르므로, 첫 scan은 고정 한도 비교이고 두 scan 결과는 실제 누적 계획의 운영 비교다. 두 번째 한도가 모두4/8MiB로 고정됐다고 해석하지 않는다. 과거 파일 추출은 별도의 논리8MiB/body16MiB/158HTTP 예산이다.
+
+| 변형 | 합성 완전 파일 누적: 첫→둘째 | 실제 Lab PNG 누적: 첫→둘째 |
+| --- | --- | --- |
+| 기본 buffer64KiB / spacing1MiB |1→1|0→0|
+| buffer256KiB만 변경 |2→3|1→1|
+| buffer1MiB만 변경 |2→4|1→2|
+| buffer2MiB만 변경 |5→5|3→3|
+| spacing256KiB만 변경 |2→3|1→2|
+| spacing512KiB만 변경 |1→2|0→0|
+| buffer4MiB만 변경 |checkpoint hard 한도 실패·게시0|checkpoint hard 한도 실패·게시0|
+
+개발14조건은 합계22.203초에 실행했다. Root는 기본/buffer1MiB/spacing256KiB의 두 입력, 총6조건을7.938초에 독립 재실행해 같은 파일수·cursor·중단 사유를 확인했다. Lab 두 PNG를 별도 표준 tar reader로 읽어 catalog SHA를 대조하고 실제 이미지 decode도 통과했다. 전체 prefix gzip CRC, 다른 scene·장기 전진·Colab 성능은 검증하지 않았다. 개발에서 파일을 게시한 조건의 과거 파일 SHA 재추출은 통과했다. 추출 reader는 scanner.extract의 기존 별도 경로(buffer=4×spacing, readbuf64KiB, auto_build=False, 전체 저장 pack import)다. Scan 후보 버퍼를 그대로 사용한 추출 성능으로 보고하지 않는다.
+
+캐시 용량 가설은 관측과 맞지 않았다. 기본 Lab 첫 scan은 압축 cache resident2MiB로4MiB보다 작고 cache hit62회인 상태에서 논리 read4MiB에 도달했다. 서로 다른 압축 구간은1,114,112bytes뿐이었다. Cache는 압축 Range를 LRU로 교체하며 잘린 PNG를 누적 보관하는 곳이 아니다. PNG의 불완전 payload와 영구 catalog의 완전 member를 구분한다.
+
+인덱스 간격과 버퍼의 비율은 영향을 주지만 단독 성공 조건이 아니다. 설치된 indexed_gzip1.10.3의 IndexedGzipFile 구현은 각 raw read가 이전 point에서 재시작하므로 기본 buffer를 spacing의4배로 정한다고 설명한다. 이 프로젝트에서는 buffer를 작게 고정했었다. 다만4MiB 후보는 읽기 선행과 lazy index 때문에 checkpoint에서 추가4MiB를 사용하고 hard8MiB까지 소진했다. spacing은 목표 간격이며 실제 deflate 재시작점의 간격·현재 cursor·checkpoint coverage도 함께 봐야 한다.
+
+Root Lab 결과에서 buffer1MiB의 두 scan 논리 read는4,194,304/4,849,664bytes이며 두 번째에는 checkpoint 추가1,114,112bytes가 포함됐다. Pack은32,839→65,625bytes였다. spacing256KiB는4,128,773/3,735,557bytes, checkpoint 추가 읽기0, pack131,197→163,983bytes였다. 같은 PNG2개 확보 기준으로 이번 작은 구간에서는 촘촘한 인덱스가 읽기 비용은 적고 저장량은 컸다. 파일 크기·압축률·구간이 바뀌면 이 비교도 달라질 수 있다.
+
+다음 검증 후보는 buffer1MiB와 spacing256KiB다. 제한된 추가 segment에서 지속 진전·첫/중간/마지막 파일 추출·원본 SHA·누적 예산·인덱스 크기를 비교한 후 기본 설정 채택을 결정한다. 두 변수를 동시에 바꾸거나 예산을 자동 증액하지 않는다. 이번은 시험 결과이며 production 수정·원격 재실행 승인·전체 인덱싱 완료가 아니다. 기존 Drive pending과 예약은 보존한다.
+
+근거는 `outputs/fleet_read_cost_20261103/developer/compare.py`, `proof.json`, `proof-buffer4.json`, `FINDINGS.md`와 `root/compare.py`, `root/proof.json`, `root/png_check.json`이다. 실험 코드/산출물은 Git 제외 outputs에 보존하고 결과 요약만 버전 관리한다. 원격 요청0이며 합성 전체 gzip CRC와 실제 Lab prefix의 제한 읽기를 구분한다.
+
 ## 예외 복원 수정과 순차 평가 (2026-11-03)
 
 Production scanner가 engine 호출마다 이전 source 사유를 지우고 해당 호출에서 감싸진 원인 예외를 복원한다. 알려진 예산 중단만 partial로 처리하고 완전한 member 경계와 유효한 checkpoint만 게시한다. 전진이 없으면 기존 archive head를 유지한다. 손상·미확인 오류는 추가 checkpoint 탐색 없이 실패 처리하며, checkpoint/cleanup의 후속 오류가 원래 실패를 지우지 않도록 기록한다. Runner는 실패 단계·제한된 type/reason chain·예약·관측량을 구분하고 관측 수집 실패도 보존한다. 미확인 소비를 자동 환급하지 않는다.
