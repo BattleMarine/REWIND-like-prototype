@@ -14,6 +14,7 @@ from .extraction import code_hashes
 from .matching import verify_extraction
 from .pilot import run_metadata_pilot
 from .profiles import POSE_COUNTERPART_PROFILE, POSE_PROFILES, CACHE_PROFILE, CACHE_PROFILES, WARM128_PROFILE, TARGET_PAIR_PROFILES, validate_profile_limits, TARGET67_PROFILE, validate_target67, validate_target67_cache
+from .profiles import TARGET269_PROFILE,validate_target269,validate_target269_cache
 from .diagnostics import request_failure, safe_request_failure
 from .request_policy import validate_request_policy, policy_description, validate_no_hidden_retries
 from .prefix_cache import validate_input_spec, export_cache
@@ -68,6 +69,7 @@ def make_preflight(config, history):
     expectation=validate_expectation(config.get("cache_expectation"),required=cache_policy is not None,
         **({"policy":cache_policy} if cache_policy else {}))
     validate_target67_cache(config.get("profile"),expectation)
+    validate_target269_cache(config.get("profile"),expectation)
     if not isinstance(config["job_id"],str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",config["job_id"]):
         raise PreparationError("workflow_job_id")
     reason=config["reason"]
@@ -86,16 +88,17 @@ def make_preflight(config, history):
         validate_profile_limits(config["profile"],limits)
     if any(value>asdict(MetadataLimits())[key] for key,value in asdict(metadata).items()):
         raise PreparationError("workflow_budget_increase_not_supported")
-    maximum=67 if config["profile"]==TARGET67_PROFILE else 32
+    maximum=269 if config["profile"]==TARGET269_PROFILE else 67 if config["profile"]==TARGET67_PROFILE else 32
     config["exact_targets"]=validate_exact_targets(config["exact_targets"],config["includes"],limits,"extract" if mode=="review" else mode,maximum=maximum)
     validate_target67(config["profile"],config["exact_targets"],mode,purpose)
+    validate_target269(config["profile"],config["exact_targets"],mode,purpose)
     if config["profile"] in TARGET_PAIR_PROFILES and mode!="review" and (mode!="extract" or purpose!="targeted" or len(config["exact_targets"])!=2):
         raise PreparationError("counterpart_profile_requires_targeted_pair")
     if config["profile"] in POSE_PROFILES and (not isinstance(config["selection"],dict) or config["selection"].get("kind")!="pose"):
         raise PreparationError("pose_profile_requires_pose_kind")
     if request_policy and (config["profile"] not in POSE_PROFILES or
             (mode!="review" and (mode,purpose)!=("extract","targeted")) or
-            (len(config["exact_targets"])!=2 and config["profile"]!=TARGET67_PROFILE)):
+            (len(config["exact_targets"])!=2 and config["profile"] not in (TARGET67_PROFILE,TARGET269_PROFILE))):
         raise PreparationError("request_policy_requires_pose_targeted_pair")
     if cache_input is not None and config["profile"] not in CACHE_PROFILES:raise PreparationError("cache_profile_required")
     if expectation is not None and cache_policy is None:raise PreparationError("warm_profile_required")
@@ -305,9 +308,10 @@ def review_run(path):
                 "selected_pair_passed":bool(report.get("targets_complete")) and len(parsed)==2 and not invalid
                     and result["file_verification"]=="passed_current_code",
                 "scope":"JSON object syntax and stored-file hashes only; pose semantics unverified"}
-            if report.get("profile")==TARGET67_PROFILE:
-                result["selected_json_verification"].update(expected_targets=67,
-                    selected_targets_passed=bool(report.get("targets_complete")) and len(parsed)==67 and
+            if report.get("profile") in (TARGET67_PROFILE,TARGET269_PROFILE):
+                expected=269 if report['profile']==TARGET269_PROFILE else 67
+                result["selected_json_verification"].update(expected_targets=expected,
+                    selected_targets_passed=bool(report.get("targets_complete")) and len(parsed)==expected and
                     set(parsed)==set(report["exact_targets"]) and not invalid and result["file_verification"]=="passed_current_code")
     if (extraction_root/"pilot_report.json").is_file():
         pilot=read_report(extraction_root/"pilot_report.json")
@@ -337,7 +341,7 @@ def save_result_zip(path):
         if p.is_file():paths.append(p)
     report=read_report(extraction_root/"extraction_manifest.json") if (extraction_root/"extraction_manifest.json").is_file() else {}
     bundle_limit=(33 if (report.get("cache_policy") or {}).get("name")=="pose_prefix_tail352_v4" else 17)*1024**2
-    if len(paths)>256 or sum(p.stat().st_size for p in paths)>bundle_limit:
+    if len(paths)>(512 if report.get('profile')==TARGET269_PROFILE else 256) or sum(p.stat().st_size for p in paths)>bundle_limit:
         raise PreparationError("workflow_result_bundle_limit")
     target=root.with_suffix(".zip")
     if target.is_symlink():raise PreparationError("workflow_result_paths")

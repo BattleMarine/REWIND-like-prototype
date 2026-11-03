@@ -1,5 +1,9 @@
 # ArchVis 한정 사전 인덱싱과 g16 후속 준비
 
+## 2026-11-03 실제 g25 후속 상태
+
+실제 job002는 g25/782member·stereo 관측371/pose 관측102까지 저장했다. 9개 snapshot 누적 후 다음 총 예약809984041bytes가768MiB를 넘어 정상 중단했으며 checkpoint 오류 재발이 아니다. 기존494개 prefix와 hash/CRC/catalog를 독립 대조했다. 별도 local compact helper는 원본·receipt를 바꾸지 않고 DB55.4→28.3MB를 확인했으나 index32MiB cap은 해결하지 않는다. 새 RGB job은 준비하지 않으며 정확 미관측 pose269 한 건의 warm 확보만 다음 실측으로 인계한다. 장기 append/CAS 구조는 미구현 설계다. [상세 분석·경계·검증과 예산](G25_STORAGE_AND_POSE269.md)을 따른다. 아래 g16 job002 준비 기록은 당시 상태다.
+
 ## 2026-11-03 실제 job001과 g16 후속 job002 준비
 
 직전 `archvis_rgb_preindex_g9_001`은 고정 g9/270member부터 g16/494member까지 정상 저장했다. Root가 ZIP CRC·DB/전체 catalog hash·기존270개 prefix 보존과 split/key 재집계를 독립 확인했다. Stereo는102→224개(+122), pose 관측 교집합은102개로 유지됐으며 validation RGB0·실제 추출0이다. 전체 인덱싱·학습 준비 완료가 아니다.

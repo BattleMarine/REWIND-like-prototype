@@ -6,7 +6,9 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
-2026-11-03 사전 인덱싱 job001에서 g9/270→g16/494member, stereo102→224개를 정상 저장했습니다. Pose 관측 대응102·validation RGB0·추출0은 그대로입니다. 8번째 scan의 checkpoint peak 예산 오용을 확인해 전체768MiB 안에서 DB·checkpoint·snapshot·회수 예약을 분리했고, 실제 g16 복사본의 오프라인 저장/회수 회귀를 통과했습니다. 승인된16MiB cache opt-in과 g16 job002 입력·CPU notebook을 준비했으며 후속 원격 실행은 아직 하지 않았습니다. [실제 결과·수정 준비·남은 상한](docs/ARCHVIS_PREINDEX.md)을 따릅니다.
+2026-11-03 사전 인덱싱 job002는 g25/782member·stereo 관측371개를 정상 저장했고, 누적 snapshot/회수 예약이768MiB를 넘어 정상 중단했습니다. Pose 관측 대응102개 외269개는 미관측 목록이며 결측 판정이 아닙니다. G25 DB 복사본의 빈 페이지를 제거해55.4→28.3MB로 줄이는 별도 검증 helper와 기존235MiB cache를 재사용하는 고정 pose269 실행본을 준비했습니다. 개발40개·독립44개 검사가 통과했으며 compact는 공식 head가 아니고 새 RGB 원격/학습은 없습니다. [저장 구조·남은 상한·pose269 예산과 인계](docs/G25_STORAGE_AND_POSE269.md)를 따릅니다.
+
+2026-11-03 g16 후속 준비 당시 기록: 사전 인덱싱 job001에서 g9/270→g16/494member, stereo102→224개를 정상 저장했습니다. Pose 관측 대응102·validation RGB0·추출0은 그대로입니다. 8번째 scan의 checkpoint peak 예산 오용을 확인해 전체768MiB 안에서 DB·checkpoint·snapshot·회수 예약을 분리했고, 실제 g16 복사본의 오프라인 저장/회수 회귀를 통과했습니다. 승인된16MiB cache opt-in과 g16 job002 입력·CPU notebook을 준비했으며 후속 원격 실행은 아직 하지 않았습니다. [실제 결과·수정 준비·남은 상한](docs/ARCHVIS_PREINDEX.md)을 따릅니다.
 
 2026-11-03 초기 준비 당시 기록: 학습과 독립된 ArchVis 사전 인덱싱 실행본을 준비했습니다. 고정 g9부터 순차 재개하고 최신 pose 관측 15,465 key(그중 validation 1,331 key / 20 sequence)를 대조합니다. 명시 profile에서만 body 512MiB·1,200초와 snapshot/회수 공간을 제한하고, HTTP 호출·scan·snapshot의 겹치는 wall/process CPU를 계측합니다. 개발 38개 검사를 통과했으며 실제 원격 실행·validation RGB 발견·전체 데이터 인덱싱 완료는 아직 아닙니다. [고정 입력·예산·중단·회수 안내](docs/ARCHVIS_PREINDEX.md)를 따릅니다.
 

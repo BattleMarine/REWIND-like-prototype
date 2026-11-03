@@ -1,5 +1,9 @@
 # Pose 미관측67 목표의 warm 추출 준비
 
+## 2026-11-03 후속 pose269 준비
+
+G25 stereo 관측371개 중 최신 pose 목록과 미대응인269개를 별도 `posePrefixTargets269_v1`로 고정했다. 이전67개 profile/목표/자료는 보존한다. 입력235MiB cache pin과 기존 전송·시간·출력 상한을 그대로 사용하며, 신규 pose 원격 실행·학습은 아직 하지 않았다. [정확 목록·원본 잔여·부분 회수·검증](G25_STORAGE_AND_POSE269.md)을 따른다. 아래67개 실제 결과와 초기 준비 기록을269개 확보 완료로 해석하지 않는다.
+
 ## 2026-11-02 실제 Colab 결과: 67개 전부 확보
 
 고정5fe714a의 pose_missing67_001에서 정확목표67개·완전저장67개·미확보0, targets_complete 및 selected_targets_passed=true를 확인했다. Root도 각각의 파일SHA와JSON object파싱, 보고서selfhash, 두ZIP CRC, 확장cache의 모든chunk/prefix SHA를독립대조했다. 이전234MiB prefix SHA가그대로이고첫신규media시작은245366784다. 이번67개는원본결측이아니라기존조기종료목록의미관측파일이었다.

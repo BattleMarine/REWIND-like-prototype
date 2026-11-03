@@ -28,7 +28,7 @@ def digest(doc):
 
 def validate_includes(includes, *, maximum=32):
     """인증·metadata 전에 공유하는 선택 preflight. 중복도 입력 오류다."""
-    if type(maximum) is not int or maximum not in (32,67) or not isinstance(includes,list) or not 1 <= len(includes) <= maximum:
+    if type(maximum) is not int or maximum not in (32,67,269) or not isinstance(includes,list) or not 1 <= len(includes) <= maximum:
         raise PreparationError("explicit_selection_required")
     for pattern in includes:
         if not isinstance(pattern,str) or not pattern or len(pattern.encode("utf-8"))>1024:
@@ -42,7 +42,7 @@ def validate_includes(includes, *, maximum=32):
 def validate_exact_targets(targets, includes, limits, mode, *, maximum=32):
     if targets is None:
         return []
-    if type(maximum) is not int or maximum not in (32,67) or not isinstance(targets,list) or len(targets)>maximum:
+    if type(maximum) is not int or maximum not in (32,67,269) or not isinstance(targets,list) or len(targets)>maximum:
         raise PreparationError("exact_targets_list")
     if not targets:
         return []
