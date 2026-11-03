@@ -63,3 +63,11 @@ Root의4파일 보관 ZIP은 `outputs/pose12_recovery_20261103/root/recovered_po
 개발39개/17.297초 검사 failure/error/skip0이다. Warm 첫 신규 range·8개 SHA/JSON·변조/누락 pin·cold 차단·부분 결과 회수·새40/41MiB scope·기존269/67/일반 계약·staging 기본 cap·auth factory·notebook의 두 업로드와 mount 순서·소비 guard·stale 준비 ZIP 회귀를 포함한다. 보존 dependency 경로를 빠뜨리고 신규 테스트 파일 생성 전에 시작한 최초 검사 실패/skip 기록도 별도 보존했다. 최종 로그는 `outputs/pose12_recovery_20261103/developer/final_tests.txt`다. 신규8 실제 원격/Colab 실행·학습·commit/push는 개발 세션이 하지 않았다.
 
 Root 독립36개 검사(14.627초, failure/error/skip0)와 실제 cache/input ZIP의 pin·CRC·정확8개 차집합·preflight를 확인했다. 근거는 `outputs/pose12_recovery_20261103/root/tests.txt`, `recovery_review.json`이다. 실제 후속8개 원격 실행은 아직 하지 않았다.
+
+## 후속8개 실제 완료 및 root 검토
+
+2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다.
+
+고정 코드 acc7696의 실행 결과를 `outputs/test_pose_missing8_001_20261103/`에 보존했다. 결과 ZIP SHA는 `fc31bd09f0c46e70a0ccabff98d71a25db9e7a78491e3ae34b48c3a8b8361e13`, 확장 cache SHA는 `607844afd56dd5baa231c26f838fb8cfa38fe1635a283934ee80de1afcd16fef`다. Cache SHA는 내부 export report와 일치한다. 결과 ZIP의 Colab 출력 SHA는 미제공이므로 다운로드 전후 SHA 일치는 주장하지 않는다. 로컬 ZIP CRC와 개별 payload hash 검증은 통과했다. Root 근거는 같은 폴더 `root_review.json`이다.
+
+Drive staging은 고정239MiB cache SHA를 통과했고, 이번 실제 성공은 이 한 번의 실행에 대한 결과다. 전체 원본 gzip EOF/CRC, 모든 archive 무결성, 새 RGB269쌍 실제 확보와 의미/좌표/시간 정합, validation·학습 release는 미완료다. 다음 작업은 새 pose269의 내용 감사와 g25 인덱스를 이용한 대응 RGB 추출 준비이며, 이번 검토에서 추가 원격 실행이나 학습을 시작하지 않았다.

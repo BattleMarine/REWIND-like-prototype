@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다. [실제 결과와 검증 한계](docs/POSE8_RECOVERY.md).
+
 2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](docs/POSE8_RECOVERY.md)을 따릅니다.
 
 2026-11-03 pose269 cache 브라우저 업로드 중 연결 끊김 보고에 대응해, 작은 source/input 업로드를 유지하고 큰 cache만 명시 Drive 경로에서 bounded local copy+SHA/input_spec 검증하는 별도 notebook을 준비했습니다. 원인은 미확정이며 기존65a7244/목표/원본 pin/prepare 예산은 보존했습니다. 개발21개 검사와 local cache 복사/재사용은 통과했으나 실제 Drive 경로·Colab 안정성은 미확인입니다. [순서 변경·준비 예산·부분 회수·실행 전 조건](docs/POSE269_DRIVE_STAGING.md)을 따릅니다.
