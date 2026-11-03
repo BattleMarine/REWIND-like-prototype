@@ -1,5 +1,25 @@
 # 전체 데이터셋의 독립 사전 인덱싱
 
+## 예외 복원 수정과 순차 평가 (2026-11-03)
+
+Production scanner가 engine 호출마다 이전 source 사유를 지우고 해당 호출에서 감싸진 원인 예외를 복원한다. 알려진 예산 중단만 partial로 처리하고 완전한 member 경계와 유효한 checkpoint만 게시한다. 전진이 없으면 기존 archive head를 유지한다. 손상·미확인 오류는 추가 checkpoint 탐색 없이 실패 처리하며, checkpoint/cleanup의 후속 오류가 원래 실패를 지우지 않도록 기록한다. Runner는 실패 단계·제한된 type/reason chain·예약·관측량을 구분하고 관측 수집 실패도 보존한다. 미확인 소비를 자동 환급하지 않는다.
+
+버퍼64KiB, spacing1MiB, source soft4MiB/hard8MiB와 기존 계획을 유지한 순차 평가 결과다.
+
+| 평가 | 결과 |
+| --- | --- |
+| 합성4,802,934bytes, mock Drive 실제 runner 첫 scan | 완전한400,000bytes 파일1개 partial 저장. body1,701,555bytes/10HTTP 실측 정산 |
+| 같은 store·계획, 새 workspace의 다음 scan | 기존 catalog/pack 복원. 추가 전진 없이 no_committed_progress, pending 없음. 누적 body3,403,110bytes/20HTTP가 두 실행 합과 일치 |
+| 과거 파일 읽기 전용 재추출 |400,000bytes SHA 일치. 별도 예산 logical4MiB/body4,805,650bytes/19HTTP이며 위 indexing ledger에 포함하지 않음 |
+| 보존된 실제 Lab prefix, root 독립 runner 두 번 | 첫 scan 디렉터리8개/PNG0개 보존, 다음 scan no_committed_progress. 두 실행 pending 없음, 예산 초기화 없음, 원격 요청0, 총0.969초 |
+| 오류 경계 | 손상, stale source reason, checkpoint hard 한도, metadata finish, 관측 수집 및 cleanup 실패에서 오승격 없이 원인·예약·이전 정상본 보존 |
+
+개발31개(15.410초), root 독립31개(12.417초) 검사가 통과했다. 범위는 기존 test_fleet/test_fleet_window_storage/test_fleet_frontend와 신규 test_fleet_exception이다. 후속 checkpoint 실패의 이전 head 보존은 runner 경계 주입으로 검사했고 실제 checkpoint 한도 실패는 별도로 검사했다. Windows Python3.12/indexed_gzip1.10.3 로컬·모의 transport 결과이며 Drive 내구성 검증은 아니다.
+
+**평가: 읽기 한도 예외 복원 누락과 partial 손실은 개선됐지만 반복 읽기 비용은 해결되지 않았다.** Lab 첫 PNG는674,652bytes로 현재 한도 안에서 끝까지 읽지 못했다. 디렉터리 보존을 이미지 샘플 확보로 계산하지 않는다. 다음 작업은 읽기/재개 전략을 별도로 비교하여 동일 예산에서 실제 완전 파일의 연속 진전을 검증하고 checkpoint·과거 추출 비용까지 평가하는 것이다. 그 전에는 전체 인덱싱 준비 완료나 새 Colab 재실행 가능으로 판정하지 않는다. 실패한 기존 Drive store의 pending/예약은 그대로 보존한다.
+
+근거: `outputs/fleet_exception_fix_20261103/developer/{FINDINGS.md,proof.json,tests.txt}`, root의 `root/evaluate_real_lab.py`와 `root/real_lab_evaluation/review.json`. Lab 입력 SHA는 아래 원인 대조 검증과 동일하다. 이 실제 prefix는 실패한 ArchVis와 다른 원본이므로 과거 Colab 사건의 직접 원인까지 확정하지 않는다.
+
 ## 첫 calibration 실패와 조사 (2026-11-03)
 
 고정 `72a9ce1` 실행에서 metadata pin은 5HTTP/1483bytes/약0.87초로 성공했다. Runtime inventory와 calibration 계획의 hash·재계산·상한 일치를 root가 확인했다. 이후 한 segment는 보고서 경과4.183초에 `ZranError`로 실패했다. Archive 상태 목록은 비어 있고 pending 예약은 남았으며 lease와 settlement는 없다. 저장된 인덱스 진전이나 비용 측정 성공으로 해석하지 않는다.
@@ -10,9 +30,9 @@ Source16MiB/158HTTP/120초/artifact 논리 I/O13,521,408bytes는 **실측이 아
 
 Root는 원격 요청 없이 보존된4.8MB/두 조각 합성 archive에 동일 calibration runner를 적용해 같은 `ZranError`를 재현했다. 이 재현의 원인 예외는 `IndexFailure(read_bytes_limit)`이고, 논리 source read4,194,304bytes에서 중단되었다. 반환 decoded bytes는532,480으로 초반 구간을 반복해서 읽는 trace가 확인됐다. 이는 논리 읽기이며 네트워크 재전송량이 아니다. 근거는 위 디렉터리의 `root_repro.py`와 `root_repro/proof.json`이다.
 
-기존 `rewind_archive_index`는 `budget.last_source_failure`로 엔진 wrapper의 실제 중단 사유를 복원하지만, 새 scanner는 `EOFError/IndexFailure`만 처리하고 runner는 예외 타입명만 기록한다. 그 때문에 원래 사유·실패 단계·실제 관측량을 잃는 결함을 확인했다. 실제 Colab 회수본에는 원인 chain/read trace가 없어 동일한 읽기 한도가 직접 원인이었다고 확정하지 않는다. 압축 원본 손상, Drive 결측 또는 이중 실행으로도 단정하지 않는다.
+기존 `rewind_archive_index`는 `budget.last_source_failure`로 엔진 wrapper의 실제 중단 사유를 복원하지만, 수정 전 fleet scanner는 `EOFError/IndexFailure`만 처리하고 runner는 예외 타입명만 기록했다. 그 때문에 원래 사유·실패 단계·실제 관측량을 잃는 결함을 확인했다. 실제 Colab 회수본에는 원인 chain/read trace가 없어 동일한 읽기 한도가 직접 원인이었다고 확정하지 않는다. 압축 원본 손상, Drive 결측 또는 이중 실행으로도 단정하지 않는다.
 
-현재는 원인 조사 단계다. 코드 수정, Drive pending 복구, 원격 재실행, 상한 증액은 하지 않았다. 후속 보완은 순차 읽기 중 반복 비용, 원인 예외/실패 관측치 보존, 정상 예산 중단과 손상 구분, 완전한 member의 checkpoint 여부를 함께 검증해야 한다. 작은 합성 archive21개 검사 통과가 실제 source 한도 경계 동작을 보장하지 못했으므로 그 경계의 회귀 검사가 필요하다.
+아래는 production 수정 이전의 원인 조사 기록이다. 당시 코드 수정, Drive pending 복구, 원격 재실행, 상한 증액은 하지 않았다. 후속 보완은 순차 읽기 중 반복 비용, 원인 예외/실패 관측치 보존, 정상 예산 중단과 손상 구분, 완전한 member의 checkpoint 여부를 함께 검증해야 한다. 작은 합성 archive21개 검사 통과가 실제 source 한도 경계 동작을 보장하지 못했으므로 그 경계의 회귀 검사가 필요하다.
 
 재개 후 개발 측 독립 조사에서도 같은 scanner가 local/mock Drive 양쪽에서 동일한 chain으로 실패했다.64회 논리 read 중 같은 구간 반복38회였으며, 이미 두 restart point가 있어도 현재 decoded 위치가 두 번째 point 앞이면 원점 point에서 반복 inflate/discard가 일어났다. 첫 point가 없는 경우에만 한정된 문제가 아니다. 모의 Drive의8호출/body1,701,185bytes/cache hit62회는 실제 Colab 사용량이 아니다.
 

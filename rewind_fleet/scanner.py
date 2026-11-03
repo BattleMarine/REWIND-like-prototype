@@ -5,6 +5,7 @@ import sqlite3
 import struct
 import tarfile
 import zlib
+import sys
 from pathlib import Path
 from rewind_archive.contracts import canonical,safe_path
 from rewind_archive.extraction import pax_fields
@@ -59,13 +60,20 @@ def cache(store,head,workspace,key,*,cold_rebuild=False):
 
 def scan(state,pack,source,budget,spacing,db,max_members=64):
     check(hashlib.sha256(canonical(source.spec)).hexdigest()==state['source_sha256'],'fleet_source_identity')
-    state=dict(state);rows=[];before=state['cursor'];gz=None;reason=None
+    state=dict(state);rows=[];before=state['cursor'];gz=None;reason=None;primary=None;handled=False
+    def engine_call(call):
+        # C 확장에 감싸진 이번 호출의 source 오류만 복원한다.
+        budget.last_source_failure=None
+        try:return call()
+        except Exception as exc:
+            if budget.last_source_failure:raise IndexFailure(budget.last_source_failure) from exc
+            raise
     try:
-        gz=open_engine(source,spacing,pack,state['cursor']);crc=state['crc32']
+        gz=engine_call(lambda:open_engine(source,spacing,pack,state['cursor']));crc=state['crc32']
         def read(n):
             nonlocal crc
             budget.check();check(budget.decoded_bytes+n<=budget.limits.max_decoded_bytes,'decoded_bytes_limit')
-            raw=gz.read(n);budget.decoded_bytes+=len(raw);crc=zlib.crc32(raw,crc);budget.check();return raw
+            raw=engine_call(lambda:gz.read(n));budget.decoded_bytes+=len(raw);crc=zlib.crc32(raw,crc);budget.check();return raw
         def exact(n):
             raw=read(n)
             check(len(raw)==n,'fleet_incomplete_source');return raw
@@ -111,26 +119,50 @@ def scan(state,pack,source,budget,spacing,db,max_members=64):
                          'sha256':h.hexdigest(),'type':'directory' if member.isdir() else 'file'}
                     rows.append(row);state.update(ordinal=state['ordinal']+1,boundary=gz.tell());checkpoint();break
                 if state['tar_complete']:break
-    except (EOFError,IndexFailure) as exc:
-        reason=exc.reason if isinstance(exc,IndexFailure) else 'fleet_incomplete_source'
+    except BaseException as exc:
+        primary=exc
+        reason=exc.reason if isinstance(exc,IndexFailure) else ('fleet_incomplete_source' if isinstance(exc,EOFError) else None)
         if reason not in ('read_bytes_limit','decoded_bytes_limit','elapsed_limit','transfer_bytes_limit','ranges_limit','fleet_incomplete_source'):raise
+        handled=True
         state['status']='incomplete_source' if reason=='fleet_incomplete_source' else 'partial'
     finally:
         try:
-            newpack=export(gz) if gz else None
+            newpack=(pack if primary is not None and (not handled or state['cursor']==before) else export(gz)) if gz else None
             if gz:gz.close();gz=None
-            if newpack:
+            if newpack and (primary is None or handled) and not (handled and state['cursor']==before):
                 from .window import decode
                 h,points=decode(newpack,allow_empty=True)
                 if not points or max(h[1],points[-1][0][1])<state['cursor']:
                     budget.active_read_limit=budget.limits.max_read_bytes
                     if not points and 0<h[1]<=spacing:
-                        gz=open_engine(source,spacing,None,0);gz.build_full_index()
-                    else:gz=open_engine(source,spacing,newpack,state['cursor'])
+                        gz=engine_call(lambda:open_engine(source,spacing,None,0));engine_call(gz.build_full_index)
+                    else:gz=engine_call(lambda:open_engine(source,spacing,newpack,state['cursor']))
                     newpack=export(gz)
+        except BaseException as secondary:
+            secondary.fleet_checkpoint_failure=True
+            if primary is not None:
+                secondary.fleet_scan_primary=primary
+                if not handled:
+                    primary.fleet_checkpoint_error=secondary
+                    raise primary
+                raise secondary from primary
+            raise
         finally:
-            if gz:gz.close()
-            source.close()
+            active=sys.exc_info()[1];cleanup=[]
+            for resource in (gz,source):
+                if resource is not None:
+                    try:resource.close()
+                    except BaseException as exc:cleanup.append(exc)
+            if cleanup:
+                original=active or primary
+                if original is not None:
+                    original.fleet_cleanup_errors=cleanup
+                    if active is None:raise original
+                else:
+                    cleanup[0].fleet_cleanup_errors=cleanup[1:]
+                    raise cleanup[0]
+    if handled and state['cursor']==before:
+        return state,rows,pack,{'reason':reason,'decoded_advanced':0,'stats':budget.stats()}
     check(newpack is not None,'fleet_window_missing')
     from .window import decode
     h,points=decode(newpack);coverage=max(h[1],points[-1][0][1])

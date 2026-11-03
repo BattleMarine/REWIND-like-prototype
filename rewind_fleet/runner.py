@@ -3,6 +3,8 @@ import copy
 import json
 import time
 import zlib
+import re
+from dataclasses import asdict
 from pathlib import Path
 import psutil
 from rewind_archive.contracts import canonical
@@ -17,6 +19,26 @@ MIB=1024**2
 COUNTERS=('source_bytes','requests','seconds','artifact_io_bytes')
 STEP={'source_bytes':16*MIB,'requests':1000,'seconds':120,'artifact_io_bytes':16*MIB}
 TAIL={'seconds':5,'artifact_io_bytes':256*1024}
+
+def failure_chain(exc):
+    """메시지·경로·응답 본문 없이 제한된 type/reason chain만 보관한다."""
+    chain=[];seen=set()
+    while exc is not None and id(exc) not in seen and len(chain)<8:
+        seen.add(id(exc));reason=getattr(exc,'reason',None)
+        chain.append({'type':type(exc).__name__,'reason':reason if isinstance(reason,str) and re.fullmatch(r'[A-Za-z0-9_]{1,128}',reason) else None})
+        exc=exc.__cause__ or (None if exc.__suppress_context__ else exc.__context__)
+    return chain
+
+def observed_stats(budget,runtime):
+    result={}
+    for name,callback in [('budget',budget.stats if budget else None),('runtime',runtime.stats if runtime else None)]:
+        if callback:
+            try:
+                stats=callback();trace=stats.pop('source_read_trace',None)
+                if trace is not None:stats['source_read_trace_summary']={'reads':len(trace),'first':trace[:2],'last':trace[-2:]}
+                result[name]=stats
+            except BaseException as exc:result[name]={'observation_error':failure_chain(exc)}
+    return result
 
 def reconcile(store,ledger,head):
     held=ledger.get('settlement')
@@ -128,32 +150,35 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
             for k in COUNTERS:next_ledger['usage'][k]+=reserve[k];next_ledger['archive_usage'][selected][k]+=reserve[k]
             reserved_head=store.commit(next_ledger);store.publish(reserved_head,head);head=reserved_head;ledger=next_ledger
             current_reservation=reserve;segment_started=time.monotonic();io_start=store.io_bytes
-            session=runtime=None;db=None
+            session=runtime=None;db=None;budget=None;phase='budget_setup';cleanup_errors=[]
             try:
                 limits=IndexLimits(max_read_bytes=min(32*MIB,max(65536,int(reserve['source_bytes'])//2)),max_decoded_bytes=32*MIB,
                     max_seconds=reserve['seconds']-10,max_rss_bytes=plan['cap']['ram_bytes'])
                 budget=Budget(limits)
                 budget.active_read_limit=limits.max_read_bytes-min(4*MIB,limits.max_read_bytes//2)
-                cache_key=sha(canonical(spec));db=cache(store,old_ref,workspace,cache_key)
+                phase='catalog_restore';cache_key=sha(canonical(spec));db=cache(store,old_ref,workspace,cache_key)
                 restoring=db is None
                 if restoring:
                     rows=[];newpack=None;event={'restoration':'bounded_local_cache_progress','stats':budget.stats()}
                 else:
                     pack=store.blob(old['pack']) if old else None
+                    phase='source_open'
                     if spec['schema']=='ordered_drive_gzip_source_v1':
                         check(session_factory is not None,'fleet_session_factory_required');session=session_factory()
                         runtime=DriveRuntime(session,DriveLimits(max_body_bytes=int(reserve['source_bytes']),max_requests=int(reserve['requests']),
                             max_seconds=reserve['seconds']-10,range_bytes=MIB,max_cache_bytes=4*MIB));reader=runtime.source(spec,budget)
                     else:reader=SplitSource(spec,budget)
+                    phase='full_verify' if verify else 'scan'
                     if verify:
                         decoded=full_verify(reader,budget,state['tar_end']);state={**state,'complete':True,'status':'complete','verified_decoded_bytes':decoded};rows=[];newpack=pack;event={'verification':'full_single_gzip','stats':budget.stats()}
                     else:state,rows,newpack,event=scan(state,pack,reader,budget,1024**2,db,max_members=64)
-                _validate_source(spec)
+                phase='source_finish';_validate_source(spec)
                 if runtime:runtime.finish(budget)
                 else:_validate_source(spec)
                 stats=event.get('stats',{});trace=stats.pop('source_read_trace',[])
                 stats['source_read_trace_summary']={'reads':len(trace),'first':trace[:2],'last':trace[-2:]}
-                if restoring:archive_head=old_ref
+                phase='archive_commit'
+                if restoring or (not rows and state['cursor']==(old['state']['cursor'] if old else 0) and not verify and not state['eof']):archive_head=old_ref
                 else:
                     doc={'schema':'fleet_archive_commit_v1','parent':old_ref,'state':state,'start_cursor':old['state']['cursor'] if old else 0,
                         'pack':store.put(newpack),'catalog':store.put(canonical({'rows':rows})),'source_sha256':sha(canonical(spec)),
@@ -161,11 +186,14 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                     archive_head=store.commit(doc)
                 actual_source=runtime.transfer.transfer_bytes if runtime else budget.read_bytes
                 actual_requests=runtime.transfer.ranges if runtime else 0
-                settled=copy.deepcopy(ledger);settled.update(parent=head,pending=None);settled['archives'][selected]=archive_head
+                phase='ledger_publish'
+                settled=copy.deepcopy(ledger);settled.update(parent=head,pending=None)
+                if archive_head is not None:settled['archives'][selected]=archive_head
                 settled['settlement']={'token':token,'archive':selected,'reserved':reserve}
                 settled['statuses'][selected]={'eof':state['eof'],'complete':state['complete']}
                 settled['complete']=all(settled['statuses'].get(n,{}).get('complete') for n in plan['selected']) and inv['official_registry_complete']
                 newhead=store.commit(settled);store.publish(newhead,head);head=newhead;ledger=settled
+                phase='settlement_receipt'
                 charged={'source_bytes':actual_source,'requests':actual_requests,'seconds':time.monotonic()-segment_started+TAIL['seconds'],
                     'artifact_io_bytes':store.io_bytes-io_start+TAIL['artifact_io_bytes']}
                 check(all(charged[k]<=reserve[k] for k in COUNTERS),'fleet_settlement_reservation_exceeded')
@@ -181,11 +209,27 @@ def run(inv,plan,store_root,workspace,*,owner,single_writer=False,max_segments=8
                 if not rows and not state['eof'] and not verify and not restoring:stop='no_committed_progress';break
             except BaseException as exc:
                 stop=exc.reason if isinstance(exc,IndexFailure) else type(exc).__name__
-                events.append({'archive':selected,'status':'failed_pending_reservation_kept','reason':stop});break
+                events.append({'archive':selected,'status':'failed_reservation_kept','reason':stop,'phase':phase,
+                    'exception_chain':failure_chain(exc),'source_reason':getattr(budget,'last_source_failure',None),
+                    'checkpoint_error':failure_chain(getattr(exc,'fleet_checkpoint_error',None)),
+                    'scan_primary':failure_chain(getattr(exc,'fleet_scan_primary',None)),
+                    'checkpoint_failed':bool(getattr(exc,'fleet_checkpoint_failure',False) or getattr(exc,'fleet_checkpoint_error',None)),
+                    'cleanup_errors':[failure_chain(e) for e in getattr(exc,'fleet_cleanup_errors',[])],
+                    'reservation':dict(reserve),'observations':observed_stats(budget,runtime),
+                    'limits':asdict(budget.limits) if budget else None,
+                    'active_read_limit':getattr(budget,'active_read_limit',None),
+                    'segment_seconds':time.monotonic()-segment_started,'artifact_logical_io':store.io_bytes-io_start,
+                    'pending_reservation_kept':ledger['pending'] is not None,'unknown_consumption_refunded':False});break
             finally:
-                if db:db.close()
-                if session:session.close()
+                for resource in (db,session):
+                    if resource is not None:
+                        try:resource.close()
+                        except BaseException as exc:cleanup_errors.append(failure_chain(exc))
+                if cleanup_errors:
+                    events[-1].setdefault('cleanup_errors',[]).extend(cleanup_errors)
+                    if events[-1].get('status')!='failed_reservation_kept':stop='cleanup_failed'
                 current_reservation=None
+            if cleanup_errors:break
     effective=reconcile(store,ledger,head)
     dataset_complete=ledger['complete'] and set(plan['selected'])=={a['key'] for a in inv['archives']}
     report={'schema':'fleet_run_report_v1','head':head,'stop_reason':stop,'events':events,'usage':ledger['usage'],'reconciled_usage':effective['usage'],
