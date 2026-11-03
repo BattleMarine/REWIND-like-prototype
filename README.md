@@ -6,6 +6,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 ## 현재 상태
 
+2026-11-03 실제 RGB269 추출 완료: 사용자 재실행에서 269쌍/538PNG를 17묶음으로 확보했다. Root는 결과 ZIP 전체 CRC·SHA, 고정 입력285파일 바이트 동일성, 538개 index SHA/크기/native1024 RGB decode와 pose key 대응을 독립 검증했고 기존102와 중복 없는 총371쌍을 확인했다. 실제 body683808609bytes/2131HTTP/580.226초로 상한 이내이며 대표 overlay4장만 제한 시각 검토했다. 최초 중단 원인·소비량은 미확정, validation0/train_ready=false이며371 학습은 아직 시작하지 않았다. [실제 결과·검토·후속 경계](docs/RGB269_PAIRS.md).
+
 2026-11-03 전체 사전 인덱싱 준비: 공식 조각 수와 대조한 90개 archive/354개 파일/3,094,462,001,717bytes inventory를 만들고, 기존 v1/g25와 분리된 `rewind_fleet`의 bounded gzip pack·불변 catalog·누적 예산·재개·CLI/CPU notebook을 구현했다. 사용자 결정에 따라 근거 있는 비용 추정의 각 항목에 2배 상한을 적용하며 unknown 전체 계획은 실행하지 않는다. 소량 calibration 후 실제 시간·저장 비용을 확정할 예정이며 실제 전체 인덱싱·Drive 새 runtime 복원·전체 CRC·학습 adapter는 미완료다. [구현 범위·비용·측정 절차와 남은 경계](docs/FLEET_INDEXING.md)를 따른다.
 
 2026-11-03 새 pose257+4+8의269개와 기존102개를 기존62관절 spec·좌표/mm·mask·재투영으로 감사했고 전체371 train key가 g25 stereo와 대응했습니다. 기존102 records/contract/blockers는 같고 재투영 최대7.62e-5px로 내부 annotation 수치 검사를 통과했습니다. 신규 RGB269쌍/538PNG의617.44MiB payload를 확인하고 정확 목표·g25 identity·명시 예산에 묶인 runner/입력/notebook을 준비했습니다. 기존102 RGB 재다운로드·일반 gate 수정·신규 RGB 원격 실행·371 학습은 하지 않았습니다. [실제 pose 감사·RGB 추출 예산·인계와 후속 경계](docs/RGB269_PAIRS.md)를 따릅니다.

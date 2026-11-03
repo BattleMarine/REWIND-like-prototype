@@ -1,5 +1,22 @@
 # 새 pose269 감사와 g25 RGB269쌍 추출 준비
 
+## 실제 추출 결과와 root 독립 검토 (2026-11-03)
+
+사용자가 중단 후 재실행한 `rgb269_pairs_001`은 정상 완료했다. 최초 실행의 중단 원인과 실제 소비량은 알 수 없으며 아래 수치는 성공한 재실행 한 건의 값이다.
+
+- 신규269쌍 / 좌우538PNG / 17묶음, 기존102와 중복 없이 총371쌍이다.
+- 응답 body 683,808,609bytes, 2,131HTTP, 580.226초, 관측 peak RSS 324,087,808bytes다. 논리 source read 774,635,549bytes, 반환 PNG payload 647,429,967bytes다. 고정 상한 안에서 완료했다.
+- 보고서는 `all_targets_content_audited=true`, `index_unchanged=true`, `scan_performed=false`다. 인덱스 변경 없음은 실행 보고서의 전후 SHA 근거이며 결과 ZIP에는 live DB가 포함되지 않는다. 새 인덱싱 없이 g25에서 원하는 좌우 파일을 추출한 결과다.
+- 결과 ZIP은 `outputs/test_rgb269_pairs_001_20261103/rgb269_pairs_001_result.zip`, 688,954,705bytes/SHA256 `41f4e3ad306c9788c6d91d7db75422ae804f3d2d334cb0b0d8a51b834297d4db`다.
+
+Root는 ZIP SHA·전체 member CRC, 고정 config SHA, 보존 입력 ZIP과 회수 입력285파일의 바이트 동일성, 정확한269 pose key, 고정 g25 선택538개 row와 모든 실제 PNG의 SHA/크기/1024×1024 RGB 디코딩을 독립 확인했다. 기존102 config pin과 신규 key의 disjoint union371도 확인했다. 원격 요청0·학습0이며 검토9.766초, 근거는 `outputs/test_rgb269_pairs_001_20261103/root_review/review.json` 및 상위 `review_result.py`다.
+
+대표 GT2D overlay4장은 몸/사지의 대체적인 위치를 제한적으로 시각 확인했다. 손의 가림·영상 경계/화면 밖 관절이 있으며 정밀한 관절별 영상 정합, 좌우 timestamp, 전수 정합이나 사람의 승인을 입증하지 않는다. `validation_pairs=0`, `train_ready=false`와 기존 차단 사유를 유지한다. 전체 archive 무결성이나 모델 정확도 결과가 아니다.
+
+다음 작업은 두 고정 결과 ZIP을 사용하는 별도371 진단 adapter 준비다. 신규 학습은 아직 실행하지 않았다. 아래 준비 시점 기록과 구분하며, 마지막 절의 설정·identity·예산 확정 조건을 따른다.
+
+## 준비 당시 기록
+
 2026-11-03 사용자 승인에 따라 pose269의 실제 내용·좌표를 감사하고, 기존102개에 추가할 RGB269쌍의 실행본을 준비했다. 실제 신규 RGB 원격 추출·371개 진단 학습은 아직 하지 않았다. 기존102개 입력·실험 설정·checkpoint·일반 학습 gate를 보존한다.
 
 ## 실제 pose 감사
