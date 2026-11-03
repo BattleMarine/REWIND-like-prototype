@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-03 실제 Drive survey는92구간/3,752파일을 기록한 뒤 test pose 요청의 연결 오류로 중단했다. 미탐색 archive 때문에 발생한 별도 상태 집계 오류를 수정하고 로컬 검증했으며, 기존 인덱스와 pending 예약은 보존한다. 전체 인덱싱·페어 확보·재개 완료는 아니다. [실제 결과와 수정 범위](FLEET_DRIVE_SURVEY.md).
+
 2026-11-03 Drive 자동 조사 준비: 기존90archive/354파일의 현재 metadata를 대조해 파일명·크기·수정 시각 차이0을 확인했다. 전체 비용을 확정하기 전 각 archive 최대2개 정상 scan으로 측정하는 survey와 고정 실행 notebook을 구현·로컬 검토했다. 최신 사용자 결정에 따라 총 실행시간 상한 없이 비차단 타이머·사용자 stop을 제공하고, 시간 외 자원 상한은 유지한다. 실제 Drive 실행·전체 비용 확정은 아직 미완료다. [원본 확인·조사 예산·인계 상태](FLEET_DRIVE_SURVEY.md).
 
 2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬16segment·mock Drive14segment에서 각각800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](AUTOMATIC_FLEET_INDEXING.md).

@@ -37,8 +37,10 @@ def coverage(root,*,io_limit=16*1024**2):
         if 'survey_segments' in ledger:
             report.update(scope='survey',survey_segments=ledger['survey_segments'],survey_quota=ledger.get('survey_quota'),whole_archive_estimate_complete=False)
             quota=ledger.get('survey_quota',2)
-            report['survey_complete']=all(ledger['survey_segments'].get(k,0)>=quota or ledger['statuses'].get(k,{}).get('eof') for k in ledger.get('selected_archives',[]))
-            report['survey_archives_finished']=sum(ledger['survey_segments'].get(k,0)>=quota or ledger['statuses'].get(k,{}).get('eof') for k in ledger.get('selected_archives',[]))
+            selected=ledger.get('selected_archives') or []
+            finished=[ledger['survey_segments'].get(k,0)>=quota or bool(ledger['statuses'].get(k,{}).get('eof',False)) for k in selected]
+            report['survey_complete']=bool(selected) and all(finished)
+            report['survey_archives_finished']=sum(finished)
         report['usage_reserved_or_charged']=ledger['usage']
         from .runner import reconcile
         report['usage_reconciled']=reconcile(store,ledger,report['head'])['usage']

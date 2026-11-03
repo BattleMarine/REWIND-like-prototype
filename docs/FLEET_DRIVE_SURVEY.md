@@ -78,3 +78,15 @@ Notebook 코드셀 문법, worker 비차단 시작·none 시간 인자·stop 연
 개발 측 선별 회귀50개도 통과했다(시험 본체35.782초, 원격 요청0). 기존 calibration/Drive/index/storage와 새 survey를 포함하며 root 검사와 중복된다. 근거: `outputs/fleet_drive_prepare_20261103/developer/tests.txt` 및 `test_result.json`.
 
 최종 source 혼용 차단 보완 후 notebook 관련5개 검사를 root가 재실행해 통과했다(0.062초). 다른 경로에서 이미 불러온 프로젝트 모듈은 새 runtime을 요구하고 차단하며, 정상 source의 재사용은 허용한다.
+
+## 2026-11-03 실제 첫 조사 결과와 상태 집계 수정
+
+고정 b1960de의 실제 Colab worker는838.138초 동안46개 archive의 각2구간(총92segment), 파일3,752개와 디렉터리505개를 기록했다. 다음 test pose의 ArchVisInterior_ArchVis_RT에서 첫 media 요청을 열던 중 `requests`의 `connection` 분류 오류로 중단했다. 총 실행시간 cap이나 데이터 결측으로 인한 중단으로 판정하지 않는다. 인증 만료·개별 timeout 등 상세 원인은 미확정이다.
+
+회수 ZIP `outputs/test_fleet_survey_001_20261103/fleet_survey_recovery_fd645e5fc0cb402cacb1bb65ad9b0e16.zip`의 SHA256은 `d83e6f794374e11c8627e4c23bb251a66d24250d5566b9b948c18a1b949bab02`이며 CRC를 확인했다. 회수본에는 전체 index pack/catalog가 없으므로 파일 내용·전체 무결성·새 runtime 인덱스 복원은 이 검사로 확인하지 않았다. 파일 수는 학습 가능한 RGB/pose 페어 수가 아니다.
+
+실패 구간의 pending 예약은 source64MiB/1000HTTP/artifact16MiB로 보존한다. 표시 사용량에는 이 예약이 포함되어 있으며 정상 정산분과 구분해야 한다. 원격 store나 pending을 수정·초기화하지 않았다.
+
+별도 `coverage` 오류는 미탐색44개 archive의 EOF 값이 없을 때 `None`을 합산하는 코드에서 발생했다. 미탐색을 false로 처리하고 빈 선택 목록을 완료로 판정하지 않도록 수정했다. 이는 조회 집계 수정이며 요청 실패 복구·학습 승인·원격 재개를 포함하지 않는다. 로컬 검증 결과는 아래에 기록한다.
+
+Root 독립 회귀8개가7.438초에 통과했다(실패0, skip0). 실제 coverage 함수에서 미탐색·부분진행·46완료/44미탐색과 pending·EOF·전체 quota·빈 선택을 검증하고, 기존 survey 실행 완료·시간 관측 경로도 확인했다. 로컬 fixture store의 조회 전후 파일 hash·HEAD·pending·usage 불변을 확인했다. 실제 Drive store 재조회나 원격 재개는 하지 않았다. 근거: `outputs/fleet_coverage_fix_20261103/root/tests.json`.
