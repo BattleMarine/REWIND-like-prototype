@@ -2,7 +2,7 @@
 
 2026-11-04 발표 자료 준비용으로 `scripts/predict_stereo_overlay.py`를 추가했다. 기존102쌍 진단 `StereoHeatmapNet` weights를 고정 SHA와 계약으로 확인하고 stereo PNG 한 쌍에서62개2D관절·confidence를 추론한다. 정답 입력·추가 학습·GT fallback은 없다. M2/M3 또는 학습 완료된 REWIND 전체 모델의 시연이 아니다.
 
-사용자가 요청한 `ArchVisInterior_ArchVis_RT/Day/rp_adanna_rigged_003_ue4/SKM_MenReadingGlasses_Shape_01/001/Joyful_Jump__16_`는 Drive에서 폴더 경로를 확인했으나 좌우 RGB 파일은0개로 조회됐고 사용자가 업로드 중임을 확인했다. 해당 시퀀스 다운로드·추론·발표 이미지 생성은 아직 수행하지 않았다. 다른 actor의 검증 이미지를 해당 동작의 결과로 사용하지 않는다.
+사용자가 요청한 `ArchVisInterior_ArchVis_RT/Day/rp_adanna_rigged_003_ue4/SKM_MenReadingGlasses_Shape_01/001/Joyful_Jump__16_`는 Drive 업로드 대기 후 사용자가 제공한 로컬 Downloads의 `json`·`fisheye_final_image`로 확인했다. 좌우 RGB 각57장과 pose57개, frame0~56의 파일 번호 대응·PNG1024×1024 RGB decode·JSON frame값(문자열)을 확인했다. 총139,403,456bytes이며 파일별SHA를 `outputs/joyful_jump_presentation_20261104/local_input_review/manifest.json`에 보존했다. 로컬 경로에 sequence 계층이 없어 해당 sequence 출처는 사용자 지정에 근거하며 timestamp·정밀정합 검증을 대신하지 않는다.
 
 ## 실행 계약
 
@@ -22,4 +22,4 @@ python scripts/predict_stereo_overlay.py --left LEFT.png --right RIGHT.png --wei
 
 개발은 기존102쌍의 Burpee frame0·1을 재추론해 저장 cache와 native 좌표·confidence 차이가 모두0임을 확인했다. Root는 실제 CLI로 frame0을 독립 실행하고 개발 결과와 좌표·confidence 동일, GT 사용 없음, 학습 update0을 확인하고 패널을 시각 검토했다. 근거는 `outputs/joyful_jump_presentation_20261104/developer/validation.json`과 `root_validation/review.json`이다.
 
-현재 두 검증 프레임에서 관절들이 화면 중앙에 집중되고 confidence도 약0.001 수준이다. 성공적인 관절 추정 사례로 소개하기 어렵다. 이번 검증은 기존 모델 출력의 충실한 재현과 시각화에 대한 것이며, 새로운 시퀀스의 정확도나 발표용 품질을 보장하지 않는다. 실제 Joyful Jump 결과는 업로드 완료 후 별도로 판단한다.
+현재 두 검증 프레임에서 관절들이 화면 중앙에 집중되고 confidence도 약0.001 수준이다. 성공적인 관절 추정 사례로 소개하기 어렵다. 이번 검증은 기존 모델 출력의 충실한 재현과 시각화에 대한 것이며, 새로운 시퀀스의 정확도나 발표용 품질을 보장하지 않는다. 실제 Joyful Jump의 시작·중간·끝 frame0·28·56도 같은 모델로 추론했다. 3개 모두62관절이 중앙 약x499~523/y497~533px 범위에 집중하며 정상적인 관절 추정 시연으로 보기 어렵다. 실제 예측을 보정하거나 GT로 대체하지 않았다. 결과는 `outputs/joyful_jump_presentation_20261104/actual/frame_000`, `frame_028`, `frame_056`의 `overlay.png`·`predictions.json` 및 `actual/preview.png`에 보존했다. Pose는 파일 대응 검사에만 사용했고 모델 추론에는 입력하지 않았다. 추가 학습·Drive 다운로드는 없다.

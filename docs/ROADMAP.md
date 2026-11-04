@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-2026-11-04 저장된102쌍 진단 frontend의 stereo PNG→62관절2D overlay CLI를 준비했다. 기존 두 프레임의 저장 예측 재현과 root 독립 실행을 확인했으나 관절이 중앙에 몰리는 미흡한 결과이며 성능 시연 완료는 아니다. 요청한 Joyful Jump RGB는 사용자 업로드 중으로 실제 추론 전이다. [실행·검증·제한](PREDICTION_OVERLAY.md).
+2026-11-04 저장된102쌍 진단 frontend의 stereo PNG→62관절2D overlay CLI를 준비했다. 기존 두 프레임의 저장 예측 재현과 root 독립 실행을 확인했으나 관절이 중앙에 몰리는 미흡한 결과이며 성능 시연 완료는 아니다. 후속 사용자 로컬 자료57페어를 확인하고 Joyful Jump frame0·28·56의 실제 예측 이미지를 생성했으나 동일한 중앙 집중 실패를 보였다. [실행·검증·제한](PREDICTION_OVERLAY.md).
 
 2026-11-03 두 번째 big step인 미니 프로토타입 준비를 병행한다. 보존된371쌍은 모두 train이며 실제 학습 근거는102쌍 진단까지다. 다음 개발 묶음은 기존 weights의 UI 독립 추론·결과 내보내기이며, 이후1,000~10,000쌍 확대·독립 validation·제한 시연·stereo 영상 연결로 진행한다. 이번에는 읽기 전용 감사와 계획만 완료했으며 학습·원격 추출·인덱싱 설정 변경은 없다. [재사용 입력·부족한 연결·개발 순서](MINI_PROTOTYPE_PLAN.md).
 
