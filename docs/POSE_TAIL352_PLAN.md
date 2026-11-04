@@ -1,5 +1,7 @@
 # ArchVis pose 한 장면의 파일명 선택 추출 시험
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 2026-10-29 · API10 · 개발·검토 단계. 실제 Drive/Colab 실행과 고정 배포물 생성은 아직 하지 않았다. Root 검토·로컬 커밋 뒤 revision/source ZIP/ready notebook의 정확한 경로·SHA256을 추가하고 테스트 세션에 인계한다. 기존 API9 source/ready notebook/cache는 변경하지 않는다.
 
 ## 목적과 고정 입력
@@ -11,7 +13,7 @@ RGB를 제외한 자료 중 ArchVis pose 단일 `ArchVisInterior_ArchVis_RT.tar.
 - 입력 ZIP: `outputs/test_archvis_pose_cache_warm192_20261023/prefix_cache.zip`, **201,414,370bytes**, SHA256 `7c538ca96670e5d8c8856659d5eab137d222d3ebab04321615eab3107baec157`.
 - Cache manifest SHA256 `1c775f84085f1549e7fcb46f50e56d95a6de41ab1fa9b72a2e11e5dafb8c5234`, prefix SHA256 `a2ab3367ea55cf542f5b8a324439909142057a87a57d98be7d6710963bda96a9`, prefix **201,326,592bytes**/769chunk를 고정한다. 누락/불일치/원본 변경은 실패이며 cold 다운로드로 대체하지 않는다.
 
-실제 warm192는 정상 bounded stop·목표0개였고 준비395.879초,그중 remote383.072초/신규64MiB였다. [검증 보고서](../outputs/test_archvis_pose_cache_warm192_20261023/verification.json)와 [카탈로그 요약](../outputs/test_archvis_pose_cache_warm192_20261023/catalog_summary.json)을 기준으로 한다. 180sequence/12,642entry는 부분 관측이고 목표 부재·사전순·원본 frame 정렬의 증거가 아니다. 마지막 관측 파일은 미완료이므로 추출본이 아니다.
+실제 warm192는 정상 bounded stop·목표0개였고 준비395.879초,그중 remote383.072초/신규64MiB였다. [검증 보고서 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm192_20261023/verification.json`)와 [카탈로그 요약 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm192_20261023/catalog_summary.json`)을 기준으로 한다. 180sequence/12,642entry는 부분 관측이고 목표 부재·사전순·원본 frame 정렬의 증거가 아니다. 마지막 관측 파일은 미완료이므로 추출본이 아니다.
 
 ## 예산과 중단
 
@@ -54,7 +56,7 @@ Root 검토·커밋 후 고정 revision source ZIP와 API10 ready notebook의 �
 
 보관 공식 split 세 파일은 `.local-archive/20261023/legacy_outputs.zip` 안 `outputs/m0_next_evidence_20261015/developer/official_split/UnrealEgoData2/{train,validation,test}.txt`에 있고 INDEX의 bytes/SHA256과 대조했다. 목표 sequence는 train에 정확히1행,validation/test0행이다. 이는 split 명시 근거이며 원본 motion 중복과 학습 release 검증을 대체하지 않는다. 확인된 calibration 단독 파일 목록은 없으므로 추측해 추가하지 않는다.
 
-Drive 목록 조사는 [inventory](../outputs/archive_lookup_20261028/drive_inventory.json) 기준 train_val pose15scene/15개·18,020,771,152bytes와 RGB249개·2,597,969,076,181bytes의 metadata 확인이다. 내용·전체 무결성은 미검증이다. 별도 depth ArchVis는 metadata3,729,830,083bytes로 모든 non-RGB를 작다고 일반화할 수 없다. 이번 시험에서 다른 scene·depth·RGB를 받지 않는다.
+Drive 목록 조사는 [inventory · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/archive_lookup_20261028/drive_inventory.json`) 기준 train_val pose15scene/15개·18,020,771,152bytes와 RGB249개·2,597,969,076,181bytes의 metadata 확인이다. 내용·전체 무결성은 미검증이다. 별도 depth ArchVis는 metadata3,729,830,083bytes로 모든 non-RGB를 작다고 일반화할 수 없다. 이번 시험에서 다른 scene·depth·RGB를 받지 않는다.
 
 RGB 후속 두 대안 모두 선택 scene의 최초 순차 읽기 비용이 든다. 필요한 sequence만 추출·영구보관하면 반복 학습이 단순하지만 추가 sequence에 새 탐색 비용이 든다. Tar 파일명→해제 offset와 gzip restart index를 함께 보관하면 추가 파일 접근에 유연하지만 Drive 분할/인증/원본 fingerprint 통합은 미검증이다. RGB000/001은10GiB 용량 분할이며 sequence·좌우 의미가 없다. 두 대안 모두 이번에 구현·원본 실행하지 않으며 pose 시험 성공을 RGB 해결이나 학습 준비 완료로 표시하지 않는다.
 

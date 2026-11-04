@@ -1,5 +1,7 @@
 # 검토된 실제 데이터의 bounded RGB2D 학습 연결
 
+> **2026-11-05 현재 적용 범위:** 아래 Serena2frame 차단은 해당 고정 bundle의 결과다. 후속371 train 쌍과 Joyful Jump57 로컬 자료가 있어도 독립 validation·motion/split 검토와 명시 release는 별도다. 일반 사용자 추출 폴더를 이32frame bounded release에 바로 넣는 기능이나 전체 학습 승인은 없다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 현재 구현은 완료 bundle→명시 release 검증→UI 독립 RGB2D train/validation/정확 재개/checkpoint/export를 연결한다. **현재 Serena 자료에 대한 실제 학습 승인은 발급하지 않았다.** 기존 진단 candidate·reader의 `dataset_sample/diagnostic_only/train_ready=false`와 원래 blockers는 보존한다. 별도 release는 한 bundle32frame 이내의 독립 T1/2D frontend train/validation만 허용한다. M1/M2/M3·temporal·전체 archive coverage 또는 일반 실제 학습 gate를 해제하지 않는다.
 
 ## 현재 실제 자료의 차단 이유

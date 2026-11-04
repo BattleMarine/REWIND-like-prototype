@@ -1,5 +1,7 @@
 # 제한된 압축 prefix cache와 관측 카탈로그
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 ## API9:128MiB cache에서192MiB까지
 
 `posePrefixWarm192MiB_v3`를 추가했습니다. 기존 128MiB 이상의 cache와 고정 `cache_expectation`이 필수이며 cold fallback은 없습니다. 새 network body 80MiB·논리입력 192MiB·420초·773HTTP, 해제 1200MiB·header 30,000·tar metadata 2MiB/단일 64KiB입니다. 초기 metadata는 기존 별도 예산이므로 합계 80.125MiB·450초·781회이며 인증·upload/export 비용은 별도입니다.

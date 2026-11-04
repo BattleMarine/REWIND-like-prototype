@@ -1,5 +1,7 @@
 # 분할 압축 원본의 제한된 순차 준비
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 2026-10-23 API9 후속 개발: `posePrefixWarm192MiB_v3`와 별도 v3 cache 정책을 추가했습니다. 실제 v2 128MiB 보관본을 필수로 재사용하며 기존 v1/v2 profile 상한과 실패 규칙을 유지합니다. [192 계획](PREFIX_CACHE_192_PLAN.md), [상한/산출물/단계비용](PREFIX_CACHE.md)을 따릅니다. 실제 192MiB 원본 실행·학습은 로컬 검증에 포함하지 않습니다.
 
 2026-10-21 API8 후속 개발: 필수 cache와 고정 expectation을 사용하는 `posePrefixWarm128MiB_v2`를 추가했습니다. v1 입력을 읽고 명시된 v2로 저장하며 cold fallback은 없습니다. HTTP392와 local audit1,024행을 분리해 예약합니다. 기존 profile/API 계약은 유지합니다. [새 고정 상한·업로드·산출물 안내](PREFIX_CACHE.md)를 따릅니다.
@@ -25,7 +27,7 @@ Fresh source ZIP의14모듈/API6 notebook을 모의 실행하고 사전115개·�
 
 2026-10-19 후속: Pose 전용 API4의 실제 실행은39번째 media에서 `authorized_request_failed`로 중단했습니다. 해당 보고서에는 예외 타입/정확한 발생 단계가 없어 원인을 확정하지 않습니다. 당시 API5는 예산/목표/재시도를 바꾸지 않고 안전한 요청 실패 진단을 추가합니다. 고정 revision을 테스트 세션에 인계해 별도 확인하며 실제 결과는 [로드맵](ROADMAP.md)을 따릅니다. 목표 pose·좌표/영상 검증은 여전히 미완료입니다.
 
-2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 최신 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
+2026-10-16 · 제한된 준비 코어와 단방향 notebook을 유지합니다. 당시 기본 작업은 payload 저장 없이 archive 앞부분의 regular member 순서를 관측하는 `scan`입니다. 실제 Drive를 byte0부터 읽고 해제하므로 전송 비용이 발생합니다. 전체 목록·seek index·이어받기는 아닙니다. 기존 metadata→manifest/pilot·선택 추출 API는 유지합니다. 분할 조각을 000부터 순차 읽고 선택한 완전한 regular file을 남깁니다. 전체 원본 다운로드·결합 파일·전체 추출본을 만들지 않습니다. 사용자 Colab의 HTTP200 chunked 실패를 수정했고, 후속 보고서로 pose 32개 추출·런타임 verify 성공을 확인했습니다. 후속 [sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·구조·수치와 연속 18프레임을 확인했습니다. 좌표 의미·시간·split·RGB 대응·전체 archive 무결성은 미검증입니다.
 
 ## 현재 가능한 범위
 

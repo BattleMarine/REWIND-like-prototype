@@ -1,5 +1,7 @@
 # 로컬 lazy stereo RGB 로더
 
+> **2026-11-05 현재 적용 범위:** 로컬 RGB의 lazy decode·좌우 key·hash 검증 기능은 계속 사용한다. 다만 현재 manifest builder는 아래 기존 extraction provenance 계약을 요구하며 임의 사용자 폴더의 자동 변환까지 구현된 것은 아니다. 실제102쌍 진단과 Joyful Jump 추론은 별도 고정 도구로 수행했고, 원격 인덱싱은 현재 선행 조건이 아니다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-10-28 현재: `rewind_m1.local_rgb`의 합성 PNG 검사와 사용자 Colab CPU 로더12개 검사, 고정 `65c4287`의 합성 전체 연결 진단을 확인했다. 이후 RGB manifest builder는 다중 합성 추출본으로 로컬 검증했다. 실제 데이터의 RGB–pose 정합성·학습 baseline·GPU 성능은 미검증이며 M0~M3 전체 미완료/M4 미착수 상태를 유지한다. 이 문서의 2026-10-27 최초 구현 당시 실행 미검증 설명과 아래 날짜별 후속 결과를 구분한다.
 
 ## API와 입력 경계

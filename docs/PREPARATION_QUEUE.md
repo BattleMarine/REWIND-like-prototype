@@ -1,5 +1,7 @@
 # 제한된 RGB·pose 준비 queue
 
+> **2026-11-05 현재 적용 범위:** 이 문서의 queue는 인덱스 기반 archive backend를 호출하는 기존 구현이며 현재 추출본 운영의 기본 진입점이 아니다. 사용자 추출 폴더를 바로 학습 shard로 만드는 범용 adapter는 아직 별도 작업이다. 아래 구현·예산·CLI 계약은 보존한다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 전체 학습 준비 3a 단계. 기존 `prepare_indexed`를 원본별로 호출하는 작은 영속 queue를 구현했다. **전체 데이터셋 자동 공급·학습 release는 아니다.** 기존 소량 backend 상한 안에서 준비 순서·부분 진행·원본 identity·누적 비용을 보존한다. 실제 Drive/Colab/GPU/학습 검증은 별도다.
 
 ## 지원 범위와 파일

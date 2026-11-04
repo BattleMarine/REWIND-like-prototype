@@ -1,5 +1,7 @@
 # UI 독립 RGB2D shard 학습·재개
 
+> **2026-11-05 현재 적용 범위:** 이 trainer의 합성 입력 계약은 그대로다. 이후 별도 bounded release 경로는 [실제 RGB2D 연결](REAL_RGB2D_RELEASE.md)에 구현했으나 일반 실제 데이터 shard가 자동 허용된 것은 아니다.102쌍의 실제 진단 학습은 별도 경로이며 전체 학습 준비·성능 완료로 해석하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 전체 학습 준비 3b2 단계. 작은 `StereoHeatmapNet`을 그대로 사용하고, [RGB·GT chunk](RGB_GT_SHARDS.md)를 한 shard씩 공급받는 별도 trainer/CLI를 추가했다. **합성 fixture만 학습하며 실제 `dataset_sample`은 release 미구현으로 거부한다.** 기존 native weights/cache API, 소량 diagnostic trainer, M1 regression 기본 경로는 유지한다. 논문 규모 모델이나 실제 GPU 성능을 검증한 결과가 아니다.
 
 ## Resize와 감독

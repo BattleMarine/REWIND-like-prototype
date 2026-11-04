@@ -1,5 +1,7 @@
 # 자동 인덱싱과 실제 데이터 준비 연결
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 후속 [샘플 확대 discovery](SAMPLE_EXPANSION.md)는 특정 파일 추출과 구분한 신규 source의 bounded 목록 확장이다. 기존 opt-in 준비/학습 gate/pose notebook을 유지하며, 현재 실제 triplet은 train2/val0이고 실제 Colab discovery는 아직 실행하지 않았다.
 
 2026-11-02 · 기존 API10·prefix cache·고정 A/B/C 시험과 분리된 명시적 opt-in 경로다. 로컬 개발 검증과 실제 Colab 통합 시험을 구분하며, 전체 archive 완료·실제 학습 readiness를 판정하지 않는다.

@@ -1,5 +1,7 @@
 # 실제 pose 규격 고정과 candidate 준비
 
+> **2026-11-05 현재 적용 범위:** 기존62관절·단위/좌표·mask 검증과 candidate 차단 조건은 유지한다. 현재 입력 확보 방식은 사용자가 해제한 RGB·pose다. 아래 reference ZIP과 archive 추출 실행은 과거 재현 경로이며 새 필수 준비 절차가 아니다. 새 폴더도 원본 출처·sequence/frame·split·geometry를 확인해야 한다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-10-16. 사용자가 승인한 규격 고정→변환기→RGB/validation 확보→작은 GT2D 학습 중 **첫 규격·변환 구현 묶음**이다. 실제32개 JSON을 검증해 새 candidate 문서로 변환했으며 학습은 실행하지 않았다. RGB·독립 validation·원본 motion 식별이 미충족이므로 기존 M1/M2/M3 guard를 유지한다. 후속 자료 준비는 [다음 실행 안내](REAL_DATA_NEXT_RUN.md)를 따른다.
 
 ## 채택한 새 규격

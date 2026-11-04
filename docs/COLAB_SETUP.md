@@ -1,8 +1,14 @@
-# Colab 환경 준비·부분 추출·합성 모델 실행 가이드
+# Colab 환경 준비·추출본 사용·합성 모델 실행 가이드
 
-## 최신 준비 — 합성 RGB→T1 GPU 통합 pilot
+## 현재 준비 방향 — 2026-11-05 갱신
 
-2026-11-02 [고정 GPU pilot 실행 준비](SYNTHETIC_GPU_PILOT.md)와 [일반 notebook](../notebooks/synthetic_gpu_pilot.ipynb)을 추가했다. 현재는 로컬 CPU smoke·오류/회수 경로 검증 단계이며 실제 Colab GPU 실행 결과는 없다. 오케스트레이션이 커밋/source ZIP/ready notebook의 pins를 고정해 테스트 세션에 인계하고, 테스트 세션이 한 번의 합성 FP32/AMP·재개·자원 측정을 안내한다. 자동 설치/Drive mount/실데이터 release는 없고 Drive 새VM·실제 검증 근거는 별도다. 아래 API9 보류·과거 CPU 결과는 당시 고정 실행의 이력이며 이번 pilot의 최신 실행 지시로 해석하지 않는다.
+2026-11-04 사용자 결정에 따라 새 자동 인덱싱·survey·Range 추출·실패 재개는 중단했다. 사용자가 압축 해제해 Drive에 업로드하는 RGB·pose를 직접 준비하며 Depth는 초기 필수 입력이 아니다. 현재 일반 추출본→manifest/release/학습 adapter는 미완료이고 업로드 완료·정확 경로·독립 validation도 확인 전이다. [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)과 [전체 학습 준비](FULL_TRAINING_READINESS.md)를 따른다.
+
+이번 문서의 환경·소스 전달·checkpoint 보관 절차와 과거 실행 기록을 구분한다. 아래 archive notebook·API9·counterpart 실행법은 보존 기록이며 지금 실행을 요구하지 않는다. 기존 고정 pin·원본·예약·실패 결과는 보존하고 자동 재실행하지 않는다.
+
+## 합성 RGB→T1 GPU pilot — 준비 및 후속 통과 기록
+
+2026-11-02 [고정 GPU pilot](SYNTHETIC_GPU_PILOT.md)의 `20b7aa9` 사용자 Colab A100 FP32/AMP 시험은 통과했다. 각 RGB/M1 full/resume 상태·native cache/join·export 일치를 확인했으며 실제 데이터 GPU 성능·전체 학습 readiness나 Drive 새VM 내구성을 뜻하지 않는다. [일반 notebook](../notebooks/synthetic_gpu_pilot.ipynb)과 당시 고정 ready 사본을 구분하고 같은 시험을 다시 요청하지 않는다.
 
 ## 로컬 M1 통합 CPU 진단 — 최종 통과 결과 수령
 
@@ -12,9 +18,9 @@
 
 이 시험의 성공 기준은 실제 모델 성능이 아니라 합성4 record의 전체5단계 완료·2+2 update·validation의 유한 지표와 파일 hash/원본 보존이다. CPU child180초, source ZIP64MiB/해제128MiB, fixture128KiB, 실행 중 각 log64KiB, 결과 ZIP80MiB의 제한을 뒀다. 환경 준비 실패·timeout·로그 오류도 마지막 회수 셀에서 결과를 내려받도록 구성했지만 이번 사용자 성공 실행에서 해당 실패 경로가 실제 발생한 것은 아니다. ZIP 재다운로드는 허용하지만 worker를 자동 반복하지 않는다. 상세 제약은 [M1 안내](M1_BASELINE.md)를 따른다. 합성 Colab CPU 통과를 실제 RGB/pose·GPU 검증으로 확대 해석하지 않는다.
 
-## 현재 안내 — API9 / 사용자 테스트 보류
+## 과거 안내 — API9 / 2026-10-27 사용자 테스트 보류
 
-2026-10-27 사용자 결정으로 Colab 테스트를 일시 보류합니다. 아래 실행법은 재개 시 참고용이며 지금 새 실행을 요구하지 않습니다. 재개 전 테스트 세션이 [고정 인계와 식별값](REAL_DATA_NEXT_RUN.md)을 확인하며, 기존 revision `0f6c5ca`의 소스 ZIP·ready notebook·입력 캐시는 유지합니다. 일반 notebook의 문서 수정으로 고정 배포본을 교체하지 않습니다.
+2026-10-27에는 Colab 테스트를 일시 보류했다. 이후 API9/10·실제 sample 및102 진단·합성 GPU 시험이 진행됐으며, 이 절의 보류 상태를 현재 전체 테스트 상태로 해석하지 않는다. 2026-11-04 이후 압축·인덱싱 경로는 종료돼 아래 고정본을 재개하지 않는다. revision `0f6c5ca`의 소스 ZIP·ready notebook·입력 cache는 당시 근거로 보존한다.
 
 API9 `posePrefixWarm192MiB_v3`는 [캐시 계약](PREFIX_CACHE.md)에 따라 검증된 128MiB 이상 캐시와 `cache_expectation`이 필수이며 cold fallback이 없습니다. Gzip/tar는 **byte0부터 로컬 캐시를 다시 해제**하고, 원격 Drive에서는 캐시에 없는 후속 범위만 읽습니다. 이번 고정 128MiB 입력에서 새 media는 최대64MiB입니다. Gzip 내부 상태의 이어받기·임의 seek가 아닙니다.
 
@@ -37,9 +43,9 @@ Chunked metadata 수정 당시 Python 회귀검사는 97개가 통과했습니�
 ## 준비할 파일과 실행 범위
 
 - 프로젝트의 `notebooks/m1_baseline.ipynb`: Colab에 업로드할 실행 노트북입니다.
-- 프로젝트의 `notebooks/archive_prepare.ipynb`: 분할 압축의 앞부분을 제한 읽어 member 순서를 관측하거나 선택한 완전 파일을 추출하는 별도 노트북입니다. 이 준비 단계에는 CPU 런타임을 사용합니다.
+- 프로젝트의 `notebooks/archive_prepare.ipynb`: 종료된 압축 준비 경로의 보존 notebook입니다. 현재 추출본 준비의 선행 실행 파일로 사용하지 않습니다.
 - 같은 코드 revision으로 만든 `rewind-colab-source.zip`: 모델·학습·설정·테스트 코드를 담은 소스 묶음입니다. 원본 데이터·checkpoint·인증 정보는 포함하지 않습니다.
-- Google Drive: 원본 압축 데이터 보관과 실행 결과의 영구 저장에 사용합니다. 합성 진단은 데이터셋 없이 실행할 수 있습니다.
+- Google Drive: 사용자가 올린 RGB·pose 추출본과 실행 결과를 보관합니다. 기존 압축 원본은 보존합니다. 합성 진단은 데이터셋 없이 실행할 수 있으며 범용 추출본 학습 notebook은 아직 미완료입니다.
 
 현재 자동 push를 하지 않으므로 GitHub의 `main`과 로컬 최신 구현은 다를 수 있습니다. 이 가이드는 로컬 커밋의 소스 ZIP 업로드를 기본으로 합니다. 사용자가 별도로 원격에 올린 뒤에는 동일한 revision을 지정해 GitHub에서 가져오는 경로를 선택할 수 있습니다.
 
@@ -123,15 +129,24 @@ drive.mount('/content/drive')
 | --- | --- | --- |
 | Colab `/content` 아래 프로젝트·작업 디렉터리 | 코드, 합성 fixture, 필요한 시퀀스의 추출본, 학습 중 임시 파일 | 런타임 삭제 시 소실될 수 있음 |
 | Drive의 사용자 지정 실험 디렉터리 | 실행 설정, 코드 revision, 데이터 manifest, checkpoint, 지표·로그 | 영구 보관 |
-| 기존 Drive 데이터셋 폴더 | 다운로드한 원본 분할 압축파일 | 원본 보존 |
+| 사용자 Drive 추출본 폴더 | RGB 좌우·pose 원본 파일과 입력 manifest | 업로드 완료·목록/byte/hash를 확인한 뒤 사용 |
+| 기존 Drive 압축 데이터셋 폴더 | 기존 분할 압축파일 | 보존, 현재 인덱싱 실행 안 함 |
 
-Drive 마운트와 Drive API를 통한 부분 읽기는 별개입니다. `drive.mount()`만 실행한다고 범위 다운로드·순차 추출 기능이 생기지는 않습니다. 원본 압축 데이터의 준비 경로는 [로드맵](ROADMAP.md#부분-다운로드-조사와-실행-계획)을 따릅니다.
+현재 데이터 준비는 Drive의 검증된 RGB·pose 파일을 직접 읽거나 제한된 subset만 `/content`에 복사하는 방향이다. 업로드 경로·완료 여부와 파일 검증, IO·디스크 예산을 확인해 경로를 고정한다. `drive.mount()`만으로 데이터 검증·학습 release가 성립하지 않으며 Range API·압축 해제는 필수 단계가 아니다.
 
 노트북의 결과 경로 셀에서 `PERSIST_TO_DRIVE = True`로 바꾸면 Drive 인증과 영구 저장 경로를 준비합니다. 학습은 계속 로컬 임시 디스크에서 수행합니다. 학습이 끝나면 마지막 **완료 결과 영구 보관** 셀을 실행해 checkpoint와 관련 metadata를 Drive에 복사하고, 파일을 다시 읽어 SHA-256 일치를 확인합니다. 기존 export 경로는 덮어쓰지 않습니다.
 
 기본값 `False`에서는 임시 디스크에만 결과가 있습니다. 학습 중 자동 Drive 동기화는 구현하지 않았으므로 갑작스러운 런타임 종료 시 마지막 export 이후 결과를 잃을 수 있습니다. 노트북 저장만으로 모델 checkpoint가 보관되지는 않습니다.
 
 ## 5. 실제 데이터로 넘어가기 전
+
+사용자가 업로드한 RGB·pose 추출본을 기준으로 좌우·pose의 sequence/frame·원본 motion·split을 대조하고 크기·hash·decode·관절·단위·좌표·mask·overlay를 검사한다. 기존371 train과 추가 Joyful57의 단순 합산을 금지하고 독립 validation을 별도로 확보한다. 기존102 reader는 고정 입력만 받으므로 임의 폴더나371 전체를 바로 넣지 않는다.
+
+범용 adapter·명시 release·고정 학습 입력이 준비된 뒤 테스트 세션에서 작은 sample→overfit→pilot을 안내한다. 실제 GPU/VRAM·precision·batch·해상도·시간·RAM·디스크·update 상한을 고정하고 optimizer/scheduler/scaler/RNG/cursor를 포함한 재개 상태와 결과를 영구 보관한다. 이번 문서 갱신으로 새 학습을 시작하지 않는다.
+
+### 이전 archive 준비 절차 — 2026-11-04 종료
+
+아래는 과거 notebook의 동작·원본 pin·예산과 회수 절차를 보존한 기록이다. 현재 추출본 준비 절차가 아니며 새 원격 실행·예산 변경·실패 재개를 요청하지 않는다.
 
 먼저 `archive_prepare.ipynb`를 별도로 업로드하고 같은 revision의 소스 ZIP을 가져옵니다. CPU에서 합성 archive 진단을 실행한 뒤, [부분 압축 준비 안내](ARCHIVE_PREPARATION.md)에 따라 읽을 Drive 파일을 선택합니다. 아래 metadata 단계가 인증된 API에서 크기·버전을 확인해 manifest를 생성하므로 이 값을 직접 채우지 않습니다. 실제 Drive 읽기에는 노트북의 Colab 계정 인증과 `AuthorizedSession`이 필요합니다. 결과 저장용 `drive.mount()`와 원본의 HTTP Range 읽기는 서로 다른 연결입니다.
 
@@ -145,7 +160,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 특히 `train_val` 폴더명만으로 train 소속을 확정하거나, unknown 단위·좌표를 임의로 검증 완료 표시하지 않습니다. 준비된 small sample과 명시적 계약을 얻은 뒤 GT 입력 진단, 예측 입력 baseline 순서로 진행합니다. 한 시퀀스를 프레임별로 나누어 일반화 성능을 보고하지 않습니다.
 
-### Archive 준비 notebook: 한 방향 실행
+### Archive 준비 notebook: 한 방향 실행 — 과거 기록
 
 1. **CPU 런타임**에서 사용자용 `archive_prepare.ipynb`와 같은 revision의 코드 source ZIP을 준비합니다. 배포 묶음 전체 대신 내부 source ZIP만 업로드합니다. 이전 모듈이 import되어 있으면 결과를 먼저 내려받고 커널을 재시작합니다. Source 업로드는 한 번이며 별도 plan/선택 JSON 업로드는 없습니다.
 2. 위에서 아래로 로컬 사전 검사153개(archive24+metadata14+planning8+scan7+workflow7+targets10+pose-profile10+request-diagnostics14+request-retry21+prefix-cache22+warm128 8+warm192 8)를 실행합니다. 실제 데이터·Google 인증 없이 합성/모의/localhost만 검사합니다. Notebook/source API는9이며 기존14셀/7코드 셀 순서는 유지합니다. 이후 **JOB 한 설정 셀(id=job-config)**을 확인합니다. 사용자용 사본은 검토한 selection·profile·exact_targets가 이 셀에 미리 채워질 수 있으며 generic notebook은 직접 입력합니다.
@@ -161,7 +176,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 **기존 선택 추출은 별도 검토:** `profile=None`, `mode="extract"`, `purpose="discovery"`는 기존 custom8MiB 이하 limits에서 max_files를2이하로 설정하고 glob1~32개를 입력합니다. `targeted`도 실제 관측한 sequence/frame 필터만 바꿀 뿐 byte0 재읽기 비용은 같습니다. 18frame 좌우는 `camera_*`18개로 표현할 수 있으며36개 glob은 인증 전에 거부합니다. 필터로 반대쪽 파일이 예산 안에 나타난다고 보장하지 않습니다. 대응 파일을 자동 요청하지 않습니다.
 
-### 별도 counterpart64MiB_v1: 정확한2파일 추출
+### 별도 counterpart64MiB_v1: 정확한2파일 추출 — 과거 기록
 
 기본 smoke8MiB_v1(8MiB/60초/128요청/해제32MiB/최대32파일)은 유지합니다. 별도 `counterpart64MiB_v1`은 준비 body64MiB·협력적300초·768요청·해제128MiB·저장2파일의 고정 상한입니다. [고정 JSON](../configs/archive_limits_counterpart64MiB_v1.json)과 Python preset이 일치해야 하며 직접 수치만 변경하면 preflight에서 거부합니다. File4MiB·disk16MiB·path1024bytes·metadata64KiB·header1000과 Range/IO 상한은 바꾸지 않습니다.
 
@@ -175,7 +190,7 @@ Drive의 압축파일이나 추출 결과를 그대로 학습 CLI에 넣지 않�
 
 모든 결과는 train_ready=false입니다. 관측 목록/파일 hash·이름 대응, 실제 좌우 RGB/pose·시간·split/원본 motion 정합성, 학습 준비 완료를 구분합니다. 실행의 목적·기존 결과·다음 선택은 [다음 실제 데이터 준비 실행](REAL_DATA_NEXT_RUN.md)을 따릅니다.
 
-### Pose metadata가 많은 경우의 별도 고정 정책
+### Pose metadata가 많은 경우의 별도 고정 정책 — 과거 기록
 
 기존 pose 테스트는 같은64MiB 상한에서도 header1000에서 먼저 멈췄고 tar metadata64KiB 상한에도 근접했습니다. 동일 설정을 반복하지 않습니다. 별도 `poseCounterpart64MiB_v1`은 body64MiB/300초/768요청은 유지하고 **header10000·누적 tar metadata1MiB·해제512MiB**를 명시합니다. [설정 JSON](../configs/archive_limits_poseCounterpart64MiB_v1.json)과 실제 limits의 정확한 일치를 검사합니다. 기존 smoke/RGB-counterpart 정책은 그대로입니다.
 

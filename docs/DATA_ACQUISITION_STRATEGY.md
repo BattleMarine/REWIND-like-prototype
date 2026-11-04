@@ -1,8 +1,45 @@
-# 실제 데이터 확보 전략 검토
+# 실제 데이터 확보 전략
+
+2026-11-05 문서 갱신. **2026-11-04 사용자 결정으로 자동 인덱싱 경로를 중단하고, 사용자가 원본을 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용하는 방향으로 전환했다.** Depth는 초기 필수 입력이 아니다. 업로드 완료·정확한 경로·전체 내용 검증은 아직 확인하지 않았으며 범용 추출본→학습 adapter도 미완료다.
+
+기존371쌍은 모두 train이며 독립 validation은0이다. 추가 로컬 Joyful Jump57페어는 기존 자료와의 중복·원본 motion·split 검토 전이므로371과 단순 합산하지 않는다. 실제 학습 근거는102쌍 CPU 진단(2D frontend·3D regression 각51update)까지이며, 같은 train-fit의 화면안2D 오차330.28px·3D MPJPE634.07mm로 정확도가 낮다. Joyful Jump frame0·28·56의 실제2D 예측도 중앙에 몰리는 실패를 보였다. 전체57프레임의 GT overlay171PNG는 정답 시각화이며 모델 성능 근거가 아니다.
+
+현재 개발 순서는 **검증된1,000~10,000페어와 독립 validation 준비 → 2D 학습 개선 → 예측2D 기반3D baseline → 실제 M2/M3 학습 → 영상 연결**이다. 이는 목표와 순서이며 확보량·학습 완료를 뜻하지 않는다. 화면 UI는 학습·평가·추론 코어와 분리한다. 기존 코드·원본·snapshot·고정 pin·pending 예약은 보존하며 이번 전환으로 새 인덱싱·대규모 추출·학습을 자동 시작하거나 예산을 초기화하지 않는다.
+
+## 현재 입력 준비 절차와 완료 기준
+
+1. 사용자 업로드가 완료된 RGB·pose 폴더의 정확한 경로·원본 dataset/version·scene/actor/avatar/motion 식별자를 확인한다. 파일 수·byte와 누락 목록을 남기며 업로드 중인 디렉터리를 완전본으로 간주하지 않는다. Depth 부재로 초기 준비를 차단하지 않는다.
+2. 좌우 RGB·pose를 완전한 sequence/frame 키로 대조한다. 디렉터리 열거 순서·archive 순서·frame 번호만으로 서로 다른 motion을 결합하지 않는다. 중복 파일·중복 렌더링·누락과 split 소속을 검사하고, 기존371과 Joyful57도 동일한 기준으로 중복을 판정한다.
+3. 선택한 파일의 크기·SHA-256, RGB 해상도/PNG decode, raw 관절 이름·배열·유한 수치, calibration·좌표·단위·mask와 영상 overlay를 확인한다. 프로젝트의 raw cm→mm 가정과 수치 재투영 검사, 원본에 명시된 사실을 구분한다. 화면 밖의 유효 정답과 visibility를 혼동하지 않는다.
+4. sequence와 원본 motion이 겹치지 않는 train/validation을 고정한다. 기존371 train을 임의 frame 분할해 독립 validation이라고 부르지 않는다. Test는 튜닝에 사용하지 않는다. frame 연속성과 실제 timestamp/좌우 시간 정합을 따로 기록하며 명목25FPS로 시간을 생성하지 않는다.
+5. 추출본 manifest와 기존 변환기·RGB loader·reviewed release/shard 계약을 연결하는 **범용 adapter를 별도 구현·검증**한다. 현재 폴더를 기존102 전용 reader나 학습 CLI에 바로 넣는 경로는 지원 완료가 아니다. 기존 candidate의 blockers/`train_ready=false`와 신뢰 경계를 유지한다.
+6. manifest·코드 revision·입력/전처리 hash·split·자원 상한을 고정하고 작은 sample→overfit→pilot 순서로 확인한다. IO·RAM·임시 디스크·GPU/VRAM·update/학습시간 예산과 중단 조건을 실제 환경에서 측정한다. 결과·checkpoint·재개 상태는 임시 데이터와 분리해 영구 보관한다.
+
+Drive 직접 읽기와 필요한 subset의 Colab 로컬 복사 중 어느 경로를 쓸지는 업로드 목록과 IO 비용 확인 후 정한다. 새 notebook·범용 학습 실행 명령은 아직 완성되지 않았으므로 이 문서에서 실행 완료로 안내하지 않는다. 고정본 검토 후 테스트 세션에 인계한다. 화면 개발을 기다리지 않고 CLI/config로 준비·학습·저장·재개할 수 있게 한다.
+
+## 현재 확보량과 성능 근거
+
+| 자료 | 확인된 범위 | 남은 제한 |
+| --- | --- | --- |
+| 기존102+269 | 중복 없는371쌍,7sequence, 모두 train; 고정 ZIP·hash/decode/pose 키 검토 근거 | validation0, 전체 시간/원본 motion·학습 release·범용 통합 adapter 미완료 |
+| Joyful Jump 로컬 자료 | frame0..56의57좌우 RGB+pose,62관절 수치 및 GT overlay57패널+114개별뷰=171PNG | 사용자 제공 출처, 기존371과 중복·공식 split·원본 motion 독립성 미검토; 모델 예측 결과 아님 |
+| 실제102 학습 | frontend/regression 각51update, 보존 weights·재추론 일치 | 동일 train-fit 진단; 일반화·정식 baseline 성능 근거 없음 |
+| Joyful 실제 예측 | frame0·28·56에 보존2D frontend 적용 | 관절 중앙 집중 실패; 전체57 예측·3D·영상·성능 개선 완료 아님 |
+| 사용자 Drive 추출본 | 사용자가 압축 해제 후 업로드 중이라고 전달 | 업로드 완료·정확 폴더·총 페어 수·내용/시간 정합은 아직 확인 전 |
+
+근거는 [RGB269/371 검토](RGB269_PAIRS.md), [102 진단](REAL_RGB102_DIAGNOSTIC.md), [예측·GT overlay](PREDICTION_OVERLAY.md)를 따른다. 1,000~10,000은 목표이며 catalog 파일 수·관측 key·GT 시각화 수로 확보된 학습 페어 수를 대신하지 않는다.
+
+## 종료된 압축·인덱싱 경로의 보존
+
+분할 압축 원본·cache·index DB·receipt·고정 source/notebook·과거 실험 보고서·pending 예약은 보존한다. 로컬 보관 위치가 바뀐 자료는 [로컬 보관·복원 안내](LOCAL_STORAGE.md)의 원래 경로·크기·SHA를 기준으로 찾는다. 기존 소스 삭제, 서로 다른 원본/index 결합, 무제한 원격 실행·예산 초기화·예약 자동 해제는 이 전환에 포함되지 않는다.
+
+아래2026-10-21 비용 계산·prefix cache·Range 확대 제안은 **당시 검토 기록**이다. 일부 기능은 이후 구현·시험됐으나 새 데이터 확보 절차로 채택하지 않는다. 당시 ‘현재·미구현·다음’ 표현은 그 시점에 한하며 최신 상태는 이 문서 상단과 [로드맵](ROADMAP.md)을 따른다. 이번 문서 최신화는 추가 데이터 확보·학습·검증 완료를 의미하지 않는다.
+
+## 2026-10-21 압축 prefix 비용 검토 — 과거 기록
 
 2026-10-21 · 기준 revision `f6ef5c3e9a535d76360f0fbfd0a56dc50b7764eb` · M0 후속 계획 초안
 
-**권고하는 다음 개발 묶음은 제한된 압축 prefix 보관·재사용과 sequence/frame 관측 카탈로그다.** 기존 보관본을 먼저 대조하고, 이 기능을 로컬에서 검증한 뒤에만 한 번의 확장 탐색을 별도로 결정한다. 같은64MiB 작업의 반복이나 근거 없는 sequence 전환을 다음 실행으로 권고하지 않는다.
+**당시 권고했던 개발 묶음은 제한된 압축 prefix 보관·재사용과 sequence/frame 관측 카탈로그였다. 현재 권고에서는 제외한다.** 기존 보관본을 먼저 대조하고, 이 기능을 로컬에서 검증한 뒤에만 한 번의 확장 탐색을 별도로 결정한다. 같은64MiB 작업의 반복이나 근거 없는 sequence 전환을 다음 실행으로 권고하지 않는다.
 
 이 문서는 저장된 보고서·ZIP·파일·현재 코드를 오프라인으로 대조한 결과다. 새 원본 요청, 코드·예산 변경, 학습, 사용자 재실행 요청을 하지 않았다. 아래 확대 수치는 비용 시나리오와 제안이며 승인된 preset·D2 확정 예산이 아니다. M0의 좌표/영상·시간·split 검증과 실제 baseline 완료 상태도 올리지 않는다.
 
@@ -116,7 +153,7 @@ Local 읽기도64KiB마다 `local_reads`와 공유 `ranges`를 늘리고 `transf
 
 현API6 ZIP에는63.925MiB 압축 본체가 없으므로 **지금 cache hit로 삼을 수 없다**. 보관돼 있었다면96MiB까지 새 압축 읽기는 약32.075MiB였겠지만, 실제로는 최초 cache 구축 읽기가 필요하다. 중간 gzip part나 마지막 Range만 독립 해제하는 방식이 아니다.
 
-## 6. 권고 개발 한 묶음과 완료 기준
+## 6. 당시 권고 개발 한 묶음과 완료 기준
 
 기존 물건의 보관·검증을 정리하면서 **상한 있는 prefix 영구재사용과 sequence/frame 관측 보존**을 개발한다. 오른쪽 성공ZIP 미수령은 이후 영상대조의 제한이며 독립적인 cache 개발 전체의 blocker로 삼지 않는다. 이번 문서는 구현·실행 지시가 아니며 후속 개발·검토 후 고정 버전을 테스트 세션에 인계한다.
 
@@ -128,7 +165,7 @@ Local 읽기도64KiB마다 `local_reads`와 공유 `ranges`를 늘리고 `transf
 | 관측 카탈로그에 상한 | 도달한 완전sequence명·frame·좌우/pose·payload완료·저장·trust를 보존. 건수/path/report disk cap과 잘림 기록. Header명은 내용검증/seek index가 아님 |
 | 저장·보관·재사용 검증 | Cache 별도disk·영구보관 전송/용량/시간/중단조건,원본과결과의분리. 작은fixture에서 hit/miss/실패/원본변경/누락/출력hash/예산/post검사를 검증하고 보관본 재생 근거 제시 |
 
-### 이후 한 번의 탐색에 대한 절충 예시
+### 당시 후속 탐색에 대한 절충 예시 — 현재 실행하지 않음
 
 첫 원본 시험 후보로 Serena frame1·10을 유지하고 **body96MiB 정도를 cache/관측보존과 함께 한 번 탐색하는 안**을 권고한다.80MiB는 추가 진행이 약16MiB이고128MiB는 현재 평균으로 약465초·703MiB 해제가 필요하다.96은 중간 비용의 절충 예시이며 목표 위치에 근거한 최적값·최소 필요량이 아니다.80/96/128 어느 값에서도 성공 가능성은 미확정이다.
 

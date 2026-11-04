@@ -1,5 +1,7 @@
 # M0 JSON 사전 도구
 
+> **2026-11-05 현재 적용 범위:** JSON 감사·관절·mask 기능은 계속 사용한다. 현재 입력 확보는 사용자 압축 해제본이며 아래 압축 원본/prefix 실행 절은 과거 구현 기록이다. 새 데이터의 JSON 파싱·파일 대응 성공은 학습 release나 좌표·시간·split 검증 완료를 대신하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-10-13 첫 개발 묶음의 실행법과 검증 근거다. 모델 학습·평가, 좌표 의미 검증, M0 전체 완료를 포함하지 않는다.
 
 2026-10-15 후속 [ArchVis 실제 sample 감사](ARCHVIS_POSE_AUDIT.md)에서 32 JSON의 hash·관절 배열, 연속 18프레임 smoke 및 실제 causal window를 검사했다. 전체 subset에는 Opening의 gap 오류가 남으며 의미 검증과 학습은 미완료다.

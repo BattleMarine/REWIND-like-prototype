@@ -1,5 +1,7 @@
 # RGB 부분 인덱싱 가능성 조사
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 2026-10-29 · Production 구현이나 전체 데이터 인덱싱이 아닌 제한된 조사다. 기준 코드는 `33adef1`, 독립 실험 스크립트·의존성·입출력은 Git 제외 경로 `outputs/rgb_index_probe_20261029/`에 보존한다. 기존 환경과 원본 archive는 변경하지 않았다.
 
 ## 목적과 구성
@@ -78,4 +80,4 @@ Python3.12/Windows·indexed_gzip1.10.3, 간격별 별도 프로세스, 해제 �
 
 이번 작은 표본에서는 작은 파일 임의 조회에1MiB 간격이 읽기량을 줄였다. 전체 인덱스 저장 비용과 긴 시퀀스 추출 비용까지 포함한 최적값은 확정하지 않는다. 다음 개발 후보는 고정 원본 길이/identity, 부분 인덱스 checkpoint, 압축 Range 캐시를 함께 관리하는 reader다. 전체 RGB 인덱싱·사용자 Colab 테스트·모델 학습은 시작하지 않았고 M0~M3 상태는 유지한다.
 
-근거: [전송](../outputs/rgb_index_probe_followup_20261029/fetch_report.json), [1MiB](../outputs/rgb_index_probe_followup_20261029/spacing_1MiB/catalog.json), [4MiB](../outputs/rgb_index_probe_followup_20261029/spacing_4MiB/catalog.json), [16MiB](../outputs/rgb_index_probe_followup_20261029/spacing_16MiB/catalog.json), [부분 재개](../outputs/rgb_index_probe_followup_20261029/partial_resume.json), [독립 검토](../outputs/rgb_index_probe_followup_20261029/root_review.json). 후속 스크립트·보고서·바이너리는 신규 Git 제외 폴더에 보존하며, 의존성은 이전 실험의 isolated deps를 재사용했다. 전체 gzip CRC·archive 무결성과 사용자 Drive 복사본 일치는 확인하지 않았다.
+근거: [전송 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/fetch_report.json`), [1MiB · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/spacing_1MiB/catalog.json`), [4MiB · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/spacing_4MiB/catalog.json`), [16MiB · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/spacing_16MiB/catalog.json`), [부분 재개 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/partial_resume.json`), [독립 검토 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/rgb_index_probe_followup_20261029/root_review.json`). 후속 스크립트·보고서·바이너리는 신규 Git 제외 폴더에 보존하며, 의존성은 이전 실험의 isolated deps를 재사용했다. 전체 gzip CRC·archive 무결성과 사용자 Drive 복사본 일치는 확인하지 않았다.

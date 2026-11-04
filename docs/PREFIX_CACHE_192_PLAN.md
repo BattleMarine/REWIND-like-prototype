@@ -1,10 +1,12 @@
 # 보존128MiB cache에서192MiB까지의 bounded suffix
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 2026-10-23 · 기준 `2c5e334` · API9 개발 계약. 실제192MiB Drive 실행은 하지 않았다.
 
 ## 근거와160/192 비교
 
-[실제 warm128 검증](../outputs/test_archvis_pose_cache_warm128_20261021/verification.json)과 [보존 독립 검토](../outputs/test_archvis_pose_cache_warm128_20261021/orchestrator_cache_retention_review.json)를 기준으로 한다. 폴더 날짜20261021은 고정 인계명이며 검토일은10월23일이다. 두 ZIP은 Git 제외 보관물이다.
+[실제 warm128 검증 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm128_20261021/verification.json`)과 [보존 독립 검토 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm128_20261021/orchestrator_cache_retention_review.json`)를 기준으로 한다. 폴더 날짜20261021은 고정 인계명이며 검토일은10월23일이다. 두 ZIP은 Git 제외 보관물이다.
 
 - Cache는 논리128MiB(134,217,728bytes)·513chunk이며 기존 v1 prefix를 그대로 포함한다. 실제 warm 준비112.094초,그중 `remote_range_seconds=102.287`초다.
 - 목표 pose0개,카탈로그118sequence·8,434entry,잘림/미분류0이다. 빈 저장목록 검증은 목표 성공이 아니다. 동일128MiB warm을 반복하면 새 탐색량은0이다.

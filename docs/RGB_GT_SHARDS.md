@@ -1,5 +1,7 @@
 # 독립 frame용 RGB·GT shard 공급
 
+> **2026-11-05 현재 적용 범위:** 준비된 로컬 RGB/GT chunk를 공급하는 구현은 유지한다. 사용자가 해제한 원본 폴더에서 이 계약의 manifest와 split을 만드는 공통 경로는 별도 준비 작업이다. 이 문서의 구현을 실제 데이터 학습 승인이나 인덱싱 의무로 해석하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 전체 학습 준비 3b1 단계. 로컬에 준비한 RGB manifest와 `m1_features_v1` GT 문서를 작은 chunk 카탈로그로 묶고, 한 shard/선택 split의 metadata만 유지한다. 픽셀은 요청한 batch에서 해시 검사·decode한다. UI·모델 학습·resize·예측 cache 생성은 이번 범위 밖이며 실제 학습 release를 발급하지 않는다.
 
 ## 계약과 경계

@@ -1,5 +1,7 @@
 # 지속형 로컬 archive 인덱스
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 후속 [실제 샘플 확대 discovery](SAMPLE_EXPANSION.md)는 별도 명시 profile과 신규 ArchVis RGB source로 batch별 snapshot/receipt를 누적한다. 아래 기본 한도·기존 pose notebook/DB는 바꾸지 않으며 metadata+Range body256MiB/600초 등의 확대 profile은 그 고정 job에만 적용한다.
 
 2026-10-29 첫 구현. `rewind_archive_index`는 RGB·pose의 로컬 분할 gzip/tar를 대상으로 인덱스를 저장·복원·확장하는 선택 기능이다. 기존 API10, archive_prepare notebook, 원본과 캐시는 변경하지 않는다.
@@ -50,7 +52,7 @@ Pose는 `--kind pose`로 별도 DB를 만들고 JSON의 정확한 member 경로�
 - 기존 실제19.68MiB 구간을 불변 로컬 진단 입력으로 등록해20→40member를 새 프로세스에서 누적했다. 선택 PNG hash·offset은 앞선 독립 조사와 일치하며 root가 실제 추출 payload hash를 재대조했다. 전체 Lab 원본 명세나 커지는 cache reader를 검증한 것이 아니며 complete/CRC는 false다.
 - Windows DB 핸들 누수를 수정했고, Windows 생성은 기존 파일을 덮어쓰지 않는 rename, POSIX는 같은 filesystem hard link를 사용한다. 최종 검사는 일반 로컬 실행에서 통과했다. Python3.12.10과 이전 격리 indexed_gzip1.10.3·설치된 psutil을 사용했으며 기존 .venv는 바꾸지 않았다.
 
-근거는 [개발 검사](../outputs/persistent_index_development_20261029/tests.json), [기존 회귀](../outputs/persistent_index_development_20261029/existing_core_regression.json), [실제 구간](../outputs/persistent_index_development_20261029/real_prefix/result.json), [독립 검사](../outputs/persistent_index_review_20261029/root_final_tests.txt)에 보존한다. 최종 방어 조건과 EOF 빈 줄 정리 후 root가13개 검사를 다시 통과했으며 최종 코드 hash를 함께 보존했다.
+근거는 [개발 검사 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/persistent_index_development_20261029/tests.json`), [기존 회귀 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/persistent_index_development_20261029/existing_core_regression.json`), [실제 구간 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/persistent_index_development_20261029/real_prefix/result.json`), [독립 검사 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/persistent_index_review_20261029/root_final_tests.txt`)에 보존한다. 최종 방어 조건과 EOF 빈 줄 정리 후 root가13개 검사를 다시 통과했으며 최종 코드 hash를 함께 보존했다.
 
 기존 local source DB에는 경로와 파일 identity가 있으므로 다른 런타임에 복사만 해서 바로 재사용할 수 없다. 후속 [Drive 고정 source·닫힌 snapshot 연결](DRIVE_PERSISTENT_INDEX.md)은 runtime 경로 없는 원본 metadata와 명시 receipt로 저장·복원하는 adapter를 추가했으며 모의 검사와2026-10-30 실제 pose A→B 복원·목록16→32개 누적을 확인했다. 2026-10-30 후속 C 시험에서는 실제 pose의 기존 gzip coverage 밖 확장·저장본 재추출도 확인했다([C 결과](PERSISTENT_INDEX_EXTENSION.md#2026-10-30-수정본-실제-c-시험-결과)). RGB 원격·대규모 처리량은 미검증이고 학습 hook·대규모 행 catalog도 미구현이다. Live DB는 로컬에서만 실행하며 Drive 동기화 원자성을 가정하지 않는다. 전체 데이터 인덱싱·실제 사용자 pilot은 root의 별도 고정 인계 후 진행한다.
 

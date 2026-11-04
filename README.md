@@ -1,5 +1,23 @@
 # REWIND-like prototype
 
+REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정하며 정확도·강건성·실시간성을 개선하는 연구용 프로젝트입니다.
+
+논문과 동일한 절대 성능을 보장하는 공식 구현이 아닙니다. 비교 가능한 기준 모델과 재현 가능한 실험 체계를 먼저 구축합니다.
+
+## 현재 상태
+
+2026-11-05 문서 갱신. **2026-11-04 사용자 결정으로 자동 인덱싱 경로를 중단하고, 사용자가 원본을 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용하는 방향으로 전환했다.** Depth는 초기 필수 입력이 아니다. 업로드 완료·정확한 경로·전체 내용 검증은 아직 확인하지 않았으며 범용 추출본→학습 adapter도 미완료다.
+
+기존371쌍은 모두 train이며 독립 validation은0이다. 추가 로컬 Joyful Jump57페어는 기존 자료와의 중복·원본 motion·split 검토 전이므로371과 단순 합산하지 않는다. 실제 학습 근거는102쌍 CPU 진단(2D frontend·3D regression 각51update)까지이며, 같은 train-fit의 화면안2D 오차330.28px·3D MPJPE634.07mm로 정확도가 낮다. Joyful Jump frame0·28·56의 실제2D 예측도 중앙에 몰리는 실패를 보였다. 전체57프레임의 GT overlay171PNG는 정답 시각화이며 모델 성능 근거가 아니다.
+
+현재 개발 순서는 **검증된1,000~10,000페어와 독립 validation 준비 → 2D 학습 개선 → 예측2D 기반3D baseline → 실제 M2/M3 학습 → 영상 연결**이다. 이는 목표와 순서이며 확보량·학습 완료를 뜻하지 않는다. 화면 UI는 학습·평가·추론 코어와 분리한다. 기존 코드·원본·snapshot·고정 pin·pending 예약은 보존하며 이번 전환으로 새 인덱싱·대규모 추출·학습을 자동 시작하거나 예산을 초기화하지 않는다.
+
+현재 데이터 준비 기준은 [실제 데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md), 다음 개발 묶음은 [미니 프로토타입 계획](docs/MINI_PROTOTYPE_PLAN.md), 실행 가능 범위는 [전체 학습 준비](docs/FULL_TRAINING_READINESS.md)와 [Colab 안내](docs/COLAB_SETUP.md)를 따른다. [문서 전수 감사](docs/DOCUMENTATION_AUDIT_20261105.md)는 이번 정리 범위를 기록한다.
+
+## 이전 개발·실험 기록
+
+아래 날짜별 기록의 ‘현재·다음·최신·미실행’은 해당 시점의 상태다. 과거 인덱싱 우선순위·Range 실행·재개 안내는 현재 실행 지시에서 제외한다. 실제102 진단 이후 상태는 위 최신 요약을 따른다.
+
 2026-11-04 저장된102쌍 진단 frontend의 stereo PNG→62관절2D overlay CLI를 준비했다. 기존 두 프레임의 저장 예측 재현과 root 독립 실행을 확인했으나 관절이 중앙에 몰리는 미흡한 결과이며 성능 시연 완료는 아니다. 후속 사용자 로컬 자료57페어를 확인하고 Joyful Jump frame0·28·56의 실제 예측 이미지를 생성했으나 동일한 중앙 집중 실패를 보였다. [실행·검증·제한](docs/PREDICTION_OVERLAY.md).
 
 2026-11-03 두 번째 big step인 미니 프로토타입 준비를 병행한다. 보존된371쌍은 모두 train이며 실제 학습 근거는102쌍 진단까지다. 다음 개발 묶음은 기존 weights의 UI 독립 추론·결과 내보내기이며, 이후1,000~10,000쌍 확대·독립 validation·제한 시연·stereo 영상 연결로 진행한다. 이번에는 읽기 전용 감사와 계획만 완료했으며 학습·원격 추출·인덱싱 설정 변경은 없다. [재사용 입력·부족한 연결·개발 순서](docs/MINI_PROTOTYPE_PLAN.md).
@@ -10,11 +28,7 @@
 
 2026-11-03 Drive 자동 조사 준비: 기존90archive/354파일의 현재 metadata를 대조해 파일명·크기·수정 시각 차이0을 확인했다. 전체 비용을 확정하기 전 각 archive 최대2개 정상 scan으로 측정하는 survey와 고정 실행 notebook을 구현·로컬 검토했다. 최신 사용자 결정에 따라 총 실행시간 상한 없이 비차단 타이머·사용자 stop을 제공하고, 시간 외 자원 상한은 유지한다. 실제 Drive 실행·전체 비용 확정은 아직 미완료다. [원본 확인·조사 예산·인계 상태](docs/FLEET_DRIVE_SURVEY.md).
 
-REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정하며 정확도·강건성·실시간성을 개선하는 연구용 프로젝트입니다.
-
-논문과 동일한 절대 성능을 보장하는 공식 구현이 아닙니다. 비교 가능한 기준 모델과 재현 가능한 실험 체계를 먼저 구축합니다.
-
-## 현재 상태
+## 2026-11-03까지의 구현·실행 기록
 
 2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬16segment·mock Drive14segment에서 각각800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](docs/AUTOMATIC_FLEET_INDEXING.md).
 
@@ -82,18 +96,20 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 | 단계 | 확인한 구현·검증 | 남은 완료 조건 |
 | --- | --- | --- |
-| M0 데이터 | JSON 감사·window·candidate 변환기, 실제 ArchVis 32 JSON 검토, Serena 실제 stereo+pose2개 준비 | 대응 RGB·좌표/시간·split/원본 motion 및 학습 입력 검증. M0 전체 미완료 |
-| M1 비교 기준 | 합성 regression·예측 2D 캐시·학습 재개 검증. 합성 전체 연결 Colab CPU 진단 및 실제2sample GT 및 RGB 예측 입력→3D CPU 진단 통과 | 2D 정확도 개선·독립 validation 기반 baseline·GPU 검증. M1 전체 미완료 |
+| M0 데이터 | JSON·candidate 도구, 기존371 train 페어 검증 근거와 추가 로컬57페어 확인 | 신규 추출본 manifest·중복/motion/split·좌표/시간·독립 validation·학습 adapter. M0 전체 미완료 |
+| M1 비교 기준 | 합성 GPU 재개 검증과 실제102쌍 CPU 진단, 고정2D weights overlay 실행. 실제예측 정확도는 낮음 | 2D 정확도 개선·독립 validation·예측2D→3D baseline·실제 GPU 검증. M1 전체 미완료 |
 | M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
 | M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
 | M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
 | M5~M6 개선·통합 | 미착수 | Ablation·failure 평가·최종 재현 |
 
-최신 실제 API10(`33adef1`)은 목표 JSON2개 완전 저장·hash·파싱에 성공했습니다. 현재 압축 캐시는234MiB이며 ArchVis 전체 본체 상한은351.091MiB입니다. 다른 장면의 최대 크기와 범용 운영 제안은 [JSON 캐시 상한 계산](docs/POSE_CACHE_BOUNDS.md)을 따릅니다. 실제 GT2D 소량 진단 이후의 baseline 학습·전체 archive 무결성은 미검증입니다. [RGB 부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)에서는 실제19.68MiB·PNG31개와1/4/16MiB 간격을 비교하고, 원본 길이를 고정한 부분 인덱스 재개를 확인했습니다. 전체 RGB·Drive 연결은 미검증입니다.
+과거 API10(`33adef1`)은 목표 JSON2개 저장·hash·파싱에 성공했고 당시 압축 캐시는234MiB였다. 이후 RGB102+269의371쌍 확보와102쌍 진단까지 진행했다. [캐시 상한 기록](docs/POSE_CACHE_BOUNDS.md)과 [부분 인덱싱 조사](docs/RGB_INDEX_PROBE.md)는 보존 근거이며 현재 데이터 준비의 선행 실행 조건이 아니다. 전체 archive 무결성·정식 baseline 학습·일반화 성능은 미검증이다.
 
-최신 진입점은 [ArchVis pose 후속 시험 설계](docs/POSE_TAIL352_PLAN.md), [실제 데이터 확보 상태·보류 및 재개 기준](docs/REAL_DATA_NEXT_RUN.md), [캐시 계약](docs/PREFIX_CACHE.md), [192MiB 비용·상한](docs/PREFIX_CACHE_192_PLAN.md)입니다. 날짜별 구현·검증 기록은 [구현 이력](docs/IMPLEMENTATION_HISTORY.md), 세부 계획과 M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md)에서 확인합니다. 이전 자료와 현재 테스트 보호 범위는 [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md)를 따릅니다.
+현재 진입점은 [실제 데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md)과 [미니 프로토타입 계획](docs/MINI_PROTOTYPE_PLAN.md)이다. 과거 pose/cache 시험의 고정 pin과 결과는 해당 문서 및 [구현 이력](docs/IMPLEMENTATION_HISTORY.md)에 보존한다. M0~M6·E1~E8·D1~D5는 [로드맵](docs/ROADMAP.md), 이전 outputs 경로의 보관·복원은 [로컬 보관 안내](docs/LOCAL_STORAGE.md)를 따른다.
 
 ### RGB·pose 인덱스 저장과 재개
+
+이 절은 종료된 경로의 구현·실험 기록이다. 2026-11-04 이후 새 scan·복구·재개를 요청하지 않으며 학습 입력은 검증된 추출본에서 준비한다.
 
 [지속형 archive 인덱스](docs/PERSISTENT_ARCHIVE_INDEX.md)의 로컬 코어와 `python -m rewind_archive_index` CLI를 추가했습니다. 원본별 파일 목록·gzip restart 인덱스·완전 파일 경계를 SQLite 트랜잭션으로 함께 저장하고, 다음 실행에서 복원해 확장합니다. 조각 순서와 원본 identity를 고정하며 학습 shuffle과 archive 순서를 구분합니다. RGB·pose 모두 지원하고, 자동 인덱스 생성을 끈 선택 파일 추출과 프로세스 재시작을 포함한 로컬13개 검사를 통과했습니다.
 
@@ -115,6 +131,8 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 
 | 문서 | 역할 |
 | --- | --- |
+| [실제 데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md) | RGB·pose 추출본 준비·검증과 종료된 인덱싱 경로 구분 |
+| [미니 프로토타입 계획](docs/MINI_PROTOTYPE_PLAN.md) | 현재 개발 순서와 미완료 연결 |
 | [프로젝트 로드맵](docs/ROADMAP.md) | 현재 결정, 단계별 목표·완료 기준과 날짜별 상세 기록 |
 | [구현·검증 이력](docs/IMPLEMENTATION_HISTORY.md) | README에서 분리한 이전 구현·실행 기록 |
 | [로컬 보관·복원 안내](docs/LOCAL_STORAGE.md) | 현재 테스트 보호 범위와 이전 산출물의 개별 복원 |
@@ -123,7 +141,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [실제 관절 대응표](docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
 | [단위·좌표계 및 학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) | 실제 변환 수치 검증, 단위 근거의 강도, body22+finger40 권고와 학습 진입 조건 |
 | [실제 pose 변환기](docs/REAL_DATA_PREPARATION.md) | 채택한 초기 규격, mm·mask·camera·손목 상대 특징 변환과 candidate 검증 |
-| [다음 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md) | 현재 확보 상태, Colab 테스트 보류·재개 기준과 남은 학습 조건 |
+| [이전 실제 데이터 준비 실행](docs/REAL_DATA_NEXT_RUN.md) | 과거 고정 시험과 확보 근거; 현재 경로는 데이터 확보 전략 참조 |
 | [데이터·window 계약](docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
 | [Causal window 독립 검토](docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
 | [M3 whole-body teacher 안내](docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
@@ -131,7 +149,7 @@ REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터
 | [M1 학습 기반 안내](docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
 | [로컬 lazy RGB 로더](docs/LOCAL_RGB_LOADER.md) | Manifest builder·sample/batch API·합성 CPU 검증 범위와 실제 입력 제한 |
 | [Colab 준비 안내](docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
-| [압축 원본 준비 도구](docs/ARCHIVE_PREPARATION.md) | Source/예산 계약, 제한된 순차 추출, 완전 파일·CRC·매칭·재사용 검증 범위 |
+| [압축 원본 준비 도구](docs/ARCHIVE_PREPARATION.md) | 종료된 압축 준비 경로의 코드·검증 보존 기록 |
 
 프로젝트 계획은 `docs/ROADMAP.md`를 기준으로 관리합니다. 이후 변경은 문서에 반영합니다. 로드맵의 미결정 항목 D1~D5와 잠정 목표는 확정된 요구사항과 구분합니다.
 
@@ -163,25 +181,22 @@ Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입
 | M5 | 단일 변경별 개선 실험과 failure benchmark |
 | M6 | 최종 모델, 평가 결과, 재현 가이드 |
 
-각 단계의 진입 조건과 실험 E1~E8의 세부 내용은 [로드맵](docs/ROADMAP.md)에 기록합니다. JSON 사전 도구 구현 이후에는 관절 규격·좌표·시간과 split을 검증하고 GT 2D 기반 진단 학습을 준비할 계획입니다. 대응 RGB 확보 후 예측 2D 기반 baseline으로 연결하며, 다음 구현은 별도 작업 지시 범위에 따릅니다. GT 입력 진단만으로 M1 완료를 선언하지 않습니다.
+각 단계의 진입 조건과 E1~E8은 [로드맵](docs/ROADMAP.md)에 기록한다. 현재는 이미 보존된371 train 페어와 사용자 업로드 추출본을 기준으로 입력 검증·독립 validation·범용 학습 adapter를 준비한 뒤2D 개선과 예측2D 기반3D baseline으로 진행한다. GT 입력 진단이나 문서 정리만으로 M0/M1 완료를 선언하지 않는다.
 
 ## 개발과 실험 환경
 
 - 주 학습 환경은 Google Colab GPU를 계획하고 있습니다. 실제 GPU, 저장 용량과 학습 예산은 미정입니다.
 - 기존 초기 데이터 후보는 UnrealEgo입니다. 이전 UnrealEgo2 JSON으로 사전 도구를 검증했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
-- **2026-10-13 운영 결정:** Drive에는 압축 원본을 보존하고 필요한 시퀀스를 Colab/runtime 임시 디스크에 추출해 읽습니다. 같은 런타임에서는 검증된 추출본을 재사용하며 세션 종료·추출본 소실 후 다시 추출합니다. 실험 결과·checkpoint·manifest는 영구 저장소에 분리 보관합니다.
+- **2026-11-04 운영 결정:** 사용자가 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용한다. 필요한 검증 subset만 Colab 임시 디스크에 준비하고 재사용하며 결과·checkpoint·manifest는 영구 보관한다. 이전 압축 원본과 인덱스는 보존하되 자동 인덱싱·부분 Range 읽기를 기본 준비 과정에서 제외한다.
 - 작은 데이터의 입출력 검증과 과적합 테스트를 통과한 뒤 학습 규모를 늘립니다.
 - Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, regression은 `rewind_m1`, body diffusion은 `rewind_m2`, body–hand cascade는 `rewind_m3` 모듈로 분리했습니다.
 - 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
 
-### Drive와 Colab의 데이터 준비 — pose 소량 추출 확인
+### Drive와 Colab의 데이터 준비
 
-Drive의 현재 분할 압축 원본을 유지하고, 인증된 Drive API의 `Range` 요청으로 일정 바이트씩 읽어 Colab CPU에서 순차 해제하는 구조입니다. `rewind_archive`의 local/HTTP 소스와 추출 코어는 합성·기존 공식 prefix 로컬 재생으로 확인했습니다. Metadata HTTP200 chunked 실패는 사용자 Colab에서 관측했고 수정은 모의/실제 라이브러리 loopback으로 검사했습니다. 수정본의 실제 pose manifest/pilot 성공은 사용자 보고서로 확인했습니다. 좌우 RGB·pose의 정합성·split·GPU 학습 연결은 미완료입니다. 전체 압축본·결합본·전체 추출본을 런타임에 보관하지 않습니다. 결과·checkpoint·manifest는 별도 영구 보관합니다. [Drive 부분 다운로드](https://developers.google.com/workspace/drive/api/guides/manage-downloads#partial_download), [Colab 운영 제약](https://research.google.com/colaboratory/faq.html)
+Drive의 RGB·pose 추출본에서 sequence/frame·좌우 뷰·원본 motion·split을 확인하고 크기·SHA·PNG decode·JSON 관절/단위/좌표·mask를 검증한다. 업로드 폴더와 완료 여부는 실제 목록으로 확인해야 하며 현재 범용 학습 adapter·실제 데이터 release는 미완료다. Drive에서 직접 읽을지 검증 subset을 `/content`로 복사할지는 IO·공간 비용을 측정해 고정한다. 원본 압축 전체를 Colab에서 다시 다운로드·결합·인덱싱하는 단계를 요구하지 않는다.
 
-- 현재 `000`, `001` 등은 하나의 gzip 스트림을 나눈 조각입니다. 별도 인덱스 없이 중간 조각만 독립 해제하거나 원하는 학습 배치 위치로 바로 이동할 수 없습니다. 네트워크 읽기 단위와 학습 배치는 다릅니다.
-- 불완전한 archive도 `000`부터 끊김 없이 확보한 앞부분에서는 온전히 읽힌 파일을 sample 후보로 사용할 수 있습니다. 잘린 마지막 파일은 제외하며, 일부 추출 성공을 전체 무결성·완전한 시퀀스 확보로 해석하지 않습니다.
-- 저장할 sample이 작아도 앞부분을 읽고 해제하는 전송량·시간은 클 수 있습니다. 응답 body·시간·해제/IO buffer·파일/disk·metadata/range 수 상한을 구현했으며 [개발용 설정](configs/archive_limits_smoke.json)은 Colab 실측 예산이 아닙니다. 프로세스 RSS나 DNS/auth/OS 전체 hard deadline을 보장하지 않습니다. 실제 처리량·운영 상한은 Colab 소량 시험 후 정합니다.
-- 같은 런타임에서는 검증된 추출본을 재사용합니다. 런타임 삭제·추출본 소실 후에는 재준비가 필요합니다. 직접 메모리에서 학습에 공급하는 방식과 독립 압축 묶음 생성은 후속 검토 후보입니다. gzip 인덱스는 위의 별도 제한형 도구로 구현했으며 기존 준비·학습 경로에는 아직 연결하지 않았습니다.
+번호 연속성을 timestamp·stereo 동기화의 증거로 사용하지 않는다. 입력 manifest·전처리·모델 버전과 checkpoint를 런타임 추출본과 분리 보관한다. 종료된 Range·gzip·인덱스 경로의 사실과 고정 설정은 [압축 준비 기록](docs/ARCHIVE_PREPARATION.md)에 남기며 현재 실행 절차로 사용하지 않는다.
 
 작은 sample → overfit → pilot 순서는 실행 가능한 개발 방향입니다. 다만 논문 크기 모델·대규모 학습·반복 실험을 현재 Colab 예산으로 수행할 수 있는지는 GPU·VRAM·입출력·step 시간 측정 후 판단합니다. 30 FPS와 성능 개선은 달성이 보장된 결과가 아닙니다.
 
@@ -200,6 +215,8 @@ python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton confi
 기존 18프레임 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행하며, 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춥니다. 일반 데이터에는 `--provenance`를 생략할 수 있습니다. 기존 파일은 Git에 포함되지 않고 현재 가용성을 가정하지 않습니다. 합성 fixture 테스트는 데이터셋 없이 실행할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. Archive와 loader의 경계는 [도구 안내](docs/M0_JSON_TOOLS.md#압축-원본-준비-계획과-구현-상태)를 확인합니다.
 
 ## 데이터 없이 분할 archive 준비 실행
+
+종료된 경로의 합성 개발 예시다. 현재 데이터 준비나 학습의 선행 조건이 아니며 원격 실행을 요청하지 않는다.
 
 Python 표준 라이브러리 환경에서 실행합니다. 명시한 sequence/member glob만 저장하며 새 output을 지정합니다.
 

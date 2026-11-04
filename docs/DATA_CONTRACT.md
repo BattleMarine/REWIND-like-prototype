@@ -1,5 +1,7 @@
 # 데이터 규격 근거와 causal window 계약
 
+> **2026-11-05 이력 구분:** 공개 규격 조사와2026-10-15의 unknown 상태는 해당 시점·sample의 기록이다. 후속 채택된62관절·좌표 가정은 [실제 데이터 준비](REAL_DATA_PREPARATION.md)를 따른다. 사용자 추출본에도 같은 출처·mask·시간·split 검증을 적용한다.
+
 2026-10-13 · 공개 1차 자료 조사 및 합성 코드 검증. 이번 묶음에서는 Drive, 기존 raw 데이터, 실제 sample 산출물에 접근하지 않았다. **자료의 설명**, **과거 파일 관측 이력**, **프로젝트 구현 가정**을 분리하며 runtime의 `unknown` 상태를 자료 조사만으로 올리지 않는다.
 
 2026-10-15 후속 [실제 ArchVis sample 감사](ARCHVIS_POSE_AUDIT.md)에서 별도로 32개·각 87관절을 확인했다. 좌우 camera 3D 평균과 device 3D의 수치 일치를 확인했지만 단위·축·회전·시간·calibration·split은 unknown을 유지한다. 아래 10월 13일 조사와 구분한다.

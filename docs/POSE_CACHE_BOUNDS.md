@@ -1,12 +1,14 @@
 # JSON 확보용 압축 캐시 상한 계산
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 2026-10-29 · 계산과 운영 제안이며 새 예산을 적용하거나 추가 원본 읽기를 실행한 것이 아니다.
 
 ## 결론과 적용 범위
 
 한 장면의 모든 위치를 탐색할 수 있도록 압축 prefix를 보존하는 경우 본체 상한은 `S = 고정한 분할 원본 크기의 합`이다. 목표 JSON이 어디에 있는지 모르므로 작은 추출 파일 크기로 필요 압축량을 예측할 수 없다. 메모리 작업 버퍼, 디스크 압축 캐시, 추출 JSON, 학습 배치는 다른 항목이다. 캐시를 저장하지 않고 순차 처리할 수도 있지만 런타임 종료 후 원본 재읽기 비용이 발생한다.
 
-2026-10-28 Drive **train_val pose 15장면** metadata 기준이며 test pose·다른 데이터셋·향후 변경 파일의 상한은 아니다. [목록](../outputs/archive_lookup_20261028/drive_inventory.json)과 [계산](../outputs/cache_bounds_20261029/bounds.json)을 보존한다. 실행 시 원본 크기와 identity를 다시 대조해야 한다.
+2026-10-28 Drive **train_val pose 15장면** metadata 기준이며 test pose·다른 데이터셋·향후 변경 파일의 상한은 아니다. [목록 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/archive_lookup_20261028/drive_inventory.json`)과 [계산 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/cache_bounds_20261029/bounds.json`)을 보존한다. 실행 시 원본 크기와 identity를 다시 대조해야 한다.
 
 | 범위 | 압축 본체 상한 | 권장 캐시/ZIP 예산 | 구현 상태 |
 | --- | --- | --- | --- |
@@ -42,4 +44,4 @@
 
 고정33adef1/API10 `archvis_pose_1_10_tail352_001`에서 기존192MiB를 재사용하고 신규42MiB를 읽어234MiB prefix에서 두 JSON을 확보했다. 준비158.097초/506HTTP, 초기metadata 별도0.159초/1HTTP다. 저장170,985bytes, 두 JSON hash와 object 파싱을 확인했다. 목표 조기 종료이므로 전체 gzip CRC·archive 무결성은 미검증이고 `train_ready=false`다.
 
-[제출 결과](../outputs/test_archvis_pose_tail352_20261029/verification.json)의 v4 cache는245,473,378bytes, SHA256 `47ec61cef1a9115cfc0b78d1192a9d0a84e5f0902d3a1f0fa1257449e0e842cd`다. 오른쪽 RGB 성공 원본 회수·영상/좌표/시간 정합성은 남아 있다. 실제 실행 notebook·사용자 사전검사3개 로그·RAM/디스크 숫자·Drive 영구보관은 미확인이다. 이번 계산 작업에서 다시 추출하거나 캐시를 확장하지 않았다.
+[제출 결과 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_tail352_20261029/verification.json`)의 v4 cache는245,473,378bytes, SHA256 `47ec61cef1a9115cfc0b78d1192a9d0a84e5f0902d3a1f0fa1257449e0e842cd`다. 오른쪽 RGB 성공 원본 회수·영상/좌표/시간 정합성은 남아 있다. 실제 실행 notebook·사용자 사전검사3개 로그·RAM/디스크 숫자·Drive 영구보관은 미확인이다. 이번 계산 작업에서 다시 추출하거나 캐시를 확장하지 않았다.

@@ -1,5 +1,7 @@
 # 완료 bundle의 단일 프레임 진단 데이터 계약
 
+> **2026-11-05 현재 적용 범위:** 기존 완료 bundle의 진단 reader 계약은 유지한다. 압축 해제본을 확보했다고 이 reader의 완료 marker·출처·split·학습 조건이 자동 충족되는 것은 아니다. 추출본 공통 adapter와 실제 데이터 release는 후속 작업이다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 `rewind_bundle_data.PreparedBundleReader`는 [준비 bundle](PREPARED_BUNDLE.md)의 RGB와 pose candidate를 UI·모델·optimizer 없이 읽는다. `dataset_sample`, `input_source=gt_2d`, `diagnostic_only=true`, `train_ready=false`를 유지한다. generic `m1_features_v1` 문서나 학습 release를 발급하지 않으며 기존 trainer에 자동 연결하지 않는다.
 
 ## 명시 입력

@@ -1,5 +1,7 @@
 # Cold cache 결과 이후의 최소 후속 작업안
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 후속 구현·실제 결과: 이 문서의128MiB 경로는 API8 `posePrefixWarm128MiB_v2`로 구현했고 실제 캐시 재사용·128MiB 확장도 확인했습니다. 이어 API9 `posePrefixWarm192MiB_v3`를 구현해 고정 버전으로 인계했습니다. [192MiB 계획·계약](PREFIX_CACHE_192_PLAN.md), [최신 캐시 안내](PREFIX_CACHE.md), [현재 실행 보류·재개 기준](REAL_DATA_NEXT_RUN.md)을 따릅니다. 아래192MiB 비교 후보·미구현 표현은 설계 당시 기록이며 실제192MiB 원본 탐색이나 목표 pose 확보가 확인됐다는 뜻은 아닙니다.
 
 2026-10-21 · 기준 `f0607fa` · **오프라인 검토와 계획 문서이며 새 profile·원본 실행을 적용하지 않았다.**
@@ -8,7 +10,7 @@
 
 ## 1. 실제 cold가 남긴 근거
 
-근거는 [독립 검토](../outputs/test_archvis_pose_cache_cold_20261021/orchestrator_review.json),[테스트 검증](../outputs/test_archvis_pose_cache_cold_20261021/verification.json),[카탈로그 요약](../outputs/test_archvis_pose_cache_cold_20261021/catalog_summary.json)과 같은 폴더의 결과ZIP·`prefix_cache.zip`이다. 모두 Git 제외 보관물이며 새 checkout에 자동 포함되지 않는다.
+근거는 [독립 검토 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_cold_20261021/orchestrator_review.json`),[테스트 검증 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_cold_20261021/verification.json`),[카탈로그 요약 · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_cold_20261021/catalog_summary.json`)과 같은 폴더의 결과ZIP·`prefix_cache.zip`이다. 모두 Git 제외 보관물이며 새 checkout에 자동 포함되지 않는다.
 
 | 관측 | 값 |
 | --- | --- |

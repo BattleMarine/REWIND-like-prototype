@@ -1,5 +1,7 @@
 # Drive 자동 인덱싱의 첫 운영 준비
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 ## 현재 원본 확인 (2026-11-03)
 
 Google Drive connector의 files.get으로 기존 inventory의354파일을 모두 조회했다.90archive/354파일/3,094,462,001,717bytes이며 ID별 파일명·크기·수정 시각 차이는0이다. 이 조회는 원본 media를 읽지 않았고 archive 무결성을 확인한 것은 아니다. Connector는 version을 요청해도 normalized 응답에 제공하지 않았으므로 실행 전 Colab API에서 version을 고정해야 한다.
@@ -92,3 +94,8 @@ Notebook 코드셀 문법, worker 비차단 시작·none 시간 인자·stop 연
 Root 독립 회귀8개가7.438초에 통과했다(실패0, skip0). 실제 coverage 함수에서 미탐색·부분진행·46완료/44미탐색과 pending·EOF·전체 quota·빈 선택을 검증하고, 기존 survey 실행 완료·시간 관측 경로도 확인했다. 로컬 fixture store의 조회 전후 파일 hash·HEAD·pending·usage 불변을 확인했다. 실제 Drive store 재조회나 원격 재개는 하지 않았다. 근거: `outputs/fleet_coverage_fix_20261103/root/tests.json`.
 
 후속 실패1건의 명시 재개 준비는 [고정 재개 계약](FLEET_SURVEY_RESUME.md)을 따른다. 원래 실행본으로 반복 재시도하거나 원 PREPARED의 source pin을 덮어쓰지 않는다.
+
+
+## 종료 상태
+
+고정 재개 af275f5에서도 같은 첫 media 요청 오류가 재발해 진전은92segment·3,752파일에 머물렀다. 복구·집계 수정과 네트워크 원인 해결을 구분한다. 이후 사용자가 인덱싱을 중단했으며 최종 근거는 [재개 결과](FLEET_SURVEY_RESUME.md)를 따른다.

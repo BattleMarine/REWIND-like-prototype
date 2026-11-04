@@ -1,5 +1,7 @@
 # 이미지·동영상 입력과 프론트 방향
 
+> **2026-11-05 현재 적용 범위:** 이미지와 동기화된 stereo 동영상 지원 방향, UI와 모델·학습 코어 분리는 유지한다. 현재는 추출된 RGB·pose로 모델 학습을 준비하는 일이 우선이다. 실제 Joyful Jump57프레임의 GT 시각화와3프레임의 진단 모델 추론은 영상 모델의 학습·정확도 검증이 아니다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 사용자 결정: 최종 프로토타입은 개별 이미지뿐 아니라 동영상도 처리한다. 아래는 설계 방향이며 동영상 decoder·UI·실제 temporal 학습의 구현 완료 기록이 아니다. 웹 framework, codec 지원 목록, 실시간 카메라 연결은 후속 결정이다.
 
 현재 구현(2026-11-02)은 공통 프레임 선언과 기존 local RGB 이미지 경로 연결까지다. 원본·좌우·미확인 시간/geometry를 보존하며 실제 이미지 tensor/mask 동일성을 확인했다. [구현 계약과 검증](FRAME_INPUT.md)을 따르고, 아래 decoder·UI·실제 temporal 경로는 계속 후속 계획으로 유지한다.
@@ -8,7 +10,7 @@
 
 [REWIND 본문](https://jyunlee.github.io/projects/rewind/static/paper.pdf)의 §3, Fig.2, §3.1–3.3은 stereo egocentric 이미지 시퀀스와 카메라 자세를 조건으로 body를 먼저 추정하고, 예측 상체를 조건으로 hand를 추정한다. 현재·과거 window를 쓰는 relative-temporal attention과 one-step 증류가 시간 처리·속도의 핵심이다. 따라서 동영상 지원은 논문의 시간적 입력 구조에 맞는 방향이다. 임의의 외부 시점 단안 동영상을 같은 모델에 넣는 지원으로 확대 해석하지 않는다.
 
-[보충자료](https://jyunlee.github.io/projects/rewind/static/supp.pdf) S.3.1–3.3은 EfficientNet 기반 encoder/CNN heatmap decoder, 2D keypoint·confidence와 camera 특징, temporal attention을 기술한다. 현재 작은 Conv 모델의 두 sample 진단은 이 frontend의 재현이나 동영상 성능 증거가 아니다. 영상 파일 해석·타임라인 UI·결과 내보내기는 프로젝트에서 추가할 기능이다.
+[보충자료](https://jyunlee.github.io/projects/rewind/static/supp.pdf) S.3.1–3.3은 EfficientNet 기반 encoder/CNN heatmap decoder, 2D keypoint·confidence와 camera 특징, temporal attention을 기술한다. 작은 Conv 모델의 초기2sample 및 후속102sample 진단은 이 frontend의 재현이나 동영상 성능 증거가 아니다. 영상 파일 해석·타임라인 UI·결과 내보내기는 프로젝트에서 추가할 기능이다.
 
 ## 공통 입력과 추론 구조 — 구현 계획
 

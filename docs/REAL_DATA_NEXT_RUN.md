@@ -1,5 +1,7 @@
 # 다음 실제 데이터 준비 실행
 
+> **2026-11-05 현재 적용 범위:** 현재 다음 작업은 사용자가 압축 해제한 RGB·pose의 파일 목록·sequence/frame 대조와 공통 학습 입력 연결이다. 기존371쌍은 모두 train이고 신규 Joyful Jump57쌍은 로컬 확인·GT 표시까지이며 독립 split/중복 검토 전이다. 아래 2sample·prefix·고정 시험은 종료된 준비 이력이다. 기존 blockers를 해제하거나 새 원격 추출을 시작하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 ## 2026-11-02 실제 정식 RGB2D 연결 후 현재 차단 상태
 
 [외부 검토 release와 학습 연결](REAL_RGB2D_RELEASE.md)은 구현·로컬 검증했지만 현재 실제 Serena는 train2/validation0이며 original_motion=declared_unverified다. 원 candidate의6개 blockers·SHA44ec803069ddee642e45832f88a71979c5cf1966bbe2e8574d37bd9742bec0e2를 그대로 보존했다. 별도 감사는 outputs/full_training_readiness_20261102/developer/rgb_release/serena_blocked/report.json에 있고 실제 학습·release·policy 발급은0이다.
@@ -58,7 +60,7 @@ Root도 별도 출력 `outputs/real_stereo_sample_20261102/root/prepared/`에서
 
 `rgb_pose_manual_5340cbe_001`은 합성 UI의 PDF 상태와 사용자 resize 진술을 확인한 결과다. 브라우저 버전·원래 화면 이름 가독성은 미확인이고, 개발 당시 root의 브라우저 접근 불가를 소급해 성공으로 바꾸지 않는다. [수동 검토](../outputs/test_rgb_pose_manual_5340cbe_20261028/final_review.json)와 [실제 자료 대조](../outputs/test_rgb_pose_manual_5340cbe_20261028/actual_correspondence_review.json)에서 조사 범위의 동일 sequence/frame stereo+pose 확인은0개였다. 전체 보관본·Drive·archive의 부재를 의미하지 않는다. 오른쪽 성공 원본 ZIP 회수는 사용자 자료 확인이 필요한 항목으로 남는다.
 
-최신 실제 API9 `archvis_pose_1_10_cache_warm192_001` 결과를 수령했다. 논리192MiB까지 정상 bounded stop,기존128MiB cache 재사용·추가64MiB,준비395.879초·770HTTP·목표0개다. 카탈로그는180sequence/12,642entry·잘림없음이지만 전체목록/seek index가 아니다. 마지막 Nathan Sitting_Idle frame66은 payload 미완료다. 전체 archive의 Serena 부재를 뜻하지 않는다. 결과는 [verification.json](../outputs/test_archvis_pose_cache_warm192_20261023/verification.json)과 [catalog_summary.json](../outputs/test_archvis_pose_cache_warm192_20261023/catalog_summary.json)에 보존한다.
+최신 실제 API9 `archvis_pose_1_10_cache_warm192_001` 결과를 수령했다. 논리192MiB까지 정상 bounded stop,기존128MiB cache 재사용·추가64MiB,준비395.879초·770HTTP·목표0개다. 카탈로그는180sequence/12,642entry·잘림없음이지만 전체목록/seek index가 아니다. 마지막 Nathan Sitting_Idle frame66은 payload 미완료다. 전체 archive의 Serena 부재를 뜻하지 않는다. 결과는 [verification.json · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm192_20261023/verification.json`)과 [catalog_summary.json · 복원](LOCAL_STORAGE.md#개별-파일-복원) (`../outputs/test_archvis_pose_cache_warm192_20261023/catalog_summary.json`)에 보존한다.
 
 다음은 [API10 ArchVis pose 후속 시험](POSE_TAIL352_PLAN.md)을 준비한다. 검증된 v3 192MiB cache를 고정하고 남은159.09MiB를 순차 탐색해 기존 Serena frame1/10의 정확한 내부 파일명 두 개만 선택 저장한다. 원본/기존 cache·API9 고정배포본은 불변이다. 준비1200초·응답body192MiB·1916요청 상한이며 자동 재실행·RGB/다른장면/전체pose 다운로드는 없다. Root 검토·커밋 뒤 새 revision의 source ZIP/ready notebook/hash를 고정하고 테스트 세션이 사용자에게 안내한다. 실제 Drive·Colab 실행·선택파일확보는 아직 미검증이다.
 

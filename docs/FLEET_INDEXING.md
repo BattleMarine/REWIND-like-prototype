@@ -1,6 +1,8 @@
 # 전체 데이터셋의 독립 사전 인덱싱
 
-2026-11-03 최신 구현: 새 `bounded_auto_v1` profile의 자동 실행·중단·재개·coverage와 CPU worker notebook을 추가했다. 기존 calibration/legacy 계약은 유지하며, 정상 구간별 사용자 승인은 요구하지 않는다. [자동 프로그램의 검증 결과와 운영 경계](AUTOMATIC_FLEET_INDEXING.md)를 따른다. 아래 실험·실패 기록은 당시 조건의 근거로 보존한다.
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
+2026-11-03 당시 구현: 새 `bounded_auto_v1` profile의 자동 실행·중단·재개·coverage와 CPU worker notebook을 추가했다. 기존 calibration/legacy 계약은 유지하며, 정상 구간별 사용자 승인은 요구하지 않는다. [자동 프로그램의 검증 결과와 운영 경계](AUTOMATIC_FLEET_INDEXING.md)를 따른다. 아래 실험·실패 기록은 당시 조건의 근거로 보존한다.
 
 ## 버퍼·인덱스 간격의 격리 비교 (2026-11-03)
 

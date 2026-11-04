@@ -1,5 +1,7 @@
 # 실제 RGB→예측2D→3D 정적 sample 진단
 
+> **2026-11-05 이력 구분:** 이 문서는2026-11-02의 고정2sample 진단이다. 후속 [102쌍 진단](REAL_RGB102_DIAGNOSTIC.md)과 [실제 예측·GT 표시](PREDICTION_OVERLAY.md)를 현재 상태와 함께 확인한다. 어떤 결과도 독립 validation이나 완성된 REWIND 성능을 뜻하지 않는다.
+
 2026-11-02 · 보존된 Serena train frame1·10의 실제 stereo RGB2sample로 front-end→예측cache→단일 frame regression 연결을 확인했다. 같은 두 sample의 `train_fit_diagnostic`이며 validation·일반화·temporal·논문 성능 결과를 발급하지 않는다. 일반 candidate와 학습 gate는 유지한다.
 
 ## 고정 입력과 실행

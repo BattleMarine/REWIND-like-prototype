@@ -1,5 +1,7 @@
 # 단일 프레임 특징 chunk 연결
 
+> **2026-11-05 현재 적용 범위:** T1 특징 chunk·shuffle·재개 계약은 데이터 확보 방식과 독립적으로 유지한다. 사용자 압축 해제본의 RGB/pose·split·예측 cache를 먼저 검증해 연결해야 하며 인덱스 coverage를 학습 완료 조건으로 사용하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 RGB chunk별 native 예측 cache→기존 join 결과를 같은 원본 sequence 이름으로 모아 M1 **단일 프레임** regression에 연결했다. 별도 T1 schema/policy를 사용하며 기존 완결 sequence·temporal 정책과 실제 데이터 학습 차단은 유지한다. 전체 데이터셋 학습 준비나 temporal 모델의 실제 데이터 검증 완료를 뜻하지 않는다.
 
 ## 명시 계약

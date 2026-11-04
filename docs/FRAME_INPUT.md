@@ -1,5 +1,7 @@
 # 공통 프레임 선언과 기존 이미지 경로
 
+> **2026-11-05 현재 적용 범위:** 공통 frame 선언과 독립 frame 제한은 유지한다. 현재 RGB 공급원은 사용자 압축 해제본이며 archive index는 필수 입력이 아니다. Joyful Jump57프레임은 파일 번호가 대응하지만 timestamp·stereo 시간 정합을 확정하지 않았고 video decoder/temporal 지원 완료가 아니다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-11-02 · [이미지·동영상 입력 계획](VIDEO_INPUT_PLAN.md)의 공통 frame 규격과 기존 local RGB 이미지 연결을 구현했다. 영상 decoder·UI·네트워크·새 학습은 이번 범위에 포함하지 않는다.
 
 ## 실제 연결한 API

@@ -1,5 +1,7 @@
 # 실제 GT2D→3D 단일 frame 진단
 
+> **2026-11-05 이력 구분:** Serena2sample GT 입력 진단의 고정 결과·checkpoint는 보존한다. 후속102쌍 RGB 예측 입력 진단과 Joyful Jump GT 표시를 이 결과에 합산하지 않는다. 아래 실행은 역사적 재현 경로이며 새 학습 지시가 아니다.
+
 2026-11-02 · 실제 Serena 정적2sample의 학습 연결·손실·gradient·checkpoint 재개만 확인하는 명시적 진단이다. RGB 예측 성능, temporal 실험, validation/test 또는 일반화 결과가 아니다. 기존 candidate와 일반 학습 gate는 유지한다.
 
 ## 입력과 승인 범위

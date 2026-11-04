@@ -1,5 +1,7 @@
 # 완료 queue의 로컬 진단 bundle
 
+> **2026-11-05 현재 적용 범위:** 완료 queue의 기존 추출본을 읽는 bundle 계약은 보존한다. 현재 사용자가 직접 푼 RGB·pose 폴더는 기존 queue COMPLETE/출처 계약을 자동 충족하지 않으며 별도 manifest·검증 연결이 필요하다. 이 bundle 생성 때문에 인덱싱을 재개하지 않는다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 `rewind_prepared_bundle`은 완료된 준비 queue의 RGB·pose 추출본과 명시 metadata를 새 디렉터리로 묶는다. RGB manifest와 pose job별 candidate/audit, 키별 연결 provenance를 발급한다. `train_ready=false`이며 학습·release·learning shard 생성 기능은 없다.
 
 ## 입력과 지원 경계

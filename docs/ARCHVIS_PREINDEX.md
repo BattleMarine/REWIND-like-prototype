@@ -1,5 +1,7 @@
 # ArchVis 한정 사전 인덱싱과 g16 후속 준비
 
+> **보존 기록 · 2026-11-05 정리:** 2026-11-04 사용자 결정으로 분할 압축 원본의 인덱싱·부분 읽기 운영을 중단했다. 이 문서 전체의 실행 명령, 다음 단계, 예산과 미완료 표시는 해당 실험 당시의 기록이며 현재 실행 지시가 아니다. 새 기본 경로는 [압축 해제된 RGB·pose 사용](DATA_ACQUISITION_STRATEGY.md)이다. 기존 코드·원본·인덱스·예약 기록은 보존하며 자동 재개하지 않는다. 이동된 로컬 근거는 [보관·복원 안내](LOCAL_STORAGE.md)를 따른다.
+
 ## 2026-11-03 실제 g25 후속 상태
 
 실제 job002는 g25/782member·stereo 관측371/pose 관측102까지 저장했다. 9개 snapshot 누적 후 다음 총 예약809984041bytes가768MiB를 넘어 정상 중단했으며 checkpoint 오류 재발이 아니다. 기존494개 prefix와 hash/CRC/catalog를 독립 대조했다. 별도 local compact helper는 원본·receipt를 바꾸지 않고 DB55.4→28.3MB를 확인했으나 index32MiB cap은 해결하지 않는다. 새 RGB job은 준비하지 않으며 정확 미관측 pose269 한 건의 warm 확보만 다음 실측으로 인계한다. 장기 append/CAS 구조는 미구현 설계다. [상세 분석·경계·검증과 예산](G25_STORAGE_AND_POSE269.md)을 따른다. 아래 g16 job002 준비 기록은 당시 상태다.

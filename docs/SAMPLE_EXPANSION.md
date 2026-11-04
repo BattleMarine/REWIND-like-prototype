@@ -1,4 +1,16 @@
-# 실제 샘플 확대를 위한 발견 인덱싱
+# 실제 샘플 확대와 발견 인덱싱 보존 기록
+
+## 현재 샘플 확대 방향 — 2026-11-05 갱신
+
+2026-11-04 사용자 결정으로 발견·자동 인덱싱과 새 원격 실행은 중단했다. 사용자가 원본을 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용하며 Depth는 초기 필수가 아니다. 업로드 완료·정확 경로·전체 확보량은 아직 확인하지 않았다. [현재 데이터 확보 기준](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
+후속 추출에서 기존102+269의371 train 페어를 확보했으나 validation은0이다. 추가 로컬 Joyful57은 중복·원본 motion·split 검토 전이므로 총428로 계산하지 않는다. 1,000~10,000페어와 독립 validation을 목표로 파일 목록·SHA/byte·decode·pose 수치/좌표/단위·실제 overlay·sequence/frame·split/motion을 검토한다. 관측 catalog 건수는 검증된 페어 수가 아니다.
+
+새 범용 추출본 manifest/학습 adapter·release는 미완료다. 검토 후2D 학습 개선→예측2D 기반3D baseline→M2/M3→영상 연결로 진행한다. 아래 discovery job의 예산·원본·고정 pin·receipt·snapshot은 보존하며 job003이나 실패 job을 다시 실행하지 않는다. 과거 outputs 경로의 이동·복원은 [보관 안내](LOCAL_STORAGE.md)를 따른다.
+
+## 이전 발견 인덱싱 결과와 계획
+
+아래 ‘현재·다음·미실행’은2026-11-02 당시 상태다. 새 실행 지시나 현재 확보량으로 해석하지 않는다. 당시 역할 분담도 새 인덱싱을 허용하지 않으며 후속 작업은 root의 별도 고정 인계를 따른다.
 
 ## 2026-11-02 job003 실제 재개 결과
 
@@ -6,9 +18,9 @@ Root가 결과 ZIP SHA d3e35128ee38278716515f3b111d306c81e5f3cb1df57ae70f31a1366
 
 bounded_stop/transfer_bytes_limit으로 종료했다. API body267439414bytes·815요청·228.930초이며 disk 실측값은 없다. train stereo59→102(+43), stereo∩pose35→35(+0), validation0·실제추출0이다. RGB 재개는 성공했지만 추가100개의 RGB+pose 후보 목표는 진척하지 않았다. 앞선 약729MiB/637초는 첫 구간의 단순 비례 참조치이며 현재 구간에는 적용할 수 없다.
 
-다음 판단은 RGB 반복 실행보다 새 stereo 키와 기존 pose 목록의 누락 범위를 먼저 대조하는 것이다. pose 목록에 없다는 사실을 원본 pose 부재로 단정하지 않는다. 고정 g9와 기존 결과를 보존하며 job003 자동반복/예산확대는 하지 않는다. 관측35개에서 소량 추출을 검증하는 경로도 유지한다.
+당시 후속 판단은 RGB 반복 실행보다 새 stereo 키와 기존 pose 목록의 누락 범위를 먼저 대조하는 것이다. pose 목록에 없다는 사실을 원본 pose 부재로 단정하지 않는다. 고정 g9와 기존 결과를 보존하며 job003 자동반복/예산확대는 하지 않는다. 관측35개에서 소량 추출을 검증하는 경로도 유지한다.
 
-## job003 재개 준비 — 추가100 관측 후보 목표, 미실행
+## job003 재개 준비 — 당시 추가100 관측 후보 목표, 위 실제 결과로 대체
 
 현재 train stereo∩pose 관측 후보35개에서 추가100개(누적135개)를 목표로 두되, 기존 상한의 job003 한 번만 준비한다. 실제 추출0·validation0이며 관측 대응을 검증된 학습 pair로 취급하지 않는다. 달성을 보장하거나 자동 반복하지 않는다.
 
@@ -30,7 +42,7 @@ status=bounded_stop, 6번째 batch에서 transfer_bytes_limit으로 중단하고
 
 보고된 API body267440332bytes(약255.05MiB)/825requests, source read432874462bytes, decoded200673280bytes, elapsed222.865초, sampled RSS182218752bytes다. disk 실측값은 보고서에 없어 전체 디스크 상한 준수를 독립 확정하지 않는다. recovery의 archive_network_requested=false는 회수 작업의 무네트워크 의미이며 실제 인덱싱 전송이 없었다는 뜻이 아니다. 이번 결과는 부분 인덱싱·snapshot 회수를 검증했으며 새 런타임 복원·확장 및 실제 후보 추출은 별도 확인한다.
 
-다음 우선 작업은 저장한 generation5와 원본identity를 고정해 관측35개 중 소량의 좌우RGB+pose를 추출·파싱·대조하는 것이다. validation 후보 탐색과 원본motion/split 검증도 계속 필요하며 train 후보만으로 정식 baseline을 승인하지 않는다. 소비된 job002를 재실행하거나 예산을 자동 확대하지 않는다.
+당시 다음 우선 작업은 저장한 generation5와 원본identity를 고정해 관측35개 중 소량의 좌우RGB+pose를 추출·파싱·대조하는 것이다. validation 후보 탐색과 원본motion/split 검증도 계속 필요하며 train 후보만으로 정식 baseline을 승인하지 않는다. 소비된 job002를 재실행하거나 예산을 자동 확대하지 않는다.
 
 ## 2026-11-02 session retry 설정 실패 보완
 
@@ -71,7 +83,7 @@ Lab의 stereo4key는 Claudia/Pull_Heavy_Object frame2·5·12·15이며 모두 tr
 
 실제 scan0.109초, source583,160bytes·반환 해제27,408bytes·관측RSS31,711,232bytes, scan+재개0.359초였다. 원prefix 길이/SHA와 원DB SHA는 불변이며 원격0이다. 추가로 한 전후 원prefix hash 읽기 비용은 scan 계측과 별도다. 근거는 outputs/sample_expansion_20261102/developer/local_scan/report.json이다. 같은 잘린 prefix에서 반복 scan하지 않는다.
 
-## 다음 실제 실행: ArchVis RGB 신규 source
+## 당시 다음 실행 계획: ArchVis RGB 신규 source — 현재 종료
 
 이미 pose 관측이 있는 ArchVis RGB의5조각을 명시 순서로 고정해 **새 source DB**를 만든다. 오래된 Lab prefix나 pose DB를 재라벨하지 않는다. Drive file ID/name/index/size/modifiedTime은 root metadata 조사와 대조하며, 도구가 반환하지 않은 version은 추측하지 않는다. authorized metadata API가 얻은 version을 manifest에 고정한 뒤 runtime이 다시 검사한다. 원본 조각 전체를 다운로드하거나 결합하지 않는다.
 
@@ -111,6 +123,8 @@ recovery.recover는 인증·source read·scan 없이 report/metadata와 마지�
 source ZIP과 ready notebook은 아직 만들지 않았다. root가 검토/로컬커밋 후 source/input SHA·revision·새 경로·job ID·명시 예산을 고정한 본으로 인계한다. 이 문서는 지금 사용자에게 Colab 실행을 요구하지 않는다. 기존 합성 GPU 시험이나 학습을 반복하지 않는다.
 
 ## 운영 인계와 역할
+
+2026-11-05 현재 인덱싱 실행 역할은 중단 상태다. 아래는 당시 고정 job의 책임·회수 규칙이며 새 실행을 승인하지 않는다. 추출본 목록·검증 또는 모델 시험은 root가 새 범위와 고정본을 전달한 경우에 진행한다.
 
 동일 프로젝트 데이터셋 탐색 세션 01a12dd6-3940-7b91-91dd-eae1bfaba270가 root의 정확한 고정본을 받아 목록 검색·key/split 대조·정해진 budget 안의 인덱싱 실행과 결과 취합을 맡는다. 기존 테스트 세션01a14391-c1b9-7a40-b537-af6b0b43709c는 모델/GPU 등 검증 역할을 유지한다. 새 세션은 만들지 않는다.
 

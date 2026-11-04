@@ -1,5 +1,7 @@
 # M1 학습 기반과 합성 진단 실행
 
+> **2026-11-05 현재 적용 범위:** M1은 2D frontend와3D regression 비교 기준을 만드는 단계이며 전체 완료되지 않았다. 실제102 train 쌍의 짧은 진단과 Joyful Jump0·28·56 추론은 수행했지만 예측이 중앙에 집중한다. 합성 GPU 재개 검증과 실제 정확도는 구분한다. 다음은 압축 해제본의 입력 연결·독립 validation·2D 학습 개선이며, 아래 날짜별 미실행 문구는 당시 상태다. 최신 운영 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 2026-10-14 · M1의 검토 가능한 구현 묶음입니다. 실제 UnrealEgo baseline, EfficientNet front-end와 Colab GPU 검증은 남아 있습니다. 아래 코드·학습 확인을 M0/M1 전체 완료나 정확도 개선으로 해석하지 않습니다.
 
 ## 구현 범위

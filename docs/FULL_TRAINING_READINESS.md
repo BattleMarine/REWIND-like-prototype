@@ -1,26 +1,30 @@
 # 전체 데이터 학습 준비
 
-현재 상태: 고정20b7aa9 합성 A100 FP32/AMP 재개 시험은 통과했고 완료 bundle의 T1 진단 reader를 로컬 검증했다. 아래 초기 감사/준비 기록의 GPU 미검증은 당시 상태이며 실제 데이터 release·정식 학습·정확도·Drive 새VM 검증은 여전히 미완료다. 최신 범위는 문서 말미의 결과 수령 및 reader 기록을 따른다.
+현재 상태(2026-11-05): 고정20b7aa9 합성 A100 FP32/AMP 재개 시험과 T1 bundle reader 로컬 검증 근거를 보존한다. 실제 학습은102 train 페어의2D/3D 각51update CPU 진단까지이며 정식 baseline·일반화·전체 데이터 학습 완료가 아니다. 기존371쌍은 모두 train이며 validation0이고 추가 Joyful57은 중복·motion·split 검토 전이다. 실제 Joyful3frame 예측은 중앙 집중 실패이며 전체57 GT overlay171PNG는 성능 근거가 아니다.
 
 2026-11-02 사용자 결정: Colab 기준으로 전체 데이터셋 학습을 준비하며 화면 개발보다 우선한다. 화면용 프론트와 모델·학습·평가·추론 코어를 분리한다. RGB에서 2D 관절을 예측하는 신경망 frontend는 학습 모델에 포함한다. 전체 다운로드·실제 장시간 학습·의존성 설치·원격 접근은 이 개발 작업에서 실행하지 않는다.
+
+2026-11-04 사용자 결정으로 자동 인덱싱을 중단했다. 사용자가 압축 해제해 Drive에 올리는 RGB·pose 추출본에서 학습 입력을 준비하며 Depth는 초기 필수 입력이 아니다. 업로드 완료·정확 경로·전체 검증은 확인 전이고, **범용 추출본→manifest/release/shard 학습 adapter는 미완료**다. 현재 준비 기준은 [데이터 확보 전략](DATA_ACQUISITION_STRATEGY.md)을 따른다. 기존 archive 코드·고정 실행·pending 예약은 보존하며 새 실행·예산 초기화를 요구하지 않는다.
 
 ## 감사 결과
 
 | 경로 | 현재 제공 기능 | 전체 학습까지 남은 사항 |
 | --- | --- | --- |
 | `rewind_m1` | UI 없는 regression CLI, 계약·mask·sequence/motion split 검사, optimizer/scheduler/scaler/Python·Torch RNG·step 재개 | 기존 trainer는 전체 JSON과 모든 window tensor를 RAM에 올리고 replacement sampling을 사용. 새 shard 공급과 cursor 연결 필요 |
-| `rewind_m1.shard_training`(2차 추가) | 별도 합성 M1 shard trainer, epoch cursor·실제 sample 수 재개·독립 validation·checkpoint 기반 추론 export | 실제 release·persistent 준비 공급·GPU/AMP pilot 미검증 |
+| `rewind_m1.shard_training`(2차 추가) | 합성 M1 shard trainer·epoch cursor·재개/validation/export, 고정 합성 GPU 시험 통과 | 실제 추출본 공급·release·실제 GPU 성능 미검증 |
 | `rewind_m2`, `rewind_m3` | UI 없는 합성 causal diffusion·cascade 학습과 재개 | 실제 데이터 계약·shard 공급·독립 validation 연결 필요 |
 | `rewind_m1.frontend_train` | 작은 CPU RGB→2D 진단, inference weights 저장 | 소량/100step 제한, 일반 재개·GPU·장시간 공급 미지원 |
 | `rewind_m1.rgb_shards`(3b1 추가) | native RGB+GT 한-shard 공급·독립frame chunk·split/identity·PNG lazy/full 검사·epoch cursor | T1은 별도 명시 연결, temporal chunk/context 확장은 미구현 |
-| `rewind_m1.rgb_training`(3b2 추가) | 명시 resize·작은2D CNN 합성 CPU 학습/재개·native cache/join·독립 validation | 실제 release·GPU/AMP 실측·전체 데이터 성능 미검증 |
-| `rewind_archive_index.preparation` | 명시 target의 예산 제한 탐색·snapshot 저장/복원·선택 추출·로컬 재사용 | epoch와 archive coverage는 별개 |
-| `rewind_prepare_queue`(3a 추가) | 기존 backend 소량 범위의 raw 준비 순서·영속 cursor·전역 예약/정산·partial 재개·준비 목록 | 학습 shard 변환/자동 공급·eviction·실제 Drive queue/새VM 지속성 미검증 |
-| 실제 pose candidate | 원본 hash·좌표 수치 검사를 거친 진단용 candidate | `training_release=not_implemented`, 원본 motion identity·독립 validation 등 blockers 유지 |
+| `rewind_m1.rgb_training`(3b2 추가) | 명시 resize·작은2D CNN·native cache/join·validation, 합성 GPU 재개 통과 | 추출본 범용 연결·실제 release/학습 성능·실제 GPU 실측 미완료 |
+| `rewind_archive_index.preparation` | 과거 bounded 탐색·snapshot·선택 추출·재사용 구현 보존 | 현재 운영 중단; 학습 선행 조건에서 제외 |
+| `rewind_prepare_queue`(3a 추가) | 과거 archive 준비 queue·cursor·예약/정산·partial 재개 구현 보존 | 현재 새 실행 중단; 추출본 adapter 지원 완료를 의미하지 않음 |
+| 실제 pose candidate / reviewed release | 진단 candidate 보존, 별도 한 bundle32frame T1/2D 외부 검토 policy 경로 구현 | 범용 release 아님; 실제 policy 발급·독립 validation·원본 motion 검토와 adapter 미완료 |
 
 화면 UI를 학습 코드가 import하지 않는 구조는 이미 존재한다. 화면을 분리한다는 이유로 신경망 2D frontend를 제거하거나 학습을 화면 실행에 종속시키지 않는다. 기존 소량 진단은 전체 데이터셋 baseline 성능을 입증하지 않는다.
 
 ## 1차 구현 범위
+
+이하 차수별 구현·검증 수치는 당시 기록이다. 이후 합성 GPU 시험·실제102 CPU 진단은 최신 요약과 별도 결과 문서를 따른다. 종료된 archive 준비 queue는 현재 학습 공급의 필수 단계가 아니다.
 
 새 `rewind_m1.shards`는 **로컬의 준비된 `m1_features_v1` 파일**만 지원한다. GT 2D 진단 입력과 고정 버전 예측 2D 특징을 기존 `load_document`로 검증한다. RGB PNG·동영상·raw pose candidate를 직접 학습 데이터로 승격하지 않는다. M1 모델은 기존 `single_frame`과 `temporal` regression이며 논문 규모 모델 지원을 뜻하지 않는다. M2/M3/2D trainer는 이번 shard 경로에 연결되지 않았다.
 
@@ -79,14 +83,14 @@ export/load는 CPU Torch RNG를 보존하고 export는 원본 모델의 mode/dev
 
 ## 이후 구현과 완료 기준
 
-1. **현재 묶음:** 로컬 특징 shard 계약·읽기·readiness·sampler·추론 가중치. 기존 dataset gate 유지.
-2. **Shard trainer(로컬 합성 CPU 구현·검증):** 기존 M1 모델/loss 재사용, CPU/CUDA/AMP 실행 경로, 독립 validation 누적, cursor와 optimizer/scheduler/scaler/RNG·환경·catalog를 함께 저장. 합성 CPU uninterrupted/resume 동등성과 epoch coverage를 검증했다. CUDA/AMP 실제 실행은 미검증이며 기존 trainer API는 보존한다.
-3. **준비 공급 연결(3a 로컬 구현·검증):** 기존 persistent-index의 명시 target·전역 예약/정산·재사용을 제한된 raw queue에 연결했다. RGB/pose 키 대조·임시 디스크 상한·중단/재개를 검사하고 자동 삭제 없이 소비 표시를 기록한다. 학습 shard 변환/자동 공급·eviction·실제 Drive/새VM 시험은 남아 있다. archive 탐색 순서와 학습 shuffle을 구분하고 epoch를 전체 indexing 완료로 사용하지 않는다. [queue 계약](PREPARATION_QUEUE.md)을 따른다.
+1. **구현된 기반:** 로컬 특징 shard 계약·읽기·readiness·sampler·추론 가중치. 기존 dataset gate 유지.
+2. **Shard trainer(로컬 합성 CPU 구현·검증):** 기존 M1 모델/loss 재사용, CPU/CUDA/AMP 실행 경로, 독립 validation 누적, cursor와 optimizer/scheduler/scaler/RNG·환경·catalog를 함께 저장. 합성 CPU uninterrupted/resume 동등성과 epoch coverage를 검증했다. 이후 고정20b7aa9 합성 GPU FP32/AMP 재개 시험도 통과했다. 실제 추출본 GPU 학습 성능은 미검증이며 기존 trainer API는 보존한다.
+3. **추출본 공급 연결(후속):** 사용자 Drive RGB·pose의 업로드 완료·목록을 확인하고 sequence/frame·split/motion·파일 hash/decode·관절/좌표/단위/시간·mask를 검증한다. 범용 manifest→기존 loader/변환기→reviewed release/RGB shard adapter를 별도 구현·검증한다. 기존102 전용 reader에371이나 임의 폴더를 바로 넣지 않는다. 과거3a persistent-index queue는 보존 경로이며 현재 자동 공급의 전제가 아니다. 학습 epoch와 원본 archive coverage는 계속 별개다. [현행 데이터 기준](DATA_ACQUISITION_STRATEGY.md)을 따른다.
 4. **실제 release:** unit/좌표·calibration·RGB-pose·원본 motion·독립 validation의 근거 검토와 명시 release adapter. GT 입력 진단과 예측 입력 결과를 분리. 미검증 상태를 문자열로 해제하지 않음.
 5. **Colab pilot:** 테스트 세션에서 실제 GPU/VRAM·디스크·세션 길이·준비 비용을 측정. 작은 sample→overfit→pilot 순서, 실행 전 전송량/시간/RAM/디스크/업데이트 예산과 중단 조건 고정. artifact/checkpoint/manifest를 runtime 추출본과 분리 보관. 결과를 보고 다음 규모 결정.
-6. **M2/M3/2D 확장:** 지원한 M1 경로의 검증 후 모델별 input/loss/시간 정합성·재개 계약을 추가. 동영상 adapter/UI는 이 학습 준비 우선순위 뒤에서 진행.
+6. **모델 확대와 영상:** 검증된1,000~10,000페어·독립 validation 준비→2D 학습 개선→예측2D 기반3D baseline→실제 M2/M3 학습 순서로 진행하고 모델별 시간 정합성·재개 계약을 검증한다. 동영상 decoder/PTS/seek/reset·화면 UI는 이후 연결한다. UI와 모델 학습 코어는 분리한다.
 
-Colab 자원은 아직 측정하지 않았으며 전체 원본 학습·논문 규모·실시간 목표의 달성은 미검증이다.
+합성 A100 pilot의 자원 수치는 아래 결과로 확인했으나 실제 추출본 학습의 IO·GPU/VRAM·저장·세션 비용은 별도 pilot이 필요하다. 전체 원본 학습·논문 규모·실시간 목표의 달성은 미검증이다.
 
 ## 개발 검증 근거
 
@@ -98,7 +102,7 @@ Colab 자원은 아직 측정하지 않았으며 전체 원본 학습·논문 �
 
 `rewind_m1.shard_training.ShardTrainer`와 `python -m rewind_m1.shard_cli`를 추가했다. 기존 `rewind_m1 train`의 API·sampler·checkpoint는 바꾸지 않는다. 새 진입점은 `m1_shard_checkpoint_v1`을 사용한다. 모델/loss/seed·RNG/원자적 checkpoint 저장은 기존 코드를 재사용한다. 화면 UI import나 실행이 필요하지 않다.
 
-현재 새 trainer의 **학습 허용 데이터는 `synthetic_fixture`만**이다. `dataset_sample`은 검증 문자열이 있어도 `shard_dataset_sample_release_not_implemented`로 거부한다. 실제 candidate·기존 diagnostic-only checkpoint를 이 진입점으로 우회 학습할 수 없다. 실제 학습 release와 persistent 준비 공급은 후속 묶음이다.
+현재 새 trainer의 **학습 허용 데이터는 `synthetic_fixture`만**이다. `dataset_sample`은 검증 문자열이 있어도 `shard_dataset_sample_release_not_implemented`로 거부한다. 실제 candidate·기존 diagnostic-only checkpoint를 이 진입점으로 우회 학습할 수 없다. 실제 학습 release와 입력 공급 연결은 후속 묶음이며 현재는 archive queue 대신 사용자 추출본 adapter를 준비한다.
 
 학습 전에 config의 model/window/batch/seed/크기와 catalog 계약을 검사하고 모든 명시 payload를 한 번씩 검증한다. 별도 train/validation이 필요하며 sequence와 motion split 검사를 유지한다. `single_frame`/`temporal`, CPU/CUDA, CUDA AMP 실행 경로를 제공하되 이번 검증은 CPU FP32다. CUDA/AMP의 실제 속도·VRAM·수치/skip 동작은 Colab pilot에서 확인해야 한다. CPU mock의 scaler skip 제어 검사는 GPU 검증을 대신하지 않는다.
 
@@ -116,7 +120,7 @@ validation은 train sample과 분리해 `distance_sum_mm`, `squared_sum_mm2`, `v
 
 보고서 log는 기본 최근64event만 보관하며 `--log-limit`으로 제한한다. 각 batch의 sample ID는 앞8개까지만 저장한다. 전체 학습 step log를 메모리나 JSON list에 무제한 쌓지 않는다. 재개 실행의 report는 이번 실행을 기록하며 이전 실행의 무제한 history를 이어 붙이지 않는다. 원본 보고서를 영구 보존하려면 실행 전에 별도 경로에 보관한다.
 
-`export`는 checkpoint만 읽고 model state를 복원하므로 원본 shard가 없어도 가능하다. 현재 모델 코드 hash, catalog/input contract/model shape를 대조한 뒤 원본 checkpoint 파일 SHA를 weights에 기록한다. training optimizer를 재개하거나 전체 dataset을 다시 읽지 않는다. train의 `--export-weights`도 저장 완료된 checkpoint를 다시 읽어 그 내용에서 export한다. UI는 이 고정 추론 파일을 사용하고 학습 재개 파일은 따로 유지한다. GPU 훈련 checkpoint를 CPU 추론용으로 export할 수 있는 경계이며 실제 GPU checkpoint export 시험은 남아 있다.
+`export`는 checkpoint만 읽고 model state를 복원하므로 원본 shard가 없어도 가능하다. 현재 모델 코드 hash, catalog/input contract/model shape를 대조한 뒤 원본 checkpoint 파일 SHA를 weights에 기록한다. training optimizer를 재개하거나 전체 dataset을 다시 읽지 않는다. train의 `--export-weights`도 저장 완료된 checkpoint를 다시 읽어 그 내용에서 export한다. UI는 이 고정 추론 파일을 사용하고 학습 재개 파일은 따로 유지한다. GPU 훈련 checkpoint를 CPU 추론용으로 export할 수 있는 경계이며 이후 고정20b7aa9 합성 GPU 시험에서 export 예측 일치를 확인했다. 실제 데이터 GPU checkpoint export 검증은 별도다.
 
 검토용 실행 예시는 보존된 합성 fixture를 사용한다. 이미 존재하는 output에는 새 이름을 쓰거나 명시한 resume를 사용한다.
 
@@ -131,7 +135,9 @@ python -m rewind_m1.shard_cli export --checkpoint outputs/m1_shard_example/last.
 
 고정31개(신규trainer14개+기반17개)가 failure/error/skip0으로 통과했다. 최종 검사에서 합성 성공 update84개와 mock AMP skip1회를 확인했고 별도 보존 CLI 실행은2→5step 재개 총5update·실제sample22개·완료1epoch/현재10개를 기록했다. 두 모델 모두 shard 중간·shard 경계·epoch 경계 분할재개에서 model/optimizer/scheduler/scaler/RNG/cursor/counter 전체가 중단없는 실행과 동일했다. Root도 신규14개를 별도로 통과했으며 근거는 `outputs/full_training_readiness_20261102/root/stage2_tests.txt`, `stage2_review.json`이다.
 
-## 3a 구현: raw 준비 queue
+## 3a 구현: raw 준비 queue — 종료된 경로의 보존 기록
+
+2026-11-04 이후 새 queue 실행·인덱싱은 중단했다. 아래 수치와 남은 Drive 시험 항목은 당시 구현 범위이며 현재 후속 실행 의무가 아니다.
 
 [제한된 준비 queue](PREPARATION_QUEUE.md)를 추가했다. 로컬 합성13개 검사와 보존 실행에서 서로 다른 left/right/pose 원본을 고정 순서로 준비하고, partial→새 attempt retry→같은 index 복원/계속→완료본 재사용→소비 표시를 확인했다. 별도 보존 결과는 source read5856bytes·returned decode12756bytes·신규member12·HTTP/body0·phase 누적7.345초이며 정확한 stereo/pose 키1개를 대조했다. 준비 결과는 `train_ready=false`이고 신경망 학습에 투입하지 않았다.
 

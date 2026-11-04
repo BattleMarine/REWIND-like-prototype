@@ -36,3 +36,8 @@ python scripts/predict_stereo_overlay.py --left LEFT.png --right RIGHT.png --wei
 ```text
 python scripts/render_pose_gt_overlay.py --pose-dir POSE_DIRECTORY --rgb-dir FISHEYE_FINAL_IMAGE_DIRECTORY --sequence SEQUENCE_ID --frames 0 28 56 --output NEW_OUTPUT_DIRECTORY
 ```
+
+
+## 전체57프레임 GT 출력 완료 (2026-11-04, 11-05 문서 반영)
+
+사용자의 전체 처리 요청으로 frame0~56의 좌우 개별114장과 비교 패널57장, 총171 PNG를 추가 생성했다. `outputs/joyful_jump_gt_all57_20261104/joyful_jump_GT_all57.zip`(279,684,113bytes)과 `report.json`에 보존한다. 전체171 PNG decode·크기와57프레임의 원본JSON 좌표·입력hash 불변을 확인했다. 최초3프레임 결과와 별도로 유지하며 모두GT 표시다. 실제 모델 예측은 여전히 앞서 실행한3프레임이며57프레임 학습·예측 결과로 표시하지 않는다.
