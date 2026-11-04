@@ -23,3 +23,16 @@ python scripts/predict_stereo_overlay.py --left LEFT.png --right RIGHT.png --wei
 개발은 기존102쌍의 Burpee frame0·1을 재추론해 저장 cache와 native 좌표·confidence 차이가 모두0임을 확인했다. Root는 실제 CLI로 frame0을 독립 실행하고 개발 결과와 좌표·confidence 동일, GT 사용 없음, 학습 update0을 확인하고 패널을 시각 검토했다. 근거는 `outputs/joyful_jump_presentation_20261104/developer/validation.json`과 `root_validation/review.json`이다.
 
 현재 두 검증 프레임에서 관절들이 화면 중앙에 집중되고 confidence도 약0.001 수준이다. 성공적인 관절 추정 사례로 소개하기 어렵다. 이번 검증은 기존 모델 출력의 충실한 재현과 시각화에 대한 것이며, 새로운 시퀀스의 정확도나 발표용 품질을 보장하지 않는다. 실제 Joyful Jump의 시작·중간·끝 frame0·28·56도 같은 모델로 추론했다. 3개 모두62관절이 중앙 약x499~523/y497~533px 범위에 집중하며 정상적인 관절 추정 시연으로 보기 어렵다. 실제 예측을 보정하거나 GT로 대체하지 않았다. 결과는 `outputs/joyful_jump_presentation_20261104/actual/frame_000`, `frame_028`, `frame_056`의 `overlay.png`·`predictions.json` 및 `actual/preview.png`에 보존했다. Pose는 파일 대응 검사에만 사용했고 모델 추론에는 입력하지 않았다. 추가 학습·Drive 다운로드는 없다.
+
+
+## 발표용 GT 관절점 이미지
+
+2026-11-04 사용자 요청으로 `scripts/render_pose_gt_overlay.py`를 추가하고 같은 로컬 Joyful Jump의 frame0·28·56에 pose JSON의 `camera_left_pts2d`/`camera_right_pts2d`를 직접 그렸다. 모델을 실행하지 않으며 이미지에 `GT 2D ANNOTATIONS / not model predictions`를 표시한다. 기존62관절 중 몸은 주황색, 손은 하늘색 점이다. 원본1024×1024를 유지하고 바깥에 제목을 붙였다. 가려진 관절을 임의 제거하거나 화면 밖 좌표를 안으로 이동하지 않는다.
+
+산출물은 `outputs/joyful_jump_gt_20261104/`의 `frame_000_panel.png`, `frame_028_panel.png`, `frame_056_panel.png`, 프레임별 `_left.png`/`_right.png`, `report.json`, 전체 이미지 묶음 `joyful_jump_GT_images.zip`이다. frame0/56은 좌우 각각62개, frame28은 각각41개를 표시하고 화면 밖21개는 report에 원래 좌표를 남겼다. Root는3프레임6view의62개 좌표를 원본JSON과 대조하고 PNG 크기·GT 라벨·시각적 위치를 확인했다. 모델 예측 성능이나 정확도 검증 결과로 사용하지 않는다.
+
+실제 실행 진입점은 아래와 같다. 새 출력 디렉터리를 지정하며 최대10프레임씩 처리한다.
+
+```text
+python scripts/render_pose_gt_overlay.py --pose-dir POSE_DIRECTORY --rgb-dir FISHEYE_FINAL_IMAGE_DIRECTORY --sequence SEQUENCE_ID --frames 0 28 56 --output NEW_OUTPUT_DIRECTORY
+```
