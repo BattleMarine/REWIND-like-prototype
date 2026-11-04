@@ -22,7 +22,7 @@
 
 ### 로컬 M1 소량 end-to-end runner
 
-`run_diagnostic` 및 `python -m rewind_m1.local_diagnostic`는 기존 모듈을 frontend 학습→고정 weights 읽기→예측 cache→validation 2D 평가→예측 특징 결합→CPU regression 학습·validation 순서로 호출한다. 새 모델이나 별도 학습 알고리즘은 없다. Train/validation을 사전 확인하며 test를 자동 평가하지 않는다. 입력·관절·출처·실데이터 검증 guard는 기존 API를 따른다. CLI 인자는 [README 실행 안내](../README.md#데이터-없이-m1-학습-기반-실행)에 있다.
+`run_diagnostic` 및 `python -m rewind_m1.local_diagnostic`는 기존 모듈을 frontend 학습→고정 weights 읽기→예측 cache→validation 2D 평가→예측 특징 결합→CPU regression 학습·validation 순서로 호출한다. 새 모델이나 별도 학습 알고리즘은 없다. Train/validation을 사전 확인하며 test를 자동 평가하지 않는다. 입력·관절·출처·실데이터 검증 guard는 기존 API를 따른다. CLI 인자는 [보존된 CPU 진단 실행 예시](README_HISTORY_20261105.md#데이터-없이-m1-학습-기반-실행)에 있다.
 
 새 출력 디렉터리에 `frontend/frontend_weights.pt`, `frontend/report.json`, `predictions.json`, `evaluation_2d.json`, `predicted_features.json`, `regression/last.pt`, `regression/report.json` 및 최상위 `report.json`을 저장한다. Frontend 파일은 추론용 weights이며 regression 파일은 기존 model/optimizer/scheduler/scaler/RNG·step·설정/코드/데이터를 담는 checkpoint다. Runner 자체 재개·부분 실행 재사용·자동 재시도는 지원하지 않는다. Regression checkpoint는 기존 Trainer의 동일 코드·환경 재개 계약을 유지한다.
 

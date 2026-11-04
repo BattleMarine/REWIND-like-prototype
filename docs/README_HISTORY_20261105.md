@@ -1,0 +1,321 @@
+# README 이전 내용 보존 — 2026-11-05
+
+기준 revision: `303c26d430983547f446a8c5366b5886ea291c9f`. README를 간결하게 정리하기 전의 전체 내용을 보존한다. 상대 Markdown 링크만 이 문서 위치에 맞게 조정했으며, 코드 블록의 경로는 당시와 같이 프로젝트 루트 기준이다.
+
+**이 문서는 실행 가이드가 아닌 과거 기록이다.** 아래의 ‘현재’, ‘다음’, ‘보류’, 미완료 수치는 기록 당시 표현이다. 최신 상태와 실행 진입점은 [README](../README.md), 상세 계획은 [로드맵](ROADMAP.md)을 따른다. 인덱싱·archive 재개 명령을 새 작업 지시로 해석하지 않는다.
+
+원문에 남아 있던 오래된 표현도 이력 보존을 위해 유지한다. 최신 README에서는 다음을 바로잡았다.
+
+- 실제 진단 학습은 초기 2프레임 이후 102페어까지 진행했다. 독립 validation 평가는 미완료다.
+- warm192 보류 안내는 과거 상태이며 현재 테스트 지시가 아니다.
+- 실제 train-fit 지표는 측정했지만 일반화 성능은 확인하지 않았다.
+- 로컬 보관 안내는 2026-11-05 정리 결과를 기준으로 연결한다.
+
+아래 본문은 기존 [구현 이력](IMPLEMENTATION_HISTORY.md)을 대체하지 않고 이번에 README에서 분리한 기록·상세 실행 예시를 보존한다.
+
+---
+
+# REWIND-like prototype
+
+REWIND 논문의 핵심 구조를 공개 데이터에서 재현하고, 데이터와 diffusion 학습·추론 방식을 수정하며 정확도·강건성·실시간성을 개선하는 연구용 프로젝트입니다.
+
+논문과 동일한 절대 성능을 보장하는 공식 구현이 아닙니다. 비교 가능한 기준 모델과 재현 가능한 실험 체계를 먼저 구축합니다.
+
+## 현재 상태
+
+2026-11-05 문서 갱신. **2026-11-04 사용자 결정으로 자동 인덱싱 경로를 중단하고, 사용자가 원본을 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용하는 방향으로 전환했다.** Depth는 초기 필수 입력이 아니다. 업로드 완료·정확한 경로·전체 내용 검증은 아직 확인하지 않았으며 범용 추출본→학습 adapter도 미완료다.
+
+기존371쌍은 모두 train이며 독립 validation은0이다. 추가 로컬 Joyful Jump57페어는 기존 자료와의 중복·원본 motion·split 검토 전이므로371과 단순 합산하지 않는다. 실제 학습 근거는102쌍 CPU 진단(2D frontend·3D regression 각51update)까지이며, 같은 train-fit의 화면안2D 오차330.28px·3D MPJPE634.07mm로 정확도가 낮다. Joyful Jump frame0·28·56의 실제2D 예측도 중앙에 몰리는 실패를 보였다. 전체57프레임의 GT overlay171PNG는 정답 시각화이며 모델 성능 근거가 아니다.
+
+현재 개발 순서는 **검증된1,000~10,000페어와 독립 validation 준비 → 2D 학습 개선 → 예측2D 기반3D baseline → 실제 M2/M3 학습 → 영상 연결**이다. 이는 목표와 순서이며 확보량·학습 완료를 뜻하지 않는다. 화면 UI는 학습·평가·추론 코어와 분리한다. 기존 코드·원본·snapshot·고정 pin·pending 예약은 보존하며 이번 전환으로 새 인덱싱·대규모 추출·학습을 자동 시작하거나 예산을 초기화하지 않는다.
+
+현재 데이터 준비 기준은 [실제 데이터 확보 전략](../docs/DATA_ACQUISITION_STRATEGY.md), 다음 개발 묶음은 [미니 프로토타입 계획](../docs/MINI_PROTOTYPE_PLAN.md), 실행 가능 범위는 [전체 학습 준비](../docs/FULL_TRAINING_READINESS.md)와 [Colab 안내](../docs/COLAB_SETUP.md)를 따른다. [문서 전수 감사](../docs/DOCUMENTATION_AUDIT_20261105.md)는 이번 정리 범위를 기록한다.
+
+## 이전 개발·실험 기록
+
+아래 날짜별 기록의 ‘현재·다음·최신·미실행’은 해당 시점의 상태다. 과거 인덱싱 우선순위·Range 실행·재개 안내는 현재 실행 지시에서 제외한다. 실제102 진단 이후 상태는 위 최신 요약을 따른다.
+
+2026-11-04 저장된102쌍 진단 frontend의 stereo PNG→62관절2D overlay CLI를 준비했다. 기존 두 프레임의 저장 예측 재현과 root 독립 실행을 확인했으나 관절이 중앙에 몰리는 미흡한 결과이며 성능 시연 완료는 아니다. 후속 사용자 로컬 자료57페어를 확인하고 Joyful Jump frame0·28·56의 실제 예측 이미지를 생성했으나 동일한 중앙 집중 실패를 보였다. [실행·검증·제한](../docs/PREDICTION_OVERLAY.md).
+
+2026-11-03 두 번째 big step인 미니 프로토타입 준비를 병행한다. 보존된371쌍은 모두 train이며 실제 학습 근거는102쌍 진단까지다. 다음 개발 묶음은 기존 weights의 UI 독립 추론·결과 내보내기이며, 이후1,000~10,000쌍 확대·독립 validation·제한 시연·stereo 영상 연결로 진행한다. 이번에는 읽기 전용 감사와 계획만 완료했으며 학습·원격 추출·인덱싱 설정 변경은 없다. [재사용 입력·부족한 연결·개발 순서](../docs/MINI_PROTOTYPE_PLAN.md).
+
+2026-11-03 실패 지점의 고정 재개 경로를 준비했다. 기존 PREPARED·원본·plan·46개 완료 quota를 보존하고 pending 예약 전액을 유지한 복구 후 같은 계획으로 이어간다. 새 코드 적용 기록·중간 실패 차단·진단 회수와 로컬 재개를 검증했으며, 실제 Drive 복구·재실행은 아직 하지 않았다. [재개 계약·실행본·검증 범위](../docs/FLEET_SURVEY_RESUME.md).
+
+2026-11-03 실제 Drive survey는92구간/3,752파일을 기록한 뒤 test pose 요청의 연결 오류로 중단했다. 미탐색 archive 때문에 발생한 별도 상태 집계 오류를 수정하고 로컬 검증했으며, 기존 인덱스와 pending 예약은 보존한다. 전체 인덱싱·페어 확보·재개 완료는 아니다. [실제 결과와 수정 범위](../docs/FLEET_DRIVE_SURVEY.md).
+
+2026-11-03 Drive 자동 조사 준비: 기존90archive/354파일의 현재 metadata를 대조해 파일명·크기·수정 시각 차이0을 확인했다. 전체 비용을 확정하기 전 각 archive 최대2개 정상 scan으로 측정하는 survey와 고정 실행 notebook을 구현·로컬 검토했다. 최신 사용자 결정에 따라 총 실행시간 상한 없이 비차단 타이머·사용자 stop을 제공하고, 시간 외 자원 상한은 유지한다. 실제 Drive 실행·전체 비용 확정은 아직 미완료다. [원본 확인·조사 예산·인계 상태](../docs/FLEET_DRIVE_SURVEY.md).
+
+## 2026-11-03까지의 구현·실행 기록
+
+2026-11-03 독립 자동 인덱싱 profile과 auto-run/stop/resume/coverage CLI·CPU worker notebook을 구현했다. 정상 구간은 수동 승인 없이 자동 저장·정산하고 다음 archive로 진행한다. 로컬16segment·mock Drive14segment에서 각각800합성파일, 정상 중단 후 새 workspace 재개를 확인했다. 실제 보존 Lab prefix는2segment/24PNG를 저장했고 root가24개 SHA·decode를 확인했다. 실제 Drive 장기 실행·전체 비용 확정·1,000~10,000페어 확보는 아직 미완료다. [자동 프로그램·검증 범위·실행 경계](../docs/AUTOMATIC_FLEET_INDEXING.md).
+
+2026-11-03 사용자 우선순위 변경: 전체 데이터셋의 독립 자동 인덱싱 프로그램을 먼저 구현한다. 정상 구간마다 수동 검토를 요구하지 않고 고정 계획·누적 예산 안에서 자동 처리·저장·재개·다음 archive 진행을 제공한다. 미니 모델용 데이터는1,000~10,000쌍 규모를 지향하며 기존371쌍을 최종 목표로 삼지 않는다. 실제 원격 전체 실행과 확보 완료를 의미하지 않는다. [자동 인덱싱 목표·구현 경계](../docs/AUTOMATIC_FLEET_INDEXING.md).
+
+2026-11-03 반복 읽기 비용의 격리 비교에서 해제 버퍼1MiB 또는 인덱스 간격256KiB가 같은 예산으로 실제 Lab PNG를 첫 scan1개→두 번째 누적2개 확보했다. 개발14조건 중 핵심6조건을 root가 독립 재현하고 표준 tar SHA·PNG decode를 확인했다. 기본 설정과 원격 실행은 변경하지 않았으며, 두 scan의 국소 개선을 장시간 인덱싱 성공으로 해석하지 않는다. [비교 결과·후속 검증](../docs/FLEET_INDEXING.md).
+
+2026-11-03 fleet 읽기 한도 예외 복원을 production에 반영했다. 같은 예산의 mock Drive runner에서 완전한 합성 파일1개 저장·실측 정산·새 workspace 복원·과거 파일 재추출을 확인했고 개발/root 각각31개 검사가 통과했다. 다음 scan은 반복 읽기로 전진하지 못했으며, 보존된 실제 Lab RGB도 디렉터리8개/PNG0개에서 멈췄다. 예외 처리 개선과 실제 인덱싱 처리량 개선을 구분한다. 기존 Drive pending/예약은 보존하며 원격 재실행은 하지 않았다. [검증 결과·남은 반복 읽기 문제](../docs/FLEET_INDEXING.md).
+
+2026-11-03 실제 RGB269 추출 완료: 사용자 재실행에서 269쌍/538PNG를 17묶음으로 확보했다. Root는 결과 ZIP 전체 CRC·SHA, 고정 입력285파일 바이트 동일성, 538개 index SHA/크기/native1024 RGB decode와 pose key 대응을 독립 검증했고 기존102와 중복 없는 총371쌍을 확인했다. 실제 body683808609bytes/2131HTTP/580.226초로 상한 이내이며 대표 overlay4장만 제한 시각 검토했다. 최초 중단 원인·소비량은 미확정, validation0/train_ready=false이며371 학습은 아직 시작하지 않았다. [실제 결과·검토·후속 경계](../docs/RGB269_PAIRS.md).
+
+2026-11-03 전체 사전 인덱싱 준비: 공식 조각 수와 대조한 90개 archive/354개 파일/3,094,462,001,717bytes inventory를 만들고, 기존 v1/g25와 분리된 `rewind_fleet`의 bounded gzip pack·불변 catalog·누적 예산·재개·CLI/CPU notebook을 구현했다. 사용자 결정에 따라 근거 있는 비용 추정의 각 항목에 2배 상한을 적용하며 unknown 전체 계획은 실행하지 않는다. 소량 calibration 후 실제 시간·저장 비용을 확정할 예정이며 실제 전체 인덱싱·Drive 새 runtime 복원·전체 CRC·학습 adapter는 미완료다. [구현 범위·비용·측정 절차와 남은 경계](../docs/FLEET_INDEXING.md)를 따른다.
+
+2026-11-03 새 pose257+4+8의269개와 기존102개를 기존62관절 spec·좌표/mm·mask·재투영으로 감사했고 전체371 train key가 g25 stereo와 대응했습니다. 기존102 records/contract/blockers는 같고 재투영 최대7.62e-5px로 내부 annotation 수치 검사를 통과했습니다. 신규 RGB269쌍/538PNG의617.44MiB payload를 확인하고 정확 목표·g25 identity·명시 예산에 묶인 runner/입력/notebook을 준비했습니다. 기존102 RGB 재다운로드·일반 gate 수정·신규 RGB 원격 실행·371 학습은 하지 않았습니다. [실제 pose 감사·RGB 추출 예산·인계와 후속 경계](../docs/RGB269_PAIRS.md)를 따릅니다.
+
+2026-11-03 후속 pose_missing8_001은 targets_complete로8/8 확보했다. Root는 각 파일 SHA·크기·JSON과 ZIP CRC, 기존257+로컬4+신규8의269개 정확 집합 및 기존102와 중복 없는371개 pose 키를 확인했다. 추가 body262504bytes/5HTTP/18.262초이며 확장prefix250871808bytes의 모든chunk/전체SHA도 확인했다. 새 RGB 추출·pose 의미/좌표/시간 검증·학습 승인은 별도다. [실제 결과와 검증 한계](../docs/POSE8_RECOVERY.md).
+
+2026-11-03 실제 pose269 Colab 실행은257개 hash/JSON 검증 후 출력32MiB 한도에서 중단했습니다. 확장 cache를 원격0으로 조사해 완전한4개를 추가 확보하고 기존102개와 대조하여 g25 stereo371 중363개 pose 이름 대응을 확인했습니다. 신규 RGB 추출·학습은0이며 남은8개는 원본 결측이 아닌 현 prefix 미관측입니다. 기존269/67/일반 계약을 보존한 새 exact8 profile·40MiB 출력/41MiB 회수·239MiB cache pin·새job/Drive notebook을 준비했고 개발39개 검사가 통과했습니다. 신규8 실제 원격 실행과 Drive 정확 경로는 미확인입니다. [실제 결과·상한 계산·남은8개 실행 계약](../docs/POSE8_RECOVERY.md)을 따릅니다.
+
+2026-11-03 pose269 cache 브라우저 업로드 중 연결 끊김 보고에 대응해, 작은 source/input 업로드를 유지하고 큰 cache만 명시 Drive 경로에서 bounded local copy+SHA/input_spec 검증하는 별도 notebook을 준비했습니다. 원인은 미확정이며 기존65a7244/목표/원본 pin/prepare 예산은 보존했습니다. 개발21개 검사와 local cache 복사/재사용은 통과했으나 실제 Drive 경로·Colab 안정성은 미확인입니다. [순서 변경·준비 예산·부분 회수·실행 전 조건](../docs/POSE269_DRIVE_STAGING.md)을 따릅니다.
+
+2026-11-03 사전 인덱싱 job002는 g25/782member·stereo 관측371개를 정상 저장했고, 누적 snapshot/회수 예약이768MiB를 넘어 정상 중단했습니다. Pose 관측 대응102개 외269개는 미관측 목록이며 결측 판정이 아닙니다. G25 DB 복사본의 빈 페이지를 제거해55.4→28.3MB로 줄이는 별도 검증 helper와 기존235MiB cache를 재사용하는 고정 pose269 실행본을 준비했습니다. 개발40개·독립44개 검사가 통과했으며 compact는 공식 head가 아니고 새 RGB 원격/학습은 없습니다. [저장 구조·남은 상한·pose269 예산과 인계](../docs/G25_STORAGE_AND_POSE269.md)를 따릅니다.
+
+2026-11-03 g16 후속 준비 당시 기록: 사전 인덱싱 job001에서 g9/270→g16/494member, stereo102→224개를 정상 저장했습니다. Pose 관측 대응102·validation RGB0·추출0은 그대로입니다. 8번째 scan의 checkpoint peak 예산 오용을 확인해 전체768MiB 안에서 DB·checkpoint·snapshot·회수 예약을 분리했고, 실제 g16 복사본의 오프라인 저장/회수 회귀를 통과했습니다. 승인된16MiB cache opt-in과 g16 job002 입력·CPU notebook을 준비했으며 후속 원격 실행은 아직 하지 않았습니다. [실제 결과·수정 준비·남은 상한](../docs/ARCHVIS_PREINDEX.md)을 따릅니다.
+
+2026-11-03 초기 준비 당시 기록: 학습과 독립된 ArchVis 사전 인덱싱 실행본을 준비했습니다. 고정 g9부터 순차 재개하고 최신 pose 관측 15,465 key(그중 validation 1,331 key / 20 sequence)를 대조합니다. 명시 profile에서만 body 512MiB·1,200초와 snapshot/회수 공간을 제한하고, HTTP 호출·scan·snapshot의 겹치는 wall/process CPU를 계측합니다. 개발 38개 검사를 통과했으며 실제 원격 실행·validation RGB 발견·전체 데이터 인덱싱 완료는 아직 아닙니다. [고정 입력·예산·중단·회수 안내](../docs/ARCHVIS_PREINDEX.md)를 따릅니다.
+
+2026-11-03 실제102 train 페어를 UI 독립 RGB→예측2D cache→T1 3D 진단 학습에 연결했습니다. Adam1e-4/B2로 각51update·102개 전체1pass(합102update)를32.922초에 실행했고 finite/nonzero gradient·weight 변화·저장weights 재추론 일치를 확인했습니다. 같은102개 train-fit MPJPE는682.60→634.07mm, 화면안2D 평균은330.33→330.28px였습니다. 오차는 크며 일반화/정식 학습 release는 별도입니다. 개발·root 계약검사15개가 통과했고 원래 blockers/train_ready=false를 유지합니다. [설정·coverage·실측·재개 한계](../docs/REAL_RGB102_DIAGNOSTIC.md)를 따릅니다.
+
+2026-11-03 고정14d94d4의 실제 Colab 추출에서 RGB102페어(204PNG)+pose102 확보를 완료했습니다. 응답body266392949bytes(254.05MiB)·837HTTP·271.007초, 관측RSS202.23MiB였고7묶음 모두 내용 감사를 통과했습니다. Root는 ZIP CRC·인덱스 기준204PNG SHA/크기/decode와 고정 pose 입력을 독립 대조했습니다. 대표 overlay10장만 제한 시각 점검했으며 사람 승인·전체 영상 정합·validation·정식 학습 release는 별도입니다. [실제 결과와 한계](../docs/RGB102_PAIRS.md).
+
+2026-11-03 준비 당시 기록: 저장 g9 RGB102페어의 실제 추출·내용 감사 실행본을 준비했습니다. 부족했던 pose33개를 원격 없이235MiB 캐시에서 확보해 총102 JSON·기존69 SHA 일치와 좌표/재투영 감사를 확인했습니다. RGB204 PNG(236.14MiB)는 아직 Colab에서 추출하지 않았으며, 512MiB 전송·1200초의 누적 예산과 부분 결과 회수로 한 번 실행하도록 준비했습니다. 학습 release·시각 정합 승인은 별도입니다. [입력 pin·예산·내용 감사·회수](../docs/RGB102_PAIRS.md)를 따릅니다.
+
+2026-11-02 pose 미관측67개를 실제 Colab에서 모두 추출·파싱·hash 검증했습니다. 기존234MiB 캐시를 재사용하고 신규1MiB media로 약19.1초에 목표완료했습니다. 원본 결측이 아니라 이전 조기종료의 미관측이었습니다. RGB102페어와 pose의 이름대응은 확보했지만 실제 RGB 추출·내용정합·학습은 미완료입니다. [실제 결과·독립 검토](../docs/POSE_MISSING67.md).
+
+2026-11-02 Colab RGB job003은 g5/160항목에서 g9/270항목으로 재개·확장했습니다. train stereo는59→102개, 기존 pose 관측 대응은35개로 유지됐으며 실제 추출0·validation0입니다. 추가 전송을 자동 반복하지 않고, 기존234MiB warm cache에서 미관측 pose67개를 고정 추출하는 전용 profile·notebook을 준비했습니다. 이는 당시 준비 기록이며, 후속 pose67 실제 추출 성공은 위 기록을 따릅니다. 학습 준비는 미완료입니다. [RGB 실제 결과](../docs/SAMPLE_EXPANSION.md)와 [pose67 준비·상한·회수](../docs/POSE_MISSING67.md)를 따릅니다.
+
+2026-11-02 Colab job002에서 ArchVis RGB 부분 인덱싱·스냅샷 저장·결과 회수에 성공했습니다. 전송 상한에서 정상 중단했으며 저장 항목160개, train 좌우 RGB 대응59개 중 pose 관측 대응35개를 확인했습니다. 실제 추출0개·validation0개로 학습 준비 완료는 아닙니다. 다음은 저장 인덱스에서 후보 일부를 추출·검증하고 validation 후보 탐색을 이어가는 것입니다. [실제 결과와 제한](../docs/SAMPLE_EXPANSION.md)을 따릅니다.
+
+2026-11-02 실제 샘플 확대 조사와 ArchVis RGB 증분 인덱싱 실행본을 준비했습니다. 보존 pose 목록에서 validation 후보 1,331개(20개 sequence)를 확인했지만, 대응 RGB가 없어 완전한 추출 triplet은 기존 Serena train 2개뿐입니다. 보유 Lab prefix의 복사 DB를 한 번 확장했으나 다음 파일이 불완전해 새 후보는 늘지 않았습니다. 새 Drive 원본의 인덱스를 최대 256MiB·600초·512개 항목까지 확장하고 저장하는 도구와 CPU 노트북을 준비했으며, 로컬 모의 검사 4개를 통과했습니다. 실제 Colab 원격 실행은 아직 하지 않았습니다. 검토한 고정본은 데이터셋 탐색 세션에 인계합니다. [조사 결과·상한·운영 인계](../docs/SAMPLE_EXPANSION.md)를 따릅니다.
+
+2026-11-02 외부 고정 policy로 검토된 실제 데이터만 허용하는 bounded RGB2D release→train/validation/정확 재개/checkpoint/export 경로를 구현했습니다. 한 bundle32frame·T1/2D 범위이며 기존 synthetic gate와 원 candidate는 보존합니다. 개발34개 및 root 신규7개·기존27개 검사를 통과했고 명시 development_fixture CPU에서 전체4update와2+2재개의 전체state 일치를 확인했습니다. 현재 실제 Serena는 train2/validation0·원본motion/외부검토근거 미충족으로 차단했고 실제 학습/release/policy 발급은0입니다. [계약·신뢰범위·CLI/config·다음 자료 요건](../docs/REAL_RGB2D_RELEASE.md)을 따릅니다.
+
+2026-11-02 완료 bundle의 UI 독립 T=1 진단 reader를 추가했습니다. 명시 COMPLETE pin·split과 전체 byte/raw 수치 감사를 거쳐 candidate 한 개를 캐시하고, native RGB·GT2D/annotation mask·GT3D mm/target mask·GT2D 특징을 제한 batch로 읽습니다. 자체 생성 fixture 개발8개와 root 독립8개가 통과했으며 기존 학습 gate와 dataset_sample/diagnostic_only/train_ready=false를 유지합니다. [데이터 계약과 상한](../docs/BUNDLE_T1_DATA.md)을 따릅니다.
+
+아래 날짜별 구현 기록의 GPU 미실행·미검증은 해당 준비 당시 상태입니다. 현재 고정20b7aa9의 합성 A100 FP32/AMP 시험은 통과했으며 실제 데이터 GPU 학습·정확도 검증은 별도입니다.
+
+2026-11-02 고정 `20b7aa9`의 사용자 Colab 합성 GPU 시험 `synthetic_gpu_20b7aa9_001`이 통과했다. A100-SXM4-40GB에서 FP32/AMP 각각 RGB·M1의 전체 학습 상태 재개 일치, native cache/join의 GT3D·mask 보존, export 예측 일치를 확인했다. 32attempt/32성공 update·AMP skip0, supervisor24.000초·관측 worker RSS2,676,375,552bytes, Torch allocator peak allocated174,359,552/reserved203,423,744bytes로 고정 예산 이내였다. 시간은 IO 포함이며 전체 driver VRAM 계측이 아니다. Root도 결과 ZIP CRC와 checkpoint12개 SHA를 독립 대조했다. 실제 데이터 학습·정확도·Drive queue 새VM 지속성은 미검증이며 `full_training_ready=false`를 유지한다. Drive 영구보관은 미확인이다. [시험 근거](../docs/SYNTHETIC_GPU_PILOT.md).
+
+2026-11-02 완료 준비 queue를 로컬 RGB manifest·pose job별 candidate/audit·출처 연결 bundle로 묶는 UI 독립 adapter를 추가했습니다. 전체 triplet 명시 선택과 source/file/metadata SHA·split/motion·예산을 검사하고, 새 출력의 완료 marker를 검증합니다. 개발47개 회귀와 최종 정렬/완료 경로3개, root20개 및 verify3개가 통과했습니다. 이는 합성 로컬 준비 검증이며 학습 release·candidate→학습 shard·실제 GPU 실행은 포함하지 않습니다. [지원 범위와 검증 근거](../docs/PREPARED_BUNDLE.md)를 따릅니다.
+
+2026-11-02 제한된 Colab 합성 GPU 통합 pilot의 runner·4셀 notebook·회수 가이드를 준비했습니다. 로컬 최종12개와 독립12개 검사, 작은 CPU16update 및 오류/ZIP 회수를 확인했으며 실제 GPU는 실행하지 않았습니다. 오케스트레이션이 source ZIP·ready notebook을 고정한 뒤 테스트 세션이 안내합니다. [GPU pilot 준비·예산·미검증 범위](../docs/SYNTHETIC_GPU_PILOT.md)를 따릅니다.
+
+2026-11-02 같은 원본 sequence의 RGB 예측 chunk를 별도 T=1 특징 카탈로그로 연결했습니다. 단일 프레임 3D 학습·재개·평가·export까지 합성 통합을 확인했고52개 검사가 통과했습니다. 기존 temporal/완결-sequence 정책과 실제 데이터 release 차단은 유지합니다. [T1 연결 범위와 근거](../docs/T1_FEATURE_CHUNKS.md)를 따릅니다.
+
+2026-11-02 UI 독립 RGB2D shard trainer를 추가했습니다. 작은 CNN에 명시 resize·native 좌표 복원·epoch/optimizer/RNG 재개를 연결했고, 개발38개 검사와 합성 checkpoint→weights→native cache→기존 join을 확인했습니다. 실제 dataset_sample 학습은 계속 거부하며 GPU/AMP 실측·temporal chunk 연결은 남아 있습니다. [2D 학습·재개와 추론 경계](../docs/RGB_SHARD_TRAINING.md)를 따릅니다.
+
+2026-11-02 RGB·GT chunk 공급을 추가했습니다. 같은 원본 sequence의 겹치지 않는 2D 독립 frame chunk를 한 shard씩 읽고, native RGB/GT 좌표·mask와 기존 API를 보존합니다. 개발20개 검사와 root 신규11개가 통과했으며 공급 경로는 실제 학습 release 차단 상태를 유지합니다. [RGB·GT shard 범위와 사용법](../docs/RGB_GT_SHARDS.md)을 따릅니다.
+
+2026-11-02 전체 데이터 학습 준비를 우선하며 Colab 기준으로 진행합니다. UI와 분리된 로컬 M1 특징 shard·제한 로딩·epoch cursor·readiness·추론 가중치에 이어 별도 headless shard trainer/CLI를 구현했습니다. 두 M1 regression 모델의 합성 CPU 학습·정확 재개·독립 validation과 31개 검사, root 별도14개가 통과했습니다. 실제 dataset_sample 학습은 release 미구현으로 거부합니다. 후속 raw RGB·pose의 제한된 영속 준비 queue와 누적 예산/부분 재개를 구현했고 로컬 합성13개 검사를 통과했습니다. 전체 데이터 자동 공급·실제 release·Drive/새VM·GPU/AMP pilot은 후속입니다. [준비 queue 범위](../docs/PREPARATION_QUEUE.md)를 따릅니다. [전체 학습 준비와 단계별 완료 기준](../docs/FULL_TRAINING_READINESS.md)을 따릅니다.
+
+2026-11-02 공통 프레임 입력의 선언과 기존 이미지 로더 연결을 구현했습니다. Local RGB 로더와 RGB 진단 입력이 원본 출처·좌우 뷰·미확인 시간/geometry 이유를 보존하며, 기존 이미지 tensor·정답 mask는 유지합니다. 현재 Serena1·10은 독립 T=1 입력이고 동영상 decoder·UI·temporal 처리는 후속 범위입니다. [공통 프레임 입력](../docs/FRAME_INPUT.md)을 따릅니다.
+
+로컬 RGB·GT 2D 입력부터 frontend 학습·예측 cache·2D 평가·예측 특징 결합·3D regression까지 연결하는 소량 M1 runner를 구현했습니다. 사용자 Colab CPU 통합 진단 `local_m1_cpu_65c4287_001`에서 합성4 record·5단계·2+2 update가 통과했고, 후속 합성 GT2D 검토 UI도 사용자 PDF 상태와 resize 진술로 확인했습니다. 브라우저 버전·원래 화면 가독성은 미확인이며, 2026-11-02 기존 원본을 재검토해 Serena frame1·10의 실제 좌우 RGB+pose 대응2개를 확보했습니다. 실제 두 sample의 GT2D→3D 진단과 RGB→예측2D cache→3D 단일 프레임 CPU 진단 학습까지 확인했습니다. 실제 RGB 예측 baseline·GPU 성능·M1 전체 완료는 아직 미검증입니다. [M1 기록](../docs/M1_BASELINE.md)과 [다음 실제 자료 준비 상태](../docs/REAL_DATA_NEXT_RUN.md)를 따릅니다. 후속 API10 실제 시험에서 Serena pose2개를 확보했고, 보존된 좌우 RGB와 결합했습니다. 기존192MiB를 재사용하고 신규42MiB를 읽어 약158초에 목표 완료했습니다. [캐시 상한과 실제 결과](../docs/POSE_CACHE_BOUNDS.md)를 따르며 후속 영상·좌표 검토와 GT2D 진단 결과는 아래에 기록하며, 정식 baseline 학습 검증은 남아 있습니다.
+
+| 단계 | 확인한 구현·검증 | 남은 완료 조건 |
+| --- | --- | --- |
+| M0 데이터 | JSON·candidate 도구, 기존371 train 페어 검증 근거와 추가 로컬57페어 확인 | 신규 추출본 manifest·중복/motion/split·좌표/시간·독립 validation·학습 adapter. M0 전체 미완료 |
+| M1 비교 기준 | 합성 GPU 재개 검증과 실제102쌍 CPU 진단, 고정2D weights overlay 실행. 실제예측 정확도는 낮음 | 2D 정확도 개선·독립 validation·예측2D→3D baseline·실제 GPU 검증. M1 전체 미완료 |
+| M2 Body teacher | 합성 causal diffusion·DDIM·streaming·학습 재개 검증 | 실제 데이터 body 학습·비교 성능·GPU 검증. M2 전체 미완료 |
+| M3 Whole-body teacher | 합성 body–hand cascade·세 조건 평가·Colab CPU 재개 검증 | 실제 body/hand 학습·cascade 성능·GPU 검증. M3 전체 미완료 |
+| M4 Student | 미착수 | One-step 증류와 정확도·지연 비교 |
+| M5~M6 개선·통합 | 미착수 | Ablation·failure 평가·최종 재현 |
+
+과거 API10(`33adef1`)은 목표 JSON2개 저장·hash·파싱에 성공했고 당시 압축 캐시는234MiB였다. 이후 RGB102+269의371쌍 확보와102쌍 진단까지 진행했다. [캐시 상한 기록](../docs/POSE_CACHE_BOUNDS.md)과 [부분 인덱싱 조사](../docs/RGB_INDEX_PROBE.md)는 보존 근거이며 현재 데이터 준비의 선행 실행 조건이 아니다. 전체 archive 무결성·정식 baseline 학습·일반화 성능은 미검증이다.
+
+현재 진입점은 [실제 데이터 확보 전략](../docs/DATA_ACQUISITION_STRATEGY.md)과 [미니 프로토타입 계획](../docs/MINI_PROTOTYPE_PLAN.md)이다. 과거 pose/cache 시험의 고정 pin과 결과는 해당 문서 및 [구현 이력](../docs/IMPLEMENTATION_HISTORY.md)에 보존한다. M0~M6·E1~E8·D1~D5는 [로드맵](../docs/ROADMAP.md), 이전 outputs 경로의 보관·복원은 [로컬 보관 안내](../docs/LOCAL_STORAGE.md)를 따른다.
+
+### RGB·pose 인덱스 저장과 재개
+
+이 절은 종료된 경로의 구현·실험 기록이다. 2026-11-04 이후 새 scan·복구·재개를 요청하지 않으며 학습 입력은 검증된 추출본에서 준비한다.
+
+[지속형 archive 인덱스](../docs/PERSISTENT_ARCHIVE_INDEX.md)의 로컬 코어와 `python -m rewind_archive_index` CLI를 추가했습니다. 원본별 파일 목록·gzip restart 인덱스·완전 파일 경계를 SQLite 트랜잭션으로 함께 저장하고, 다음 실행에서 복원해 확장합니다. 조각 순서와 원본 identity를 고정하며 학습 shuffle과 archive 순서를 구분합니다. RGB·pose 모두 지원하고, 자동 인덱스 생성을 끈 선택 파일 추출과 프로세스 재시작을 포함한 로컬13개 검사를 통과했습니다.
+
+고정 Drive 원본 명세의 Range reader와 닫힌 snapshot 저장·복원 연결을 추가했습니다. [Drive 지속형 인덱스 시험](../docs/DRIVE_PERSISTENT_INDEX.md)에서 2026-10-30 실제 pose의 Drive 저장본을 새 Colab CPU 런타임으로 복원하고 목록을16→32개로 이어 가는 시험을 통과했습니다. 선택 JSON2개의 실제 해시도 일치했습니다. 후속 C pilot은 B 저장본을 복원해 기존 gzip coverage 밖의 새 JSON과 인덱스 확장을 확인하고, 새 snapshot을 다시 열어 재추출하는 경로입니다. 실제 C 첫 실행은 B 복원 기록만 남은 채 미완료이며, 회수 DB는32member/generation2로 확장 저장이 없습니다. 최초 중단 원인은 미확정입니다. 후속 수정본은 실행 전 버전·입력 식별값과 단계·중단 종류를 저장하고, 실행 셀을 다시 돌리지 않고 디스크 기록에서 보고서를 회수하도록 보완했습니다. 수정본 `1c31a73`의 실제 Colab CPU C 시험에서는 목록32→80개, gzip coverage3,791,957→6,324,814bytes 확장과 저장된 새 인덱스로 기존·신규 JSON3개 재추출·해시 일치를 확인했습니다. 응답body3,673,616bytes/54HTTP로 예산 내였고 보고서 회수와 flush가 완료됐습니다. [실제 C 결과](../docs/PERSISTENT_INDEX_EXTENSION.md#2026-10-30-수정본-실제-c-시험-결과)를 따릅니다. C 이후 새VM 지속성·RGB 원격 검증은 남아 있습니다. 기존 archive_prepare/학습 epoch 자동 연결과 대규모 행 단위 catalog는 미구현입니다. 기존 API10과 캐시는 변경하지 않았고, Core 직접 추출 형식과 달리 아래 opt-in 준비 경로는 기존 추출 검증 도구에 연결했습니다. 학습1epoch 완료를 전체 인덱싱 완료로 표시하지 않습니다. 관측 목록 완료와 전체 gzip CRC 검증을 별도로 기록하며 두 조건을 만족해야 전체 완료입니다.
+
+2026-11-02 자동 인덱싱 연결: 기존 데이터 준비 `prepare`와 `python -m rewind_archive extract`에 명시적인 persistent-index 옵션을 추가하고 로컬 검증을 마쳤습니다. 요청한 파일이 목록에 없으면 예산 안에서 인덱스를 확장·저장하고, 다음 준비 요청은 저장 상태를 복원합니다. 기존 추출본 검증·매칭·pose candidate 변환 경로에 연결하며 학습 차단 조건은 유지합니다. 이미 추출한 파일의 재사용은 로컬 해시 검증으로 구분합니다. 학습 로더가 모든 archive를 자동 순회하거나 epoch 종료가 전체 인덱싱 완료를 의미하는 기능은 아닙니다. 실제 첫 Drive 통합 시험(`pose_auto_0da5ac5_001`)은 B 복원 후 최초 HEAD 저장 구간에서 실패했습니다. 예외 종류가 미기록되어 최초 오류의 실제 원인은 미확정입니다. [자동 준비 연결 안내](../docs/AUTOMATIC_INDEX_PREPARATION.md)를 따릅니다. HEAD 게시의 hard link/fsync 의존을 제거하고 이전본 보존·읽기 검증·단계별 오류 기록을 보완했습니다. 관련 로컬35개 검사가 통과했으며 수정본의 실제 Drive 통합 시험도 통과했습니다. 상세 결과는 아래 전용 문서를 따릅니다.
+
+2026-11-02 실제 sample 확보: 기존 오른쪽 결과 ZIP을 회수해 왼쪽 RGB·pose와 결합했고, 추가 전송 없이 Serena frame1·10의 stereo+pose2개·RGB manifest·pose candidate·GT2D 검토 화면을 만들었습니다. 공식 train 소속·파일 hash·좌표 변환·재투영 수치 검사를 통과했고 root가 별도 재실행과 제한적 영상 대조를 했습니다. 두 frame은 비연속이며 정식 학습 release·독립 validation·원본 motion 검증은 남아 있습니다. 이 sample의 명시적 단일 프레임 GT2D 진단 학습까지 연결했고, 전체 RGB 인덱싱 완료를 기다리지 않습니다. [준비 명령과 산출물](../docs/REAL_DATA_NEXT_RUN.md)을 따릅니다.
+
+2026-11-02 실제 단일 프레임 진단: Serena train frame1·10의62관절을 이용해 GT2D→3D CPU regression을 연결했다. 입력은(2,1,868), target은(2,1,62,3)mm이며 프레임을 독립 처리한다. 고정100update와50시점 재개50update의 전체 checkpoint 상태가 일치했고 같은2sample train-fit normalized MSE0.146078→0.015887, MPJPE618.13→188.49mm로 감소했다. 이는 RGB 예측·일반화·temporal 성능이 아닌 실제 GT입력 진단이며 좋은 정확도나 M1 전체 완료를 뜻하지 않는다. 일반 loader와 candidate 학습 차단은 유지하고 별도 diagnostic-only 진입점만 사용한다. [실행 안내](../docs/REAL_GT2D_DIAGNOSTIC.md).
+
+2026-11-02 실제 RGB 입력 진단: 확보한 Serena 두 train sample로 RGB→2D frontend→예측 cache→3D regression을 연결했다. 원본1024영상을64로 bilinear align_corners=True 축소하고 예측을 원좌표로 복원했다. Frontend100+regression100update의 CPU 실행과 저장weights 재추론·cache 좌표/특징 hash 대조를 통과했다. Heatmap MSE3.38376e-5→3.32889e-5, 같은 sample의2D 화면안 평균오차315.452px로 예측정확도는 낮다. 예측2D입력3D train-fit MSE0.150696→0.015842, MPJPE623.06→187.98mm였다. GT2D 입력대체 없이3D mask124개를 유지하며 두 stage50시점 재로드상태 일치를 확인했다. 중단없는 학습과의 완전동등성·일반화·실시간성·M1 전체 완료를 주장하지 않는다. 일반학습 차단은 유지한다. [실행 안내](../docs/REAL_RGB_DIAGNOSTIC.md).
+
+## 문서 안내
+
+2026-11-02 종료된 개발 시험 자료 432개를 `.local-archive/20261102/`에 검증 보관하고 빈 임시 폴더를 정리했습니다. 최신 GPU 시험·학습 준비 근거·실제 데이터와 캐시는 유지했습니다. 이전 경로의 복원은 [로컬 보관·복원 안내](../docs/LOCAL_STORAGE.md)를 따릅니다.
+
+이전 실행 자료는 Git에서 제외되는 `.local-archive/20261023/`에 정리했습니다. 현재 테스트 파일은 기존 `outputs/` 경로를 유지합니다. 과거 `outputs/` 링크의 자료가 보이지 않으면 [로컬 보관·복원 안내](../docs/LOCAL_STORAGE.md)와 아카이브의 `INDEX.json`에서 원래 경로를 확인하세요.
+
+| 문서 | 역할 |
+| --- | --- |
+| [실제 데이터 확보 전략](../docs/DATA_ACQUISITION_STRATEGY.md) | RGB·pose 추출본 준비·검증과 종료된 인덱싱 경로 구분 |
+| [미니 프로토타입 계획](../docs/MINI_PROTOTYPE_PLAN.md) | 현재 개발 순서와 미완료 연결 |
+| [프로젝트 로드맵](../docs/ROADMAP.md) | 현재 결정, 단계별 목표·완료 기준과 날짜별 상세 기록 |
+| [구현·검증 이력](../docs/IMPLEMENTATION_HISTORY.md) | README에서 분리한 이전 구현·실행 기록 |
+| [로컬 보관·복원 안내](../docs/LOCAL_STORAGE.md) | 현재 테스트 보호 범위와 이전 산출물의 개별 복원 |
+| [에이전트 작업 지침](../AGENTS.md) | 구현·실험·검증·문서 수정 시 지켜야 할 원칙 |
+| [M0 JSON 도구 안내](../docs/M0_JSON_TOOLS.md) | 실행법, 로더·mask·manifest 계약, sample 검증 근거와 제한 |
+| [실제 관절 대응표](../docs/JOINT_MAPPING.md) | Raw 87개 전체 이름, 개발용 subset·공식 평가 순서 대조와 역할 후보·미확정 항목 |
+| [단위·좌표계 및 학습 관절 검토](../docs/COORDINATE_AND_TRAINING_REVIEW.md) | 실제 변환 수치 검증, 단위 근거의 강도, body22+finger40 권고와 학습 진입 조건 |
+| [실제 pose 변환기](../docs/REAL_DATA_PREPARATION.md) | 채택한 초기 규격, mm·mask·camera·손목 상대 특징 변환과 candidate 검증 |
+| [이전 실제 데이터 준비 실행](../docs/REAL_DATA_NEXT_RUN.md) | 과거 고정 시험과 확보 근거; 현재 경로는 데이터 확보 전략 참조 |
+| [데이터·window 계약](../docs/DATA_CONTRACT.md) | 공식 자료 근거, 관절 집합 구분, causal window 정책과 합성 검증 |
+| [Causal window 독립 검토](../docs/CAUSAL_WINDOW_REVIEW.md) | 오케스트레이션의 코드·합성 실행·출처 교차 확인 기록 |
+| [M3 whole-body teacher 안내](../docs/M3_WHOLE_BODY_TEACHER.md) | 고정 body·손목 상대 hand·조건 비교·cascade 평가와 CPU 합성 실행 |
+| [M2 body teacher 안내](../docs/M2_BODY_TEACHER.md) | Diffusion·camera·loss·streaming 계약과 CPU 합성 실행·한계 |
+| [M1 학습 기반 안내](../docs/M1_BASELINE.md) | Tensor·mask·loss·예측 캐시·checkpoint 계약과 합성 실행법 |
+| [로컬 lazy RGB 로더](../docs/LOCAL_RGB_LOADER.md) | Manifest builder·sample/batch API·합성 CPU 검증 범위와 실제 입력 제한 |
+| [Colab 준비 안내](../docs/COLAB_SETUP.md) | 소스 ZIP 전달, 런타임·Drive 준비와 결과 보관 |
+| [압축 원본 준비 도구](../docs/ARCHIVE_PREPARATION.md) | 종료된 압축 준비 경로의 코드·검증 보존 기록 |
+
+프로젝트 계획은 `docs/ROADMAP.md`를 기준으로 관리합니다. 이후 변경은 문서에 반영합니다. 로드맵의 미결정 항목 D1~D5와 잠정 목표는 확정된 요구사항과 구분합니다.
+
+## 이미지·동영상 프론트 방향
+
+2026-11-02 사용자 결정으로 최종 프로토타입은 이미지 쌍·순서 있는 이미지 시퀀스와 동영상을 지원하는 방향으로 설계합니다. 동기화된 stereo egocentric 영상과 camera metadata를 공통 프레임 입력으로 연결하고, 재생·타임라인·2D overlay·3D 결과 확인 화면을 계획합니다. 동영상 decoder/UI는 아직 미구현이며 현재 실제 두 sample 진단은 동영상 검증이 아닙니다. [논문 근거·입력 계약·단계별 계획](../docs/VIDEO_INPUT_PLAN.md)을 따릅니다. 실시간 카메라 연결과 임의의 단안 영상 지원은 별도 검토 대상입니다.
+
+## 목표와 범위
+
+입력은 스테레오 egocentric 영상과 카메라 자세이며, 출력은 몸과 손의 3D 관절 위치입니다. 다음 구성을 순차적으로 구현할 계획입니다.
+
+1. 2D keypoint·confidence front-end와 regression 비교 모델
+2. Graph Transformer와 causal relative-temporal Transformer를 포함한 body diffusion teacher
+3. 상체 예측을 조건으로 사용하는 body–hand cascade
+4. One-step student distillation과 streaming inference
+5. 데이터 확장, diffusion 변경, 관측 오류에 대한 강건성 개선 실험
+
+Identity conditioning과 avatar용 inverse kinematics는 후속 선택 과제입니다. Floor-alignment, 외부 static camera 융합, 완전한 physics/contact·self-penetration solver는 초기 범위에서 제외합니다.
+
+## 개발 순서
+
+| 단계 | 핵심 산출물 |
+| --- | --- |
+| M0 | 데이터 규격, 좌표 검증, 고정 split |
+| M1 | 2D front-end, 특징 캐시, regression 기준 |
+| M2 | Causal body diffusion teacher |
+| M3 | Whole-body teacher와 cascade 평가 |
+| M4 | One-step student와 정확도·지연 시간 비교 |
+| M5 | 단일 변경별 개선 실험과 failure benchmark |
+| M6 | 최종 모델, 평가 결과, 재현 가이드 |
+
+각 단계의 진입 조건과 E1~E8은 [로드맵](../docs/ROADMAP.md)에 기록한다. 현재는 이미 보존된371 train 페어와 사용자 업로드 추출본을 기준으로 입력 검증·독립 validation·범용 학습 adapter를 준비한 뒤2D 개선과 예측2D 기반3D baseline으로 진행한다. GT 입력 진단이나 문서 정리만으로 M0/M1 완료를 선언하지 않는다.
+
+## 개발과 실험 환경
+
+- 주 학습 환경은 Google Colab GPU를 계획하고 있습니다. 실제 GPU, 저장 용량과 학습 예산은 미정입니다.
+- 기존 초기 데이터 후보는 UnrealEgo입니다. 이전 UnrealEgo2 JSON으로 사전 도구를 검증했으며, 재확보 데이터의 최종 baseline 데이터셋·버전·split은 검증 후 결정합니다.
+- **2026-11-04 운영 결정:** 사용자가 압축 해제해 Drive에 업로드하는 RGB·pose 추출본을 직접 사용한다. 필요한 검증 subset만 Colab 임시 디스크에 준비하고 재사용하며 결과·checkpoint·manifest는 영구 보관한다. 이전 압축 원본과 인덱스는 보존하되 자동 인덱싱·부분 Range 읽기를 기본 준비 과정에서 제외한다.
+- 작은 데이터의 입출력 검증과 과적합 테스트를 통과한 뒤 학습 규모를 늘립니다.
+- Notebook은 준비·실행 진입점이며 JSON/window는 `rewind_data`, regression은 `rewind_m1`, body diffusion은 `rewind_m2`, body–hand cascade는 `rewind_m3` 모듈로 분리했습니다.
+- 설정, 데이터 분할, seed, checkpoint, 환경과 평가 결과를 함께 기록합니다.
+
+### Drive와 Colab의 데이터 준비
+
+Drive의 RGB·pose 추출본에서 sequence/frame·좌우 뷰·원본 motion·split을 확인하고 크기·SHA·PNG decode·JSON 관절/단위/좌표·mask를 검증한다. 업로드 폴더와 완료 여부는 실제 목록으로 확인해야 하며 현재 범용 학습 adapter·실제 데이터 release는 미완료다. Drive에서 직접 읽을지 검증 subset을 `/content`로 복사할지는 IO·공간 비용을 측정해 고정한다. 원본 압축 전체를 Colab에서 다시 다운로드·결합·인덱싱하는 단계를 요구하지 않는다.
+
+번호 연속성을 timestamp·stereo 동기화의 증거로 사용하지 않는다. 입력 manifest·전처리·모델 버전과 checkpoint를 런타임 추출본과 분리 보관한다. 종료된 Range·gzip·인덱스 경로의 사실과 고정 설정은 [압축 준비 기록](../docs/ARCHIVE_PREPARATION.md)에 남기며 현재 실행 절차로 사용하지 않는다.
+
+작은 sample → overfit → pilot 순서는 실행 가능한 개발 방향입니다. 다만 논문 크기 모델·대규모 학습·반복 실험을 현재 Colab 예산으로 수행할 수 있는지는 GPU·VRAM·입출력·step 시간 측정 후 판단합니다. 30 FPS와 성능 개선은 달성이 보장된 결과가 아닙니다.
+
+## M0 사전 도구 실행
+
+프로젝트 root에서 Python 3.10 이상으로 실행합니다. 아래 `python`은 실제 Python 실행파일을 가리켜야 합니다. 이 세션에서는 Codex 번들 Python 3.12.14로 명령을 검증했습니다. 원본 sample은 `data/`, 생성 산출물은 `outputs/`에 두며 두 경로 모두 Git에서 제외합니다.
+
+```sh
+python -m rewind_data --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --dataset-version UnrealEgo2_train_val_pose_unverified --provenance data/sample_source.json --output outputs/m0_sample
+python -m unittest discover -s tests -v
+python tests/smoke_sample.py --input data/raw/unrealego2_sample --skeleton configs/skeleton_unrealego2_dev.json --provenance data/sample_source.json --expected-frames 18 --expected-joints 87
+```
+
+위 데이터 의존 명령은 **추출된 JSON 디렉터리용**입니다. 압축 원본·분할 파일을 `--input`으로 직접 읽지 않습니다. 별도 `rewind_archive`가 manifest·상한을 받아 제한된 선택 추출과 이름 대응을 처리하며 실제 split·좌표·단위 검증은 별도로 남깁니다. gzip 인덱스 없이 원하는 멤버에 도달하려면 앞부분의 순차 해제가 필요합니다. 사용자 Drive의 pose 소량 추출·Colab verify와 후속 32 JSON annotation 감사는 확인했습니다. 실제 영상·시간·학습 준비의 남은 조건은 [감사 기록](../docs/ARCHVIS_POSE_AUDIT.md)을 따릅니다.
+
+기존 18프레임 sample과 provenance가 다시 준비된 뒤 해당 smoke 명령을 실행하며, 다른 subset에는 입력 경로와 기대 프레임·관절 수를 검증한 범위에 맞춥니다. 일반 데이터에는 `--provenance`를 생략할 수 있습니다. 기존 파일은 Git에 포함되지 않고 현재 가용성을 가정하지 않습니다. 합성 fixture 테스트는 데이터셋 없이 실행할 수 있습니다. 감사 오류가 있으면 보고서를 생성하면서 exit code 1을 반환합니다. 산출물은 `manifest.json`, `audit_report.json`, `viewer.html`입니다. Viewer는 외부 서버/CDN 없이 작성했으며 실제 브라우저 호환성 검증은 남아 있습니다. Archive와 loader의 경계는 [도구 안내](../docs/M0_JSON_TOOLS.md#압축-원본-준비-계획과-구현-상태)를 확인합니다.
+
+## 데이터 없이 분할 archive 준비 실행
+
+종료된 경로의 합성 개발 예시다. 현재 데이터 준비나 학습의 선행 조건이 아니며 원격 실행을 요청하지 않는다.
+
+Python 표준 라이브러리 환경에서 실행합니다. 명시한 sequence/member glob만 저장하며 새 output을 지정합니다.
+
+```sh
+python -m rewind_archive.fixture --output outputs/archive_fixture
+python -m rewind_archive extract --manifest outputs/archive_fixture/rgb_manifest.json --limits configs/archive_limits_smoke.json --include "Fixture/Day/person/avatar/001/Motion__1_/*" --output outputs/archive_rgb
+python -m rewind_archive extract --manifest outputs/archive_fixture/pose_manifest.json --limits configs/archive_limits_smoke.json --include "Fixture/Day/person/avatar/001/Motion__1_/*" --output outputs/archive_pose
+python -m rewind_archive verify --extraction outputs/archive_pose --manifest outputs/archive_fixture/pose_manifest.json
+python -m rewind_archive match --extraction outputs/archive_rgb --extraction outputs/archive_pose --output outputs/archive_matching.json
+```
+
+이 합성 입력은 triplet 4개를 맞추지만 split·원본 motion·물리/영상 정합성을 검증한 학습 데이터가 아니므로 train_ready=false입니다. Stop reason·CRC·완전 파일과 수신 범위를 확인하고, 손상·원본 변경으로 unusable인 추출은 재사용하지 않습니다. Source/limits schema·측정 범위와 실제 Drive adapter의 제한은 [압축 준비 안내](../docs/ARCHIVE_PREPARATION.md)에 기록합니다.
+
+Colab의 실제 pilot 입력은 version을 수동으로 채우지 않습니다. [Metadata 선택 규격과 실행 순서](../docs/ARCHIVE_PREPARATION.md#drive-metadata에서-manifest와-pilot으로)는 한 archive의 ID·기대 파일명·total_parts와 사용자 glob만 요구합니다. Metadata 기본 128KiB/30초와 준비 기본 8MiB/60초는 별도이며, 실패하면 report만 남기고 이전 성공 결과로 진행하지 않습니다. 같은 준비 코어를 로컬에서 `python -m rewind_archive pilot --manifest ... --limits ... --include ... --output ...`로 실행하면 verify와 compact pilot_report.json도 남깁니다. 실제 Drive 연결은 notebook의 별도 활성화 단계입니다.
+
+## 데이터 없이 causal window 계약 실행
+
+현재·과거만 조립하고 gap·sequence 경계에서 history를 초기화합니다. 중복/역순과 구조 오류는 거부하며, 부족한 과거는 `None` + `time_valid`로 표시합니다. Field별 mask와 unknown visibility를 보존하고, FPS나 실제 시간을 만들지 않습니다. 실제 데이터나 기존 sample 산출물이 필요하지 않습니다.
+
+```sh
+python -m unittest discover -s tests -v
+python -m rewind_data.window_fixture --window-size 3 --output outputs/synthetic_windows.json
+```
+
+Fixture는 `synthetic_fixture`로 구분된 6개 window를 출력합니다. 총 길이 정의, 명시적 container 경계의 streaming reset, 관절·단위·calibration 미확인 범위와 다음 진입 조건은 [데이터·window 계약](../docs/DATA_CONTRACT.md)에 기록합니다. 기존 개발용 skeleton은 미검증 설정으로 유지합니다.
+
+## 데이터 없이 M1 학습 기반 실행
+
+실제 입력을 학습 계약으로 바꾸기 전, RGB manifest와 pose candidate의 선택 frame을 대조하고 좌우 GT2D overlay·누락·화면 밖·출처·미확인 조건을 확인하는 [소량 검토 도구](../docs/REAL_DATA_PREPARATION.md#rgbpose-candidate-소량-검토)를 사용할 수 있습니다. 출력은 검토 준비 자료이며 학습 승인을 발급하지 않습니다. 실제 동일 frame의 좌우 RGB·pose가 확보되지 않으면 자료 확인이 필요한 경계에서 멈춥니다.
+
+이미 로컬에 있는 PNG 추출본을 기존 RGB 로더에 연결할 때는 [RGB manifest builder](../docs/LOCAL_RGB_LOADER.md#추출본에서-rgb-manifest-생성)를 사용합니다. 공통 root 아래 최대4개 추출본의 좌우를 파일 복사 없이 연결하고, 명시한 sequence/frame·split 선언을 대조합니다. 이는 RGB–pose 정합성이나 실제 데이터 학습 승인을 발급하지 않습니다.
+
+실제 데이터 없이 사용할 독립 RGB·GT 입력은 아래 진입점으로 생성할 수 있습니다. 고정 toy 관절 `root/tip`, 8×6 PNG 8개와 train/validation 각 2개 record를 만듭니다. 생성물은 `synthetic_fixture`이며 실제 관절·카메라 검증을 뜻하지 않습니다.
+
+```sh
+python -m rewind_m1.local_fixture --output NEW_FIXTURE
+```
+
+이를 기존 runner에 연결하는 [Colab CPU 통합 진단 notebook](../notebooks/local_m1_diagnostic.ipynb)의 고정 source `65c4287` 시험은 최종 통과 결과를 수령했습니다. 저장소의 일반 notebook은 고정 source 식별값이 비어 있으며 실제 시험의 ready 사본과 구분합니다. 같은 사용자 시험을 반복 요청하지 않고, 기존 warm192·로더 고정 시험과도 섞지 않습니다.
+
+준비된 로컬 RGB manifest와 검증된 GT 특징 문서가 있다면 아래 소량 CPU runner로 전체 연결을 실행합니다. `JOINT_A JOINT_B`는 입력 계약의 실제 관절 순서로 바꾸고, 그룹 파일에는 해당 관절 이름을 명시합니다. 새 출력 디렉터리를 지정합니다.
+
+```sh
+python -m rewind_m1.local_diagnostic --manifest RGB_MANIFEST.json --root RGB_ROOT --features GT_FEATURES.json --manifest-sha256 RGB_MANIFEST_SHA256 --joints JOINT_A JOINT_B --frontend-config configs/frontend_local_smoke.json --regression-config configs/m1_single_synthetic.json --groups GROUPS.json --regression-steps 2 --output NEW_OUTPUT
+```
+
+Runner는 train/validation을 필수로 요구하고 test를 자동 평가하지 않습니다. 실패한 실행은 최상위 `report.json`의 상태와 완료/부분 산출물로 구분하며, runner 자체 재개는 지원하지 않습니다. 합성 fixture 없이 위 명령에 원본 pose candidate를 넣어 검증 guard를 우회할 수 없습니다.
+
+PyTorch 환경에서 프로젝트 root를 기준으로 실행합니다. 이번 Windows 환경에서는 아래 `python`에 `.venv/Scripts/python.exe`를 사용했습니다. PyTorch가 없으면 M1 테스트는 건너뛰므로 [설치·검증 안내](../docs/M1_BASELINE.md#환경과-의존성)를 먼저 확인합니다. 새 실행에는 비어 있는 output을 지정합니다.
+
+```sh
+python -m unittest discover -s tests -v
+python -m rewind_m1 train --config configs/m1_single_synthetic.json --output outputs/m1_single --steps 80 --device cpu
+python -m rewind_m1 train --config configs/m1_temporal_synthetic.json --output outputs/m1_temporal --steps 80 --device cpu
+python -m rewind_m1 train --config configs/m1_single_synthetic.json --output outputs/m1_single --steps 100 --resume outputs/m1_single/last.pt --device cpu
+python -m rewind_m1 evaluate --checkpoint outputs/m1_single/last.pt --output outputs/m1_single/evaluation.json --device cpu
+python -m rewind_m1.predicted_fixture --config configs/m1_single_synthetic.json --output outputs/m1_predicted_chain --frontend-steps 20 --steps 30
+```
+
+GT 입력과 예측 입력 모두 `synthetic_code_check`입니다. 합성 loss 감소는 실제 데이터 정확도·실시간성의 근거가 아닙니다. `last.pt`에 전체 regression 학습 상태를 저장하며 code/config/data/environment가 같을 때 재개합니다. 예측 경로의 같은 output 재개, 특징 계약·mask·집계 방식과 미검증 항목은 [M1 안내](../docs/M1_BASELINE.md)에 기록합니다. Colab 준비는 [노트북](../notebooks/m1_baseline.ipynb)과 [환경 안내](../docs/COLAB_SETUP.md)를 따릅니다. 실제 데이터 준비·검증 조건을 생략하지 않습니다.
+
+## 데이터 없이 M2·M3 teacher 실행
+
+M2 body diffusion과 M3 body–hand cascade의 CPU 합성 진입점입니다. M3 fixture는 이름이 명시된 body 6관절과 손가락 4관절로 별도 body checkpoint를 학습·고정한 뒤, GT 상체 조건 hand와 상체 조건 없는 hand를 각각 학습합니다. 조건 없음·GT 상체 진단·예측 상체 cascade를 나눠 평가합니다. 실제 UnrealEgo의 전체 body/hand 관절 규격은 아닙니다.
+
+```sh
+python -m rewind_m2 train --config configs/m2_body_synthetic.json --output outputs/m2_body_new --steps 100 --device cpu
+python -m rewind_m3.fixture --output outputs/m3_cascade_new --body-steps 80 --hand-steps 100
+```
+
+새 실행에는 새 output을 사용합니다. M3 결과는 `comparison.json`, 단계별 `report.json`·`last.pt`, 세 조건의 평가 JSON에 기록합니다. 손목은 body가 담당하고 손가락 상대 좌표를 예측 body 손목에 연결합니다. GT 상체 진단도 연결 위치는 예측 body 손목을 사용합니다. 손목 상대 오차와 전체 좌표 오차를 구분하며, 결합 규칙상 손목 연결 차이가 0인 것은 예측 정확도 증거가 아닙니다.
+
+재개·checkpoint 식별·지표의 정확한 범위는 [M2 안내](../docs/M2_BODY_TEACHER.md)와 [M3 안내](../docs/M3_WHOLE_BODY_TEACHER.md)를 따릅니다. 현재 M3는 CPU float32 경로만 지원합니다. 다른 개발 버전의 새 실행에는 필요한 모듈을 포함한 소스가 필요합니다. 현재 보류한 warm192 시험은 인계된 고정 소스 ZIP·ready notebook을 유지하며 문서 커밋으로 교체하지 않습니다. 실제 RGB/2D baseline과 GPU 학습·성능 검증은 남아 있습니다.
+
+## 평가 원칙
+
+Body/Hand MPJPE와 PA-MPJPE, 구조·시간 오차, failure subset 성능을 함께 평가합니다. 속도는 3D 모델만의 지연과 front-end를 포함한 전체 지연을 구분합니다. 30 FPS는 지정 GPU에서 검증할 잠정 목표입니다.
+
+개선 실험에서는 한 번에 하나의 요인을 변경하고 같은 조건의 기준 모델과 비교합니다. Test set은 최종 평가에 사용하며, 모델 선택과 튜닝은 validation에서 수행합니다. 합성 코드 진단 수치만 있으며 실제 데이터 성능은 아직 측정하지 않았습니다.
+
+## 참고 자료
+
+- Lee et al., *REWIND: Real-Time Egocentric Whole-Body Motion Diffusion with Exemplar-Based Identity Conditioning*, CVPR 2025. [공식 프로젝트](https://jyunlee.github.io/projects/rewind/)
+- [UnrealEgo 공식 데이터 안내](https://unrealego.mpi-inf.mpg.de/)
+- 사용자가 제공한 REWIND 논문 및 프로젝트 요약서. 세부 근거는 [로드맵의 근거 자료](../docs/ROADMAP.md#근거-자료)를 참조합니다.
