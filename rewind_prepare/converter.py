@@ -71,6 +71,73 @@ def candidate_contract(spec):
         'visibility_semantics':'unknown','confidence_semantics':'unknown','training_release':'not_implemented'}
 
 
+def validate_pose_geometry(doc, spec, calib, residuals):
+    """Raw stereo rig, coordinate transforms and annotated reprojection checks."""
+    factor = spec['coordinates']['mm_per_raw_unit']
+    tol = spec['coordinates']['raw_consistency_tolerance']
+    camera={};raw_t={}
+    for side in ('left','right'):
+        camera[side],raw_t[side]=camera_transform(doc.get('camera_'+side),factor,tol)
+    left,right=doc['camera_left'],doc['camera_right']
+    baseline=sum((a-b)**2 for a,b in zip(left['trans'],right['trans']))**.5
+    lo,hi=spec['coordinates']['baseline_raw_range']
+    if not lo<=baseline<=hi:raise ValueError('metric_anchor_baseline_mismatch')
+    if maximum_error([x for row in camera['left']['rotation_matrix'] for x in row],[x for row in camera['right']['rotation_matrix'] for x in row])>tol:raise ValueError('stereo_rotation_mismatch')
+    midpoint=[(a+b)/2 for a,b in zip(left['trans'],right['trans'])]
+    device=doc.get('device',{})
+    if not vector(device.get('open3d_trans'),3) or not vector(device.get('open3d_rot'),3) or maximum_error(device['open3d_trans'],mv(F,midpoint))>tol:
+        raise ValueError('device_midpoint_mismatch')
+    if maximum_error(device['open3d_rot'],[math.radians(v) for v in left['open3d_rot']])>tol:raise ValueError('device_rotation_units_mismatch')
+    for side in ('left','right'):
+        meta=doc['camera_'+side];offset=mv(camera[side]['rotation_matrix'],mv(F,sub(meta['trans'],midpoint)))
+        if maximum_error(offset,meta['device_pts3d'])>tol:raise ValueError('camera_device_offset_mismatch')
+    # 선택 밖25관절도 world/camera 수치 검사에 사용하고, 원본에서 삭제하지 않는다.
+    for joint in doc['joints'].values():
+        if not isinstance(joint,dict):continue
+        for side in ('left','right'):
+            c3=joint.get('camera_'+side+'_pts3d');c2=joint.get('camera_'+side+'_pts2d');d3=joint.get('device_pts3d')
+            if vector(c3,3) and vector(joint.get('trans'),3):
+                prediction=world_to_camera(joint['trans'],camera[side]['rotation_matrix'],raw_t[side])
+                error=maximum_error(prediction,c3);residuals['world_camera_raw_max_abs'].append(error)
+                inv=camera_to_world(c3,camera[side]['rotation_matrix'],raw_t[side])
+                residuals['inverse_raw_max_abs'].append(maximum_error(inv,joint['trans']))
+                if error>tol:raise ValueError('world_camera_coordinate_mismatch')
+            if vector(c3,3) and vector(d3,3):
+                error=maximum_error(add(c3,doc['camera_'+side]['device_pts3d']),d3)
+                residuals['camera_device_raw_max_abs'].append(error)
+                if error>tol:raise ValueError('camera_device_coordinate_mismatch')
+            if vector(c3,3) and vector(c2,2):
+                error=sum((a-b)**2 for a,b in zip(project(c3,calib),c2))**.5
+                residuals['projection_px'].append(error)
+                if error>spec['coordinates']['projection_tolerance_px']:raise ValueError('annotation_projection_mismatch')
+    return camera
+
+
+def normalize_pose_fields(doc, spec, stats):
+    """Convert the pinned joint order and keep per-field validity separate."""
+    names = spec['joint_names']
+    factor = spec['coordinates']['mm_per_raw_unit']
+    fields={f:{'coordinates':[],'valid_mask':[]} for f in REQUIRED_FIELDS}
+    features=[];valid_map={};selected_raw={}
+    for name in names:
+        joint=doc['joints'].get(name,{})
+        if not isinstance(joint,dict):joint={}
+        selected_raw[name]=joint
+        valid_map[name]={}
+        for field,dim in REQUIRED_FIELDS.items():
+            value=joint.get(field);ok=vector(value,dim)
+            valid_map[name][field]=ok;stats[field+('_valid' if ok else '_missing_or_invalid')]+=1
+            converted=scale(value,factor) if ok and dim==3 else value[:] if ok else None
+            if converted is not None and not vector(converted,dim):raise ValueError('millimeter_conversion_overflow')
+            fields[field]['coordinates'].append(converted);fields[field]['valid_mask'].append(ok)
+        for v,side in enumerate(('left','right')):
+            p=joint.get('camera_'+side+'_pts2d');ok=valid_map[name]['camera_'+side+'_pts2d'];width,height=spec['coordinates']['image_sizes'][v]
+            features.extend([2*p[0]/(width-1)-1,2*p[1]/(height-1)-1] if ok else [0.,0.])
+            features.extend([float(ok),0.,0.,0.,0.])
+            if ok and any(x<0 for x in p):stats['negative_2d_joint_views']+=1
+    return fields, features, valid_map, selected_raw
+
+
 def convert(input_root,extraction_manifest,split_dir,motion_map,spec_path,calibration):
     paths=[Path(p).resolve() for p in (input_root,extraction_manifest,split_dir,motion_map,spec_path,calibration)]
     input_root,extraction_manifest,split_dir,motion_map,spec_path,calibration=paths
@@ -117,7 +184,7 @@ def convert(input_root,extraction_manifest,split_dir,motion_map,spec_path,calibr
         if not isinstance(doc,dict) or type(doc.get('frame')) not in (int,str) or str(doc['frame'])!=str(index) or not isinstance(doc.get('joints'),dict):raise ValueError('pose_frame_or_joints')
         parsed.append((seq,index,relative,h,len(raw),doc))
     motions=motion_entries(mapping,sequences,owners)
-    names=spec['joint_names'];factor=spec['coordinates']['mm_per_raw_unit'];tol=spec['coordinates']['raw_consistency_tolerance']
+    factor=spec['coordinates']['mm_per_raw_unit']
     records=[];stats=collections.Counter();per_sequence={};residuals=collections.defaultdict(list);source_files=[]
     for seq,index,relative,h,size,doc in sorted(parsed):
         budget.check()
@@ -132,59 +199,8 @@ def convert(input_root,extraction_manifest,split_dir,motion_map,spec_path,calibr
         timestamp=doc.get('timestamp')
         if timestamp is not None and not (isinstance(timestamp,str) and len(timestamp)<=256 or type(timestamp) in (int,float) and vector([timestamp],1)):
             raise ValueError('timestamp_raw_type_finite')
-        camera={};raw_t={}
-        for side in ('left','right'):
-            camera[side],raw_t[side]=camera_transform(doc.get('camera_'+side),factor,tol)
-        left,right=doc['camera_left'],doc['camera_right']
-        baseline=sum((a-b)**2 for a,b in zip(left['trans'],right['trans']))**.5
-        lo,hi=spec['coordinates']['baseline_raw_range']
-        if not lo<=baseline<=hi:raise ValueError('metric_anchor_baseline_mismatch')
-        if maximum_error([x for row in camera['left']['rotation_matrix'] for x in row],[x for row in camera['right']['rotation_matrix'] for x in row])>tol:raise ValueError('stereo_rotation_mismatch')
-        midpoint=[(a+b)/2 for a,b in zip(left['trans'],right['trans'])]
-        device=doc.get('device',{})
-        if not vector(device.get('open3d_trans'),3) or not vector(device.get('open3d_rot'),3) or maximum_error(device['open3d_trans'],mv(F,midpoint))>tol:
-            raise ValueError('device_midpoint_mismatch')
-        if maximum_error(device['open3d_rot'],[math.radians(v) for v in left['open3d_rot']])>tol:raise ValueError('device_rotation_units_mismatch')
-        for side in ('left','right'):
-            meta=doc['camera_'+side];offset=mv(camera[side]['rotation_matrix'],mv(F,sub(meta['trans'],midpoint)))
-            if maximum_error(offset,meta['device_pts3d'])>tol:raise ValueError('camera_device_offset_mismatch')
-        fields={f:{'coordinates':[],'valid_mask':[]} for f in REQUIRED_FIELDS}
-        features=[];valid_map={};selected_raw={}
-        for name in names:
-            joint=doc['joints'].get(name,{})
-            if not isinstance(joint,dict):joint={}
-            selected_raw[name]=joint
-            valid_map[name]={}
-            for field,dim in REQUIRED_FIELDS.items():
-                value=joint.get(field);ok=vector(value,dim)
-                valid_map[name][field]=ok;stats[field+('_valid' if ok else '_missing_or_invalid')]+=1
-                converted=scale(value,factor) if ok and dim==3 else value[:] if ok else None
-                if converted is not None and not vector(converted,dim):raise ValueError('millimeter_conversion_overflow')
-                fields[field]['coordinates'].append(converted);fields[field]['valid_mask'].append(ok)
-            for v,side in enumerate(('left','right')):
-                p=joint.get('camera_'+side+'_pts2d');ok=valid_map[name]['camera_'+side+'_pts2d'];width,height=spec['coordinates']['image_sizes'][v]
-                features.extend([2*p[0]/(width-1)-1,2*p[1]/(height-1)-1] if ok else [0.,0.])
-                features.extend([float(ok),0.,0.,0.,0.])
-                if ok and any(x<0 for x in p):stats['negative_2d_joint_views']+=1
-        # 선택 밖25관절도 world/camera 수치 검사에 사용하고, 원본에서 삭제하지 않는다.
-        for joint in doc['joints'].values():
-            if not isinstance(joint,dict):continue
-            for side in ('left','right'):
-                c3=joint.get('camera_'+side+'_pts3d');c2=joint.get('camera_'+side+'_pts2d');d3=joint.get('device_pts3d')
-                if vector(c3,3) and vector(joint.get('trans'),3):
-                    prediction=world_to_camera(joint['trans'],camera[side]['rotation_matrix'],raw_t[side])
-                    error=maximum_error(prediction,c3);residuals['world_camera_raw_max_abs'].append(error)
-                    inv=camera_to_world(c3,camera[side]['rotation_matrix'],raw_t[side])
-                    residuals['inverse_raw_max_abs'].append(maximum_error(inv,joint['trans']))
-                    if error>tol:raise ValueError('world_camera_coordinate_mismatch')
-                if vector(c3,3) and vector(d3,3):
-                    error=maximum_error(add(c3,doc['camera_'+side]['device_pts3d']),d3)
-                    residuals['camera_device_raw_max_abs'].append(error)
-                    if error>tol:raise ValueError('camera_device_coordinate_mismatch')
-                if vector(c3,3) and vector(c2,2):
-                    error=sum((a-b)**2 for a,b in zip(project(c3,calib),c2))**.5
-                    residuals['projection_px'].append(error)
-                    if error>spec['coordinates']['projection_tolerance_px']:raise ValueError('annotation_projection_mismatch')
+        camera = validate_pose_geometry(doc, spec, calib, residuals)
+        fields, features, valid_map, selected_raw = normalize_pose_fields(doc, spec, stats)
         local=[];local_valid=[]
         for side in ('left','right'):
             wrist=spec['wrists'][side]

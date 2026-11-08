@@ -1,5 +1,7 @@
 # 전체 데이터 학습 준비
 
+2026-11-09 구현 갱신: 직접 추출본 manifest·T1 lazy loader를 추가하고 관련40개 로컬 검사를 root가 확인했다. 약1,000 train 선택과 전체 적격 train 선택이 같은 입력 계약을 사용한다. 실제1,000페어·GPU 학습과 trainer 연결은 미완료이며, 아래 이전의 adapter 미완료 표현 중 입력 manifest/loader 부분만 이 기록으로 갱신한다. [지원 범위와 검증](EXTRACTED_STEREO_INPUT.md).
+
 현재 상태(2026-11-05): 고정20b7aa9 합성 A100 FP32/AMP 재개 시험과 T1 bundle reader 로컬 검증 근거를 보존한다. 실제 학습은102 train 페어의2D/3D 각51update CPU 진단까지이며 정식 baseline·일반화·전체 데이터 학습 완료가 아니다. 기존371쌍은 모두 train이며 validation0이고 추가 Joyful57은 중복·motion·split 검토 전이다. 실제 Joyful3frame 예측은 중앙 집중 실패이며 전체57 GT overlay171PNG는 성능 근거가 아니다.
 
 2026-11-02 사용자 결정: Colab 기준으로 전체 데이터셋 학습을 준비하며 화면 개발보다 우선한다. 화면용 프론트와 모델·학습·평가·추론 코어를 분리한다. RGB에서 2D 관절을 예측하는 신경망 frontend는 학습 모델에 포함한다. 전체 다운로드·실제 장시간 학습·의존성 설치·원격 접근은 이 개발 작업에서 실행하지 않는다.

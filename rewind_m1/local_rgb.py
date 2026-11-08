@@ -104,6 +104,40 @@ def _regular_read(path, maximum, expected_size=None):
     return raw
 
 
+def decode_rgb_payload(raw, image_size, max_pixels, Image):
+    """Validate PNG and return packed RGB bytes for both source contracts."""
+    try:
+        # Pillow에 넘기기 전에 IHDR의 원래 bit depth·channel·픽셀 수를 확인한다.
+        if len(raw) < 33 or raw[:8] != b"\x89PNG\r\n\x1a\n" or raw[8:16] != b"\0\0\0\rIHDR":
+            raise RGBContractError("rgb_png_header")
+        w, h, depth, color, compression, filtering, interlace = struct.unpack(">IIBBBBB", raw[16:29])
+        if [w, h] != image_size or w * h > max_pixels:
+            raise RGBContractError("rgb_decoded_size_or_pixel_limit")
+        if depth != 8 or color not in (2, 6) or compression or filtering or interlace not in (0, 1):
+            raise RGBContractError("rgb_png_requires_rgb_or_rgba8")
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(raw), formats=["PNG"]) as image:
+                if image.size != (w, h) or getattr(image, "n_frames", 1) != 1:
+                    raise RGBContractError("rgb_png_size_or_multiframe")
+                image.verify()
+            with Image.open(io.BytesIO(raw), formats=["PNG"]) as image:
+                image.load()
+                if image.mode not in ("RGB", "RGBA"):
+                    raise RGBContractError("rgb_png_mode")
+                if "transparency" in image.info:
+                    raise RGBContractError("rgb_transparent_pixels_not_supported")
+                if image.mode == "RGBA" and image.getextrema()[3] != (255, 255):
+                    raise RGBContractError("rgb_transparent_pixels_not_supported")
+                with image.convert("RGB") as rgb:
+                    return bytearray(rgb.tobytes())
+    except RGBContractError:
+        raise
+    except (OSError, ValueError, EOFError, SyntaxError, struct.error, zlib.error,
+            Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        raise RGBContractError("rgb_png_decode_or_file_failure") from exc
+
+
 class LocalStereoRGB:
     """Map-style API: len, metadata(index), [index], load_batch([indices]).
 
@@ -261,32 +295,10 @@ class LocalStereoRGB:
             raw = _regular_read(self._file(view["path"]), self._limits.max_file_bytes, view["size_bytes"])
             if hashlib.sha256(raw).hexdigest() != view["sha256"]:
                 raise RGBContractError("rgb_file_hash_mismatch")
-            # Pillow에 넘기기 전에 IHDR의 원래 bit depth·channel·픽셀 수를 확인한다.
-            if len(raw) < 33 or raw[:8] != b"\x89PNG\r\n\x1a\n" or raw[8:16] != b"\0\0\0\rIHDR":
-                raise RGBContractError("rgb_png_header")
-            w, h, depth, color, compression, filtering, interlace = struct.unpack(">IIBBBBB", raw[16:29])
-            if [w, h] != view["image_size"] or w * h > self._limits.max_pixels_per_view:
-                raise RGBContractError("rgb_decoded_size_or_pixel_limit")
-            if depth != 8 or color not in (2, 6) or compression or filtering or interlace not in (0, 1):
-                raise RGBContractError("rgb_png_requires_rgb_or_rgba8")
-            with warnings.catch_warnings():
-                warnings.simplefilter("error", Image.DecompressionBombWarning)
-                with Image.open(io.BytesIO(raw), formats=["PNG"]) as image:
-                    if image.size != (w, h) or getattr(image, "n_frames", 1) != 1:
-                        raise RGBContractError("rgb_png_size_or_multiframe")
-                    image.verify()
-                with Image.open(io.BytesIO(raw), formats=["PNG"]) as image:
-                    image.load()
-                    if image.mode not in ("RGB", "RGBA"):
-                        raise RGBContractError("rgb_png_mode")
-                    if "transparency" in image.info:
-                        raise RGBContractError("rgb_transparent_pixels_not_supported")
-                    if image.mode == "RGBA" and image.getextrema()[3] != (255, 255):
-                        raise RGBContractError("rgb_transparent_pixels_not_supported")
-                    with image.convert("RGB") as rgb:
-                        pixels = torch.frombuffer(bytearray(rgb.tobytes()), dtype=torch.uint8)
-                        values = pixels.reshape(h, w, 3).permute(2, 0, 1).to(torch.float32).div_(255.0)
-                        destination.copy_(values)
+            pixels = torch.frombuffer(decode_rgb_payload(
+                raw, view["image_size"], self._limits.max_pixels_per_view, Image), dtype=torch.uint8)
+            w, h = view["image_size"]
+            destination.copy_(pixels.reshape(h, w, 3).permute(2, 0, 1).to(torch.float32).div_(255.0))
         except RGBContractError:
             raise
         except (OSError, ValueError, EOFError, SyntaxError, struct.error, zlib.error,

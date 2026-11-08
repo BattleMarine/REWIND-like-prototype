@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-09 구현 갱신: 직접 추출본 manifest·T1 lazy loader를 추가하고 관련40개 로컬 검사를 root가 확인했다. 약1,000 train 선택과 전체 적격 train 선택이 같은 입력 계약을 사용한다. 실제1,000페어·GPU 학습과 trainer 연결은 미완료이며, 아래 이전의 adapter 미완료 표현 중 입력 manifest/loader 부분만 이 기록으로 갱신한다. [지원 범위와 검증](EXTRACTED_STEREO_INPUT.md).
+
 ## 현재 상태와 실행 결정
 
 2026-11-09 사용자 결정: 0버전은 초기 약1,000 train 페어에서 데이터 정합성과 학습 동작을 검증한 뒤 중간 규모 단계 없이 ArchVis 전체 train으로 확대한다. 공식 validation은 별도로 유지하고 test는 튜닝에 쓰지 않는다. 전체 확대 시에도 나머지 파일의 무결성·대응·split 검사를 적용한다. GPU 자원·처리량을 pilot에서 측정해 실행 설정을 정하며, 이번 결정 기록은 학습 완료를 뜻하지 않는다. 상세 기준은 [미니 프로토타입 계획](MINI_PROTOTYPE_PLAN.md)을 따른다.

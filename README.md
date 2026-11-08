@@ -6,11 +6,11 @@
 
 ## 현재 상태
 
-2026-11-05 기준입니다.
+2026-11-09 기준입니다.
 
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
-| M0 데이터 | 기존 371개 stereo RGB·pose 페어 확보, 모두 train | 추출본 통합 manifest·학습 adapter, 중복·시간·split 검증과 독립 validation |
+| M0 데이터 | 기존 371개 페어 확보·모두 train, 추출본 manifest·T1 로더 구현 | 실제 입력 검증·trainer 연결과 독립 validation |
 | M1 비교 모델 | 실제 102페어로 2D frontend·3D regression CPU 진단, 합성 GPU 학습·재개 검증 | 2D 정확도 개선, 독립 평가와 실제 GPU 학습 |
 | M2·M3 teacher | Causal body diffusion·body–hand cascade 구현과 합성 검증 | 실제 데이터 학습과 성능 비교 |
 | M4~M6 | Student 증류·개선 실험·통합 계획 | 후속 구현·평가 |
@@ -25,7 +25,7 @@
 - 좌우 RGB와 pose를 sequence/frame 키로 대조하고 파일 무결성·관절·단위·좌표·시간 정합을 검증합니다.
 - Sequence와 원본 motion 중복을 고려해 train/validation을 분리합니다. Test set으로 튜닝하지 않습니다.
 - 필요한 subset을 Colab에서 준비·재사용하고 manifest·설정·결과·checkpoint는 영구 보관합니다.
-- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 임의의 추출 폴더를 곧바로 학습에 넣는 범용 adapter는 미완료입니다.
+- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 추출본 manifest·T1 로더는 구현했으며 실제 검증·학습 trainer 연결은 미완료입니다. [입력 계약](docs/EXTRACTED_STEREO_INPUT.md)을 참조합니다.
 
 자세한 준비 기준은 [데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md)을 따릅니다.
 
@@ -46,7 +46,7 @@
 
 ## 다음 작업
 
-1. 추출된 RGB·pose를 통합 manifest와 학습 adapter에 연결합니다.
+1. 구현된 추출본 manifest·T1 로더를 실제 데이터에서 검증하고 학습 trainer에 연결합니다.
 2. 초기 약 1,000 train 페어와 독립 validation으로 데이터·학습 동작을 검증한 뒤 ArchVis 전체 train으로 바로 확대합니다(2026-11-09 사용자 결정). 중간 10,000페어 단계는 두지 않습니다.
 3. 2D 학습을 개선하고 예측 2D 기반 3D baseline을 평가합니다.
 4. 실제 M2·M3 학습과 영상 입력·결과 표시로 확장합니다.
