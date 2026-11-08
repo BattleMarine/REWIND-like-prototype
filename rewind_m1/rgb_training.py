@@ -50,6 +50,15 @@ class RGBTrainer(ShardTrainer):
     def _make_model(self, joints):
         return StereoHeatmapNet(joints).to(self.device)
 
+    def _loss(self, logits, gt_xy, valid):
+        return heatmap_loss(logits.float(), gt_xy, valid, self.config['training_image_size'])
+
+    def _pose_metadata(self, metadata):
+        return metadata['pose_record']
+
+    def _update_observation(self):
+        return {}
+
     def __init__(self, config, catalog, base, device='cpu', check_budget=None):
         require_torch_api(); self.config=validate_config(config)
         self.check_budget=check_budget or (lambda:None)
@@ -97,7 +106,7 @@ class RGBTrainer(ShardTrainer):
             images.append(resize_images(native['images'],self.config['training_image_size']))
             targets.append(scale_xy(native['gt_xy'],list(self.contract.image_sizes[0]),self.config['training_image_size']))
             masks.append(native['annotation_valid']); native_targets.append(native['gt_xy'])
-            pose=native['metadata'][0]['pose_record']; keys.append([pose['sequence_id'],pose['frame_index']])
+            pose=self._pose_metadata(native['metadata'][0]); keys.append([pose['sequence_id'],pose['frame_index']])
             del native
         return {'images':torch.cat(images),'gt_xy':torch.cat(targets),'valid':torch.cat(masks),
                 'native_gt_xy':torch.cat(native_targets),'keys':keys}
@@ -111,8 +120,7 @@ class RGBTrainer(ShardTrainer):
             with torch.autocast(device_type=self.device.type,dtype=torch.float16,enabled=self.config['amp']):
                 logits=self.model(batch['images'].to(self.device))[0]
             # softmax/target/reduction은 AMP context 밖에서 FP32로 계산한다.
-            loss,inside=heatmap_loss(logits.float(),batch['gt_xy'].to(self.device),batch['valid'].to(self.device),
-                                    self.config['training_image_size'])
+            loss,inside=self._loss(logits,batch['gt_xy'].to(self.device),batch['valid'].to(self.device))
             _require(torch.isfinite(loss).item(),'rgb_nonfinite_loss')
             self.scaler.scale(loss).backward(); self.scaler.unscale_(self.optimizer)
             finite=all(p.grad is None or torch.isfinite(p.grad).all().item() for p in self.model.parameters())
@@ -127,7 +135,8 @@ class RGBTrainer(ShardTrainer):
             self.scheduler.step(); self.sampler.commit(self.config['batch_size'])
             self.step+=1; self.samples_seen+=len(indices)
             return {'updated':True,'step':self.step,'loss':float(loss.detach()),'inside_joints':int(inside.sum()),
-                    'batch_samples':len(indices),'keys':batch['keys'],'coverage':self.coverage()}
+                    'batch_samples':len(indices),'keys':batch['keys'],'coverage':self.coverage(),
+                    **self._update_observation()}
         except BaseException:
             self.poisoned=True
             raise

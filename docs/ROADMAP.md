@@ -1,6 +1,8 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-2026-11-09 구현 갱신: 직접 추출본 manifest·T1 lazy loader를 추가하고 관련40개 로컬 검사를 root가 확인했다. 약1,000 train 선택과 전체 적격 train 선택이 같은 입력 계약을 사용한다. 실제1,000페어·GPU 학습과 trainer 연결은 미완료이며, 아래 이전의 adapter 미완료 표현 중 입력 manifest/loader 부분만 이 기록으로 갱신한다. [지원 범위와 검증](EXTRACTED_STEREO_INPUT.md).
+2026-11-09 2D 학습 연결: 직접 추출본 loader를 기존 RGB 학습·epoch 순회·저장/재개에 연결하고, 기본 MSE를 보존한 Gaussian cross-entropy 옵션과 train/validation 진단 지표를 추가했다. 약1,000페어 pilot의 운영 결과 및 학습 신호 검토 후 전체 train으로 확대한다. 코드·합성 CPU 검증까지이며 실제 자료 검증·GPU 실행·고정 Colab 인계본은 후속이다. [계약·실행 템플릿](ARCHVIS_DIRECT_RGB2D.md).
+
+2026-11-09 구현 갱신: 직접 추출본 manifest·T1 lazy loader를 추가하고 관련40개 로컬 검사를 root가 확인했다. 약1,000 train 선택과 전체 적격 train 선택이 같은 입력 계약을 사용한다. 실제1,000페어·GPU 학습은 미완료이며, 아래 이전의 adapter 미완료 표현 중 입력 manifest/loader 부분만 이 기록으로 갱신한다. [지원 범위와 검증](EXTRACTED_STEREO_INPUT.md).
 
 ## 현재 상태와 실행 결정
 

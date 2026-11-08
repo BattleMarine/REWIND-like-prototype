@@ -10,8 +10,8 @@
 
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
-| M0 데이터 | 기존 371개 페어 확보·모두 train, 추출본 manifest·T1 로더 구현 | 실제 입력 검증·trainer 연결과 독립 validation |
-| M1 비교 모델 | 실제 102페어로 2D frontend·3D regression CPU 진단, 합성 GPU 학습·재개 검증 | 2D 정확도 개선, 독립 평가와 실제 GPU 학습 |
+| M0 데이터 | 기존 371개 페어 확보·모두 train, 추출본 manifest·T1 로더 구현 | 실제 입력 검증과 독립 validation |
+| M1 비교 모델 | 102페어 CPU 진단·합성 GPU 재개 검증, 추출본2D trainer·CE 옵션 구현 | 2D 정확도 개선, 독립 평가와 실제 GPU 학습 |
 | M2·M3 teacher | Causal body diffusion·body–hand cascade 구현과 합성 검증 | 실제 데이터 학습과 성능 비교 |
 | M4~M6 | Student 증류·개선 실험·통합 계획 | 후속 구현·평가 |
 | 이미지·동영상 | 저장된 진단 모델의 stereo 이미지 2D 추론·표시 | GT 없는 3D 결과 연결, 동영상 decoder·시간 정합·UI |
@@ -25,7 +25,7 @@
 - 좌우 RGB와 pose를 sequence/frame 키로 대조하고 파일 무결성·관절·단위·좌표·시간 정합을 검증합니다.
 - Sequence와 원본 motion 중복을 고려해 train/validation을 분리합니다. Test set으로 튜닝하지 않습니다.
 - 필요한 subset을 Colab에서 준비·재사용하고 manifest·설정·결과·checkpoint는 영구 보관합니다.
-- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 추출본 manifest·T1 로더는 구현했으며 실제 검증·학습 trainer 연결은 미완료입니다. [입력 계약](docs/EXTRACTED_STEREO_INPUT.md)을 참조합니다.
+- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 추출본 manifest·T1 로더는 구현했으며 2D trainer 연결은 로컬 검증했으며 실제 검증·GPU 학습은 미완료입니다. [입력 계약](docs/EXTRACTED_STEREO_INPUT.md)을 참조합니다.
 
 자세한 준비 기준은 [데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md)을 따릅니다.
 
@@ -38,6 +38,7 @@
 | Drive 추출본 검사·누락 복구·시퀀스 업로드 | [단독 Colab 노트북](notebooks/unrealego2_drive_upload.ipynb) · [실행 안내](docs/UNREALEGO2_DRIVE_UPLOAD.md) |
 | Colab 환경과 결과 보관 | [Colab 준비](docs/COLAB_SETUP.md) |
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
+| 추출본 2D 학습·재개 준비 | [지원 범위](docs/ARCHVIS_DIRECT_RGB2D.md) — 실제 실행 입력 고정 전 템플릿 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |
@@ -46,7 +47,7 @@
 
 ## 다음 작업
 
-1. 구현된 추출본 manifest·T1 로더를 실제 데이터에서 검증하고 학습 trainer에 연결합니다.
+1. 추출본 manifest·T1 로더·2D trainer의 고정 Colab 실행 입력을 준비하고 실제 데이터에서 검증합니다.
 2. 초기 약 1,000 train 페어와 독립 validation으로 데이터·학습 동작을 검증한 뒤 ArchVis 전체 train으로 바로 확대합니다(2026-11-09 사용자 결정). 중간 10,000페어 단계는 두지 않습니다.
 3. 2D 학습을 개선하고 예측 2D 기반 3D baseline을 평가합니다.
 4. 실제 M2·M3 학습과 영상 입력·결과 표시로 확장합니다.

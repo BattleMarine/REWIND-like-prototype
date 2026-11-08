@@ -34,7 +34,7 @@ class StereoHeatmapNet(nn.Module):
         return logits, xy, confidence
 
 
-def heatmap_loss(logits, gt_xy, valid, image_size, sigma_grid=1.5):
+def heatmap_loss(logits, gt_xy, valid, image_size, sigma_grid=1.5, *, loss_kind="mse"):
     if gt_xy.shape != logits.shape[:3]+(2,) or valid.shape != logits.shape[:3] or valid.dtype != torch.bool:
         raise DataContractError("2D supervision shape/bool mask 불일치")
     if not torch.isfinite(gt_xy[valid]).all(): raise DataContractError("유효 GT 2D에 비유한 값")
@@ -51,6 +51,11 @@ def heatmap_loss(logits, gt_xy, valid, image_size, sigma_grid=1.5):
     gy = torch.arange(hh,device=logits.device)
     target = torch.exp(-((gx-x[...,None])[...,None,:].square()+(gy-y[...,None])[..., :,None].square())/(2*sigma_grid**2))
     target = target/target.sum((-2,-1),keepdim=True)
+    if loss_kind == "gaussian_cross_entropy":
+        log_probability = logits[inside].float().flatten(-2).log_softmax(-1)
+        return -(target[inside].float().flatten(-2) * log_probability).sum(-1).mean(), inside
+    if loss_kind != "mse":
+        raise DataContractError("unsupported_heatmap_loss")
     probability = logits.flatten(-2).softmax(-1).reshape_as(logits)
     return (probability[inside]-target[inside]).square().mean(), inside
 

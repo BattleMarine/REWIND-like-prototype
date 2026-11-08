@@ -319,10 +319,12 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
 class ExtractedStereoT1:
     """Pinned split, native stereo and independently masked 2D/3D supervision."""
 
-    def __init__(self, manifest_path, rgb_root, pose_root, spec_path, *, expected_sha256, split):
+    def __init__(self, manifest_path, rgb_root, pose_root, spec_path, *, expected_sha256, split,
+                 read_metadata=None):
         if split not in SPLITS:
             raise ValueError("extracted_loader_split")
-        manifest = read_json(_regular_read(_local(manifest_path), MAX_MANIFEST_BYTES))
+        read_metadata = read_metadata or _regular_read
+        manifest = read_json(read_metadata(_local(manifest_path), MAX_MANIFEST_BYTES))
         body = {k: v for k, v in manifest.items() if k != "content_sha256"}
         if (not _hash(expected_sha256) or manifest.get("content_sha256") != expected_sha256
                 or digest(body) != expected_sha256 or manifest.get("schema") != SCHEMA
@@ -332,14 +334,14 @@ class ExtractedStereoT1:
                 or manifest.get("distance_unit") != "mm" or manifest.get("coordinate_frame") != "device_relative"
                 or manifest.get("image_size") != IMAGE_SIZE):
             raise ValueError("extracted_manifest_identity")
-        spec_raw = _regular_read(_local(spec_path), 256 * 1024)
+        spec_raw = read_metadata(_local(spec_path), 256 * 1024)
         self._spec = validate_spec(read_json(spec_raw))
         if (sha(spec_raw) != manifest["provenance"]["spec_sha256"]
                 or self._spec["joint_names"] != manifest["joint_names"]
                 or self._spec["preprocessing_version"] != manifest["preprocessing_version"]):
             raise ValueError("extracted_loader_spec")
         keys, owners, motions, paths = set(), {}, {}, set()
-        self._rows = []
+        self._rows_by_split = {name: [] for name in SPLITS}
         for row in manifest["records"]:
             seq, frame, owner, motion = (row[k] for k in ("sequence_id", "frame_index", "split", "motion_id"))
             key = seq, frame
@@ -360,8 +362,8 @@ class ExtractedStereoT1:
                         or type(item["size_bytes"]) is not int or not 1 <= item["size_bytes"] <= maximum):
                     raise ValueError("extracted_loader_payload_identity")
                 paths.add(identity)
-            if owner == split:
-                self._rows.append(row)
+            self._rows_by_split[owner].append(row)
+        self._rows = self._rows_by_split[split]
         if not self._rows or set(owners.values()) != set(SPLITS):
             raise ValueError("extracted_loader_split_empty")
         validation = sorted(key for key in keys if owners[key[0]] == "validation")
@@ -374,6 +376,21 @@ class ExtractedStereoT1:
         self._roots = {"rgb": _local(rgb_root, directory=True), "pose": _local(pose_root, directory=True)}
         self.split = split
         self.manifest_sha256 = expected_sha256
+        self._identity = {key: manifest[key] for key in
+                          ("dataset_version", "environment", "selection", "provenance", "audit", "joint_names")}
+        self._identity["body_joint_names"] = self._spec["body_joint_names"]
+
+    @property
+    def identity(self):
+        return copy.deepcopy(self._identity)
+
+    def for_split(self, split):
+        """Reuse the same validated manifest and roots without rereading payloads."""
+        if split not in SPLITS:
+            raise ValueError("extracted_loader_split")
+        reader = copy.copy(self)
+        reader.split, reader._rows = split, self._rows_by_split[split]
+        return reader
 
     def __len__(self):
         return len(self._rows)

@@ -1,6 +1,6 @@
 # ArchVis 직접 추출본 입력
 
-2026-11-09 구현·root 검토. `rewind_prepare.extracted`는 압축을 푼 RGB·pose 폴더에서 T=1 manifest를 작성하고 필요한 배치만 읽는다. 약1,000 train 페어와 ArchVis 전체 train이 동일 계약을 사용한다. **학습 trainer·Colab 실행본 연결은 아직 후속**이며 결과는 `diagnostic_only=true`, `train_ready=false`, `temporal_ready=false`다.
+2026-11-09 구현·root 검토. `rewind_prepare.extracted`는 압축을 푼 RGB·pose 폴더에서 T=1 manifest를 작성하고 필요한 배치만 읽는다. 약1,000 train 페어와 ArchVis 전체 train이 동일 계약을 사용한다. **[2D trainer 연결](ARCHVIS_DIRECT_RGB2D.md)은 로컬 검증했으며 실제 Colab 입력 고정·실행은 후속**이며 결과는 `diagnostic_only=true`, `train_ready=false`, `temporal_ready=false`다.
 
 ## 입력과 선택
 
@@ -18,7 +18,7 @@
 
 manifest에는 파일별 상대경로·크기·SHA, split/spec/calibration/motion/코드 식별값과 감사 결과를 담는다. 출력되는 `content_sha256`은 manifest의 canonical 내용 hash이며 JSON 파일 자체의 SHA와 구분한다. 선택 파일 검사 실패 시 성공 manifest를 발급하지 않는다. 누락·중복 키는 제외 목록으로 보고하며 `--full-train` 성공이 공식 전체 파일 확보를 뜻하지는 않는다. missing/incomplete/duplicate 보고를 함께 검토한다.
 
-`ExtractedStereoT1(manifest_path, rgb_root, pose_root, spec_path, expected_sha256=content_sha256, split="train")` 또는 `split="validation"`로 로더를 연다. `load_batch([indices])`는 최대4페어를 CPU에서 읽는다. native RGB는 `[B,2,3,1024,1024]`, GT2D는 `[B,2,62,2]`, GT3D는 `[B,62,3]` mm이며 2D annotation mask와3D target mask를 분리한다. 매번 파일 hash를 재확인하며 timestamp는 추정하지 않는다. GPU batch 확대·resize·학습 재개는 후속 trainer에서 연결한다.
+`ExtractedStereoT1(manifest_path, rgb_root, pose_root, spec_path, expected_sha256=content_sha256, split="train")` 또는 `split="validation"`로 로더를 연다. `load_batch([indices])`는 최대4페어를 CPU에서 읽는다. native RGB는 `[B,2,3,1024,1024]`, GT2D는 `[B,2,62,2]`, GT3D는 `[B,62,3]` mm이며 2D annotation mask와3D target mask를 분리한다. 매번 파일 hash를 재확인하며 timestamp는 추정하지 않는다. 2D trainer는 필요한 native 페어를 순차 resize하여 배치를 구성하고 학습 재개를 제공한다. 실제 GPU 처리량은 미측정이다.
 
 ## 검증과 한계
 
