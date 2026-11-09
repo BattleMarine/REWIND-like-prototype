@@ -1,0 +1,18 @@
+{
+  "hidden": 512,
+  "heads": 4,
+  "graph_layers": 3,
+  "temporal_layers": 3,
+  "attention_past_frames": 20,
+  "diffusion_steps": 1000,
+  "dropout": 0.0,
+  "beta_start": 0.0001,
+  "beta_end": 0.02,
+  "sampling_steps": 10,
+  "learning_rate": 0.00005,
+  "scheduler_step": 1,
+  "scheduler_gamma": 1.0,
+  "target_scale_mm": 100.0,
+  "frame_loss_weight": 1.0,
+  "velocity_loss_weight": 0.0
+}

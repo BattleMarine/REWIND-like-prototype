@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-10 C 첫 구현: 논문 기반 frontend·식(4) causal body/hand teacher 후보와 근거 검증 clip adapter·한 update/저장·재개 API를 구현했다. Root 관련10개 검사 통과. 실제 입력 정합 검토, frontend/epoch 실행 연결과 GPU 학습은 남아 있다. [구현·검증 경계](V1_TEACHER_IMPLEMENTATION.md).
+
 2026-11-10 B 첫 구현: 연속 구간1,000페어 목록 선택, 제한 병렬 raw pack 생성·중단 재개·복원/조회 도구를 로컬 검토했다. 실제 보존 목록의 계획을 독립 재현하고3개 검사를 통과했다. 원격 payload 확보·속도 측정·시간/카메라 검증·GPU 학습은 아직이다. [지원 범위와 근거](V1_INPUT_PREPARATION.md).
 
 2026-11-10 최신 결정: **v1은 train1,000페어 규모를 유지하고 REWIND 논문 구조 재현을 우선한다.** 아래의 ArchVis 전체 확대 순서는 후순위로 변경한다. 연속 구간 중심 subset·카메라/시간 입력과 논문 대비 구조 차이를 검토하고 준비 병렬화·캐시 재사용을 계획한다. [v1 범위와 속도 개선 계획](V1_REWIND_PLAN.md). 새 구현·GPU 실행 완료를 뜻하지 않는다.

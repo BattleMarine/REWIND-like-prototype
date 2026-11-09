@@ -1,5 +1,7 @@
 # v1: 1,000페어에서 REWIND 구조 재현
 
+2026-11-10 C 첫 구현: 논문 기반 frontend·식(4) causal body/hand teacher 후보와 근거 검증 clip adapter·한 update/저장·재개 API를 구현했다. Root 관련10개 검사 통과. 실제 입력 정합 검토, frontend/epoch 실행 연결과 GPU 학습은 남아 있다. [구현·검증 경계](V1_TEACHER_IMPLEMENTATION.md).
+
 2026-11-10 B 첫 구현: 연속 구간1,000페어 목록 선택, 제한 병렬 raw pack 생성·중단 재개·복원/조회 도구를 로컬 검토했다. 실제 보존 목록의 계획을 독립 재현하고3개 검사를 통과했다. 원격 payload 확보·속도 측정·시간/카메라 검증·GPU 학습은 아직이다. [지원 범위와 근거](V1_INPUT_PREPARATION.md).
 
 2026-11-10 사용자 결정: train 데이터 규모를1,000페어로 유지하며 REWIND 논문 구조를 최대한 재현한다. ArchVis 전체 확대보다 이 작업을 우선한다. v0 결과와 고정 manifest는 보존한다. 아래는 계획이며 구현·GPU 실행 완료가 아니다.
