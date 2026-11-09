@@ -91,8 +91,26 @@ stage("v0_overlay", install_v0_overlay)
 print("v0 plan SHA256:", V0_PLAN["content_sha256"])
 '''
     launch = '''
+from contextlib import suppress
+import os
+import tempfile
+
 APPROVED_V0_PLAN_SHA256 = ""
 RESUME_RECOVERY_SHA256 = ""
+
+def write_v0_launch_result(path, launch):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".v0-launch-", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(canonical(launch) + b"\\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
 
 def launch_v0():
     import subprocess
@@ -125,19 +143,30 @@ def launch_v0():
     launch = {"status": "started", "runtime": resources, "plan_sha256": plan["content_sha256"],
               "resumed_recovery_sha256": RESUME_RECOVERY_SHA256 or None,
               "time_scope": "training subprocess including verified cache build; Drive mount and result download excluded"}
-    pilot._write(WORK / "v0_launch.json", launch)
+    launch_path = WORK / "v0_launch.json"
+    pilot._write(launch_path, launch)
     try:
         child = subprocess.run(command, cwd=WORK / "source", timeout=plan["hard_training_subprocess_wall_seconds"])
         launch.update(status="exited", returncode=child.returncode)
         child.check_returncode()
     except BaseException as exc:
         launch.update(status="stopped", failure_type=type(exc).__name__, reason=str(exc)[:512])
+        # A receipt write failure must not replace the subprocess error.
+        with suppress(BaseException):
+            write_v0_launch_result(launch_path, launch)
         raise
-    finally:
-        pilot._write(WORK / "v0_launch.json", launch)
+    else:
+        write_v0_launch_result(launch_path, launch)
 
 if APPROVED_V0_PLAN_SHA256:
-    stage("v0", launch_v0)
+    try:
+        launch_v0()
+    except (Exception, KeyboardInterrupt) as exc:
+        with suppress(BaseException):
+            failure_path = WORK / "v0_failure.json"
+            if not failure_path.exists():
+                pilot._write(failure_path, {"status": "failed", "type": type(exc).__name__, "reason": str(exc)[:512]})
+        raise
 else:
     print("검토된 v0 계획 SHA를 입력하면 원래 Drive 경로 확인과 학습을 한 번에 시작합니다.")
 '''

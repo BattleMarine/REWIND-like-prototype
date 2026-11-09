@@ -11,12 +11,12 @@
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
 | M0 데이터 | ArchVis train1,000·validation2,236페어 준비 검사 완료, 추출본 로더 구현 | 실제 영상·원본 motion 정합과 독립 평가 검토 |
-| M1 비교 모델 | ArchVis1,000페어 A100 MSE·CE 각1epoch 완료 | 중앙 집중 개선, 독립 평가·전체 확대 검토 |
+| M1 비교 모델 | ArchVis1,000페어 v0 T4 20epoch 완료 | 손·관절 정확도 개선, 독립 평가·전체 확대 준비 |
 | M2·M3 teacher | Causal body diffusion·body–hand cascade 구현과 합성 검증 | 실제 데이터 학습과 성능 비교 |
 | M4~M6 | Student 증류·개선 실험·통합 계획 | 후속 구현·평가 |
 | 이미지·동영상 | 저장된 진단 모델의 stereo 이미지 2D 추론·표시 | GT 없는 3D 결과 연결, 동영상 decoder·시간 정합·UI |
 
-ArchVis1,000페어 GPU 진단은 완료했으나 CE validation 오차359.584px로 중앙 고정 baseline360.405px와 비슷합니다. 학습 구간은 약0.143초/페어이며 독립 평가는 미완료입니다. [실측·성능·전체 시간 추정](docs/ARCHVIS1000_RESULTS.md). 이전102페어 CPU 진단도 정확도가 낮았습니다. Joyful Jump 3프레임의 실제 예측도 관절이 화면 중앙에 몰리는 실패를 보였습니다. 추가 로컬 Joyful Jump 57페어는 중복·split 검토 전이므로 기존 371개와 합산하지 않습니다. 해당 57프레임의 GT 관절점 이미지 171장은 **정답 시각화이며 모델 예측 결과가 아닙니다.**
+v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 평균 오차는335.29→195.31px로 줄었지만 손 오차와 예측 위치 오류가 남아 있습니다. 전체 약84분 중77분이 캐시 생성, 20epoch 학습은 약4분44초였습니다. 종료 기록 오류와 학습 완료를 구분해 검토했습니다. [결과·시간·한계](docs/ARCHVIS_V0_RESULTS.md). 이전102페어 CPU 진단도 정확도가 낮았습니다. Joyful Jump 3프레임의 실제 예측도 관절이 화면 중앙에 몰리는 실패를 보였습니다. 추가 로컬 Joyful Jump 57페어는 중복·split 검토 전이므로 기존 371개와 합산하지 않습니다. 해당 57프레임의 GT 관절점 이미지 171장은 **정답 시각화이며 모델 예측 결과가 아닙니다.**
 
 ## 데이터 사용 방식
 
@@ -39,7 +39,7 @@ ArchVis1,000페어 GPU 진단은 완료했으나 CE validation 오차359.584px�
 | Colab 환경과 결과 보관 | [Colab 준비](docs/COLAB_SETUP.md) |
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
 | 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) · [준비 결과 복원](docs/ARCHVIS_PREPARED_RESTORE.md) — 복원 후1,000페어 GPU 진단 완료 |
-| 1,000페어 v0 2D 학습 | [모델·설정·저장/재개](docs/ARCHVIS_V0_TRAINING.md) — 고정 Colab 실행 준비, 실제 GPU 결과 대기 |
+| 1,000페어 v0 2D 학습 | [모델·설정·저장/재개](docs/ARCHVIS_V0_TRAINING.md) — 20epoch 결과 검토 완료 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |
@@ -48,7 +48,7 @@ ArchVis1,000페어 GPU 진단은 완료했으나 CE validation 오차359.584px�
 
 ## 다음 작업
 
-1. 검증된 동일1,000 train 페어로 중앙 집중을 개선하는 v0 학습과 best 모델·예측 결과 저장을 준비합니다.
+1. 1,000페어 v0 결과를 바탕으로 전체 확대의 입력 준비 비용·캐시 보존과 정확도 개선을 검토합니다.
 2. 초기 약 1,000 train 페어와 독립 validation으로 데이터·학습 동작을 검증한 뒤 ArchVis 전체 train으로 바로 확대합니다(2026-11-09 사용자 결정). 중간 10,000페어 단계는 두지 않습니다.
 3. 2D 학습을 개선하고 예측 2D 기반 3D baseline을 평가합니다.
 4. 실제 M2·M3 학습과 영상 입력·결과 표시로 확장합니다.

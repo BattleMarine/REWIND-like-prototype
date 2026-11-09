@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-09 실제 결과: T4에서 동일1,000 train·2,236 validation으로20epoch/10,000update를 완료했다. 화면 안 whole 오차335.29→195.31px, 전체 약84분 중 캐시 생성77분·학습4분44초였다. 종료 기록 wrapper 오류는 학습 완료와 구분하며 재학습 없이 수정한다. 정확도·독립성·3D 연결은 남아 있다. [결과와 근거](ARCHVIS_V0_RESULTS.md).
+
 2026-11-09 v0 개발 학습 준비: 동일 train 1,000·validation 2,236을 유지하는 context heatmap 모델과 임시 전처리 캐시, 최대 20 epoch·중간 평가·best/last·예측 회수를 구현했다. 로컬 저장/재개 및 기존 경로를 검토했으며 실제 Colab 학습 결과는 아직 없다. [실행 계약과 검토 범위](ARCHVIS_V0_TRAINING.md).
 
 2026-11-09 실제 GPU 결과 갱신: 준비 복원 후 A100에서 train1,000·validation2,236의 MSE/CE 각1epoch·500update를 완료했다. 학습 구간은약0.143초/페어, 평가 포함두실행약36.3분이다. CE validation359.584px는중앙baseline360.405px와비슷해전체학습승인은발급하지않았다. 아래실제1,000GPU미실행표현은당시기록이며 [결과·wall-clock·확대조건](ARCHVIS1000_RESULTS.md)을최신기준으로한다.
