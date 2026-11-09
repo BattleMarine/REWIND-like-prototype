@@ -38,7 +38,7 @@
 | Drive 추출본 검사·누락 복구·시퀀스 업로드 | [단독 Colab 노트북](notebooks/unrealego2_drive_upload.ipynb) · [실행 안내](docs/UNREALEGO2_DRIVE_UPLOAD.md) |
 | Colab 환경과 결과 보관 | [Colab 준비](docs/COLAB_SETUP.md) |
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
-| 추출본 2D 학습·재개 준비 | [지원 범위](docs/ARCHVIS_DIRECT_RGB2D.md) — 실제 실행 입력 고정 전 템플릿 |
+| 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) — 실제 실행은 테스트 세션에서 진행 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |
@@ -47,7 +47,7 @@
 
 ## 다음 작업
 
-1. 추출본 manifest·T1 로더·2D trainer의 고정 Colab 실행 입력을 준비하고 실제 데이터에서 검증합니다.
+1. 고정 Colab 준비 묶음으로 추출본 manifest·T1 로더·2D trainer를 실제 데이터에서 검증합니다.
 2. 초기 약 1,000 train 페어와 독립 validation으로 데이터·학습 동작을 검증한 뒤 ArchVis 전체 train으로 바로 확대합니다(2026-11-09 사용자 결정). 중간 10,000페어 단계는 두지 않습니다.
 3. 2D 학습을 개선하고 예측 2D 기반 3D baseline을 평가합니다.
 4. 실제 M2·M3 학습과 영상 입력·결과 표시로 확장합니다.

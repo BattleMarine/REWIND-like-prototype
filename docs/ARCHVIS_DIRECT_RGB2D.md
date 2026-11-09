@@ -60,3 +60,5 @@ python -m rewind_m1.extracted_rgb_cli
 2026-11-09 root는 관련40개 CPU 검사를 독립 실행했고, 추가 multi-chunk 검사1개도 통과했다. 추가 검사는4+3개 입력 묶음의 순서 변경, 짧은 마지막 배치, 묶음/epoch 경계 재개, 정확 방문 bitmap 및 무중단 전체 상태 일치를 확인한다. 기존 MSE 기본값과 CE 계산, 모의 AMP skip, 추론 weights 재로딩도 검사했다. CLI help, notebook 코드 compile과 문서 링크를 확인했다.
 
 CUDA AMP·실제1,000페어·전체 ArchVis 학습은 미실행이다. 노트북은 `EXECUTE=False`인 실행 템플릿이며 아직 배포용 완성본이 아니다. 공식 split/calibration, motion 근거, duplicate inventory, 약1,000페어 manifest 준비와 실제 Drive 경로·고정 소스 ZIP/config·자원 예산·결과 보관 위치를 갖춘 뒤 테스트 세션에 인계한다. 이 단계에서 사용자에게 빈 설정을 추측해 실행하도록 요구하지 않는다.
+
+고정 소스·입력 ZIP을 검증하고 manifest 준비부터 결과 회수까지 연결하는 [Colab 인계 묶음](ARCHVIS_COLAB_HANDOFF.md)을 추가했다. 위 빈 설정 템플릿보다 테스트 세션이 전달하는 고정 ready 노트북을 우선 사용한다. 실제 경로·runtime manifest·자원 값은 Colab에서 확인한다.

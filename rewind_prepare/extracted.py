@@ -62,13 +62,13 @@ class _Budget:
         if self.entries > self.limits.max_entries:
             raise ValueError("extracted_directory_entry_limit")
 
-    def read(self, path, maximum=MAX_FILE_BYTES):
+    def read(self, path, maximum=MAX_FILE_BYTES, expected_size=None):
         self.check()
         # The regular-file reader uses one extra byte to detect growth.
         remaining = self.limits.max_read_bytes - self.bytes
         if remaining < 2 or _no_link(path).st_size >= remaining:
             raise ValueError("extracted_read_byte_limit")
-        raw = _regular_read(path, min(maximum, remaining - 1))
+        raw = _regular_read(path, min(maximum, remaining - 1), expected_size)
         self.bytes += len(raw)
         self.check()
         return raw
@@ -195,9 +195,9 @@ def _code_identity():
 
 def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, split_dir,
                          motion_map, spec_path, calibration_path, output_dir, limits,
-                         train_limit=1000, seed=0, inventory=None, inventory_sha256=None):
-    """Audit selected payloads and publish a pinned manifest only after success."""
-    from PIL import Image
+                         train_limit=1000, seed=0, inventory=None, inventory_sha256=None,
+                         plan_only=False, expected_plan_sha256=None):
+    """Plan from metadata or audit selected payloads and publish a pinned manifest."""
 
     if "/" in _path(environment) or not isinstance(dataset_version, str) or not dataset_version.strip() or len(dataset_version) > 128:
         raise ValueError("extracted_dataset_identity")
@@ -242,6 +242,44 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
     if train_limit is not None:
         train = sorted(sorted(train, key=lambda key: (digest([seed, *key]), key))[:train_limit])
     selected = train + validation
+    plan = None
+    if plan_only or expected_plan_sha256 is not None:
+        sizes = {}
+        counts = Counter()
+        payload_bytes = Counter()
+        for sequence, frame in selected:
+            counts[owners[sequence]] += 1
+            for role in ROLES:
+                budget.check()
+                relative = indexed[sequence, frame][role]
+                root = roots["pose" if role == "pose" else "rgb"]
+                info = _no_link(_payload_path(root, relative))
+                maximum = spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES
+                if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= maximum:
+                    raise ValueError("extracted_planned_file_size")
+                sizes[sequence, frame, role] = info.st_size
+                payload_bytes[owners[sequence]] += info.st_size
+        body = {"schema": "direct_extracted_selection_plan_v1", "dataset_version": dataset_version,
+                "environment": environment, "roots": {k: str(v) for k, v in roots.items()},
+                "train_limit": train_limit, "seed": seed, "selection": [
+                    [seq, frame, owners[seq], [[role, indexed[seq, frame][role], sizes[seq, frame, role]]
+                                             for role in ROLES]] for seq, frame in selected],
+                "validation_keys_sha256": digest(validation),
+                "metadata_pins": {"spec": sha(spec_raw), "calibration": sha(calibration_raw),
+                                  "split_files": split_pins, "motion_map": sha(motion_raw), "inventory": audit_pin},
+                "counts": dict(counts), "payload_bytes": dict(payload_bytes), "metadata_bytes": budget.bytes,
+                "directory_entries": budget.entries, "selected_file_stats": len(sizes),
+                "duplicates": [list(key) for key in sorted(duplicates)],
+                "inventory_missing_eligible": [list(key) for key in sorted(expected - duplicates - usable)],
+                "inventory_extra_eligible": [list(key) for key in sorted(usable - expected)] if audit_pin else [],
+                "payload_validation": "not_run"}
+        plan = {**body, "content_sha256": digest(body)}
+        if plan_only:
+            return plan
+        if plan["content_sha256"] != expected_plan_sha256:
+            raise ValueError("extracted_selection_plan_changed")
+
+    from PIL import Image
 
     records, exact_payloads = [], {}
     residual_max, residual_counts = {}, Counter()
@@ -251,7 +289,8 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
             relative = indexed[sequence, frame][role]
             root = roots["pose" if role == "pose" else "rgb"]
             raw = budget.read(_payload_path(root, relative),
-                              spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES)
+                              spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES,
+                              sizes[sequence, frame, role] if plan is not None else None)
             payloads[role] = {"path": relative, "size_bytes": len(raw), "sha256": sha(raw)}
             if role == "pose":
                 doc = _raw_pose(raw, frame)
@@ -303,6 +342,8 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
                   "timing": "unverified"},
         "records": records,
     }
+    if plan is not None:
+        body["provenance"]["selection_plan_sha256"] = plan["content_sha256"]
     manifest = {**body, "content_sha256": digest(body)}
     encoded = canonical(manifest) + b"\n"
     budget.check()
