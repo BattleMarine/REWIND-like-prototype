@@ -1,5 +1,11 @@
 # 미니 프로토타입 준비 계획
 
+## 2026-11-09 후속: 동일1,000페어로 v0 개발 학습
+
+사용자는1epoch 운영 진단을 넘어 동일1,000 train 페어로 실제 v0 학습을 요청했다. 검증된 manifest와 공식 validation2,236을 유지한다. 우선2D 학습의 중앙 집중 문제를 개선하고 validation 기준 best weights·last checkpoint와 실제 예측 결과를 확보한다. 예측2D→3D 연결과 영상 시연은 이후이며2D만으로전체v0완료라표시하지않는다.
+
+개발 초안은 전체 입력의 공간 문맥을 반영하는 별도 context heatmap 모델, 기존64×64·CE·seed71·FP32·B2·lr1e-4 유지, 최대20epoch 및 중간 validation이다. 이는 root의 구현 초안이며 사용자가 특정 아키텍처나 epoch를 지정한 것은 아니다. 최종 설정과2시간 실행 상한은 로컬 검토 후고정한다. 이전tiny모델을보존하고새모델의속도는실측전보장하지않는다. 준비manifest를재사용하고필요하면선택된동일자료만검증후로컬저장해읽기를줄인다. 사용자Colab실행은한고정인계로모아테스트세션에서진행한다.
+
 2026-11-09 실제 GPU 결과 갱신: 준비 복원 후 A100에서 train1,000·validation2,236의 MSE/CE 각1epoch·500update를 완료했다. 학습 구간은약0.143초/페어, 평가 포함두실행약36.3분이다. CE validation359.584px는중앙baseline360.405px와비슷해전체학습승인은발급하지않았다. 아래실제1,000GPU미실행표현은당시기록이며 [결과·wall-clock·확대조건](ARCHVIS1000_RESULTS.md)을최신기준으로한다.
 
 2026-11-09 2D 학습 연결: 직접 추출본 loader를 기존 RGB 학습·epoch 순회·저장/재개에 연결하고, 기본 MSE를 보존한 Gaussian cross-entropy 옵션과 train/validation 진단 지표를 추가했다. 약1,000페어 pilot의 운영 결과 및 학습 신호 검토 후 전체 train으로 확대한다. 코드·합성 CPU 검증까지이며 실제 자료 검증·GPU 실행은 후속이며, [고정 Colab 준비·인계 묶음](ARCHVIS_COLAB_HANDOFF.md)을 추가했다. [계약·실행 템플릿](ARCHVIS_DIRECT_RGB2D.md).
