@@ -39,6 +39,7 @@ ArchVis1,000페어 GPU 진단은 완료했으나 CE validation 오차359.584px�
 | Colab 환경과 결과 보관 | [Colab 준비](docs/COLAB_SETUP.md) |
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
 | 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) · [준비 결과 복원](docs/ARCHVIS_PREPARED_RESTORE.md) — 복원 후1,000페어 GPU 진단 완료 |
+| 1,000페어 v0 2D 학습 | [모델·설정·저장/재개](docs/ARCHVIS_V0_TRAINING.md) — 고정 Colab 실행 준비, 실제 GPU 결과 대기 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |
