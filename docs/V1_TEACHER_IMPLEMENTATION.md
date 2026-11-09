@@ -21,7 +21,7 @@ A100/T4 비교는 mock 검사이며 실제 A100 실행이 아니다. Frontend의
 ## 다음 구현과 실제 검증
 
 1. 새 1,000페어 payload 준비와 시간·카메라·정합 검토 근거를 확보한다. 프레임 번호만으로 timestamp를 만들지 않는다.
-2. Frontend 사전학습 runner·checkpoint 계약, teacher epoch 순회와 학습 위치 저장, validation 집계 및 결과 회수 CLI/notebook을 연결한다. 현재 한 update API를 전체 학습 runner로 부르지 않는다.
+2. 2026-11-10 후속으로 frontend 사전학습·teacher epoch 순회·validation 집계·저장/재개·회수 CLI/notebook을 연결했다. [실행 범위](V1_TRAINING_RUNNER.md)를 따른다. 실제 데이터/GPU 검증은 남아 있다.
 3. 실제 Drive worker 비교·팩 복원 비용과 A100 메모리/학습 처리량을 한 고정 시험으로 측정한다. Raw pack은 PNG/JSON 보관이며 해상도별 tensor 또는 예측 특징 캐시는 후속이다.
 4. 검증된 teacher 후 student 증류를 연결한다. 현재 student·identity conditioning·IK는 구현 완료 범위가 아니다.
 

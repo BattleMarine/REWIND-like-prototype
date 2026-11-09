@@ -42,6 +42,7 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 | 1,000페어 v0 2D 학습 | [모델·설정·저장/재개](docs/ARCHVIS_V0_TRAINING.md) — 20epoch 결과 검토 완료 |
 | v1 연속 구간·입력 묶음 준비 | [선택·병렬 준비·복원](docs/V1_INPUT_PREPARATION.md) — 로컬 검증, 실제 Drive 실행 전 |
 | v1 논문 기반 teacher 후보 | [구조·검증·남은 연결](docs/V1_TEACHER_IMPLEMENTATION.md) — 합성 CPU 검증, 실제 학습 전 |
+| v1 frontend·teacher 전체 실행 | [학습·재개·캐시 가이드](docs/V1_TRAINING_RUNNER.md) · [Colab 진입점](notebooks/archvis_v1_pipeline.ipynb) — 실제 입력 근거와 고정 인계 필요 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |

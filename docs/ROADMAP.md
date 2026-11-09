@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-10 실행 연결 구현: frontend 사전학습→고정 예측 특징→body→hand teacher의 epoch 학습·평가·저장/재개와 CLI·Colab 진입점을 추가했다. 동일 로컬 raw pack 재사용과 실제 A100/입력 근거 확인을 분리한다. 실제 데이터/GPU 학습 결과는 아직 없다. [실행·캐시·검증 범위](V1_TRAINING_RUNNER.md).
+
 2026-11-10 C 첫 구현: 논문 기반 frontend·식(4) causal body/hand teacher 후보와 근거 검증 clip adapter·한 update/저장·재개 API를 구현했다. Root 관련10개 검사 통과. 실제 입력 정합 검토, frontend/epoch 실행 연결과 GPU 학습은 남아 있다. [구현·검증 경계](V1_TEACHER_IMPLEMENTATION.md).
 
 2026-11-10 B 첫 구현: 연속 구간1,000페어 목록 선택, 제한 병렬 raw pack 생성·중단 재개·복원/조회 도구를 로컬 검토했다. 실제 보존 목록의 계획을 독립 재현하고3개 검사를 통과했다. 원격 payload 확보·속도 측정·시간/카메라 검증·GPU 학습은 아직이다. [지원 범위와 근거](V1_INPUT_PREPARATION.md).

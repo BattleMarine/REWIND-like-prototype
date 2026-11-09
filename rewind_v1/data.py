@@ -106,8 +106,35 @@ def _gt_features(fields):
     return torch.cat(views, dim=-1).flatten()
 
 
+def frame_image(raw, size):
+    width, height = IMAGE_SIZE
+    pair = []
+    for side in ("left", "right"):
+        pixels = decode_rgb_payload(raw[side], IMAGE_SIZE, width * height, Image)
+        image = torch.frombuffer(pixels, dtype=torch.uint8).view(height, width, 3)
+        pair.append(image.permute(2, 0, 1).float().div_(255.))
+    return resize_images(torch.stack(pair)[None], size)[0]
+
+
+def reviewed_clip(evidence, sequence, frames, scale_mm):
+    records = evidence["frames"].get(sequence, {})
+    maximum_dt = evidence["max_frame_delta_seconds"]
+    if type(maximum_dt) not in (int, float) or not math.isfinite(maximum_dt) or maximum_dt <= 0:
+        raise ValueError("rewind_v1_max_frame_delta")
+    review = [records.get(str(index)) for index in frames]
+    if any(row is None for row in review):
+        raise ValueError("rewind_v1_reviewed_frame_evidence_missing")
+    seconds = [row["time_seconds"] for row in review]
+    if (any(type(t) not in (int, float) or not math.isfinite(t) for t in seconds)
+            or any(not 0 < b - a <= maximum_dt for a, b in zip(seconds, seconds[1:]))):
+        raise ValueError("rewind_v1_reviewed_time_gap")
+    cameras = torch.stack([encode_camera(row["camera_pose"], scale_mm) for row in review])
+    return cameras, seconds
+
+
 def load_clip(cache, plan, sequence, start, *, split, selection_sha256, evidence, evidence_sha256,
-              spec_path, scale_mm, source, frontend=None, frontend_size=None, frontend_sha256=None):
+              spec_path, scale_mm, source, frontend=None, frontend_size=None, frontend_sha256=None,
+              check_budget=lambda: None):
     """Read one reviewed clip wholly inside the train or fixed validation selection."""
     check_pin(plan, SELECTION_SCHEMA, selection_sha256)
     _checked_evidence(plan, evidence, evidence_sha256)
@@ -139,21 +166,11 @@ def load_clip(cache, plan, sequence, start, *, split, selection_sha256, evidence
                            "evidence": evidence_sha256, "source": source, "scale_mm": scale_mm,
                            "frontend": ARCHITECTURE if frontend else None, "frontend_size": frontend_size,
                            "frontend_sha256": frontend_sha256, "preprocessing": "rgb_float_bilinear_align_corners_v1"})
-    records = evidence["frames"].get(sequence, {})
-    maximum_dt = evidence["max_frame_delta_seconds"]
-    if type(maximum_dt) not in (int, float) or not math.isfinite(maximum_dt) or maximum_dt <= 0:
-        raise ValueError("rewind_v1_max_frame_delta")
-    review = [records.get(str(index)) for index in frames]
-    if any(row is None for row in review):
-        raise ValueError("rewind_v1_reviewed_frame_evidence_missing")
-    seconds = [row["time_seconds"] for row in review]
-    if (any(type(t) not in (int, float) or not math.isfinite(t) for t in seconds)
-            or any(not 0 < b - a <= maximum_dt for a, b in zip(seconds, seconds[1:]))):
-        raise ValueError("rewind_v1_reviewed_time_gap")
-    cameras = torch.stack([encode_camera(row["camera_pose"], scale_mm) for row in review])
+    cameras, seconds = reviewed_clip(evidence, sequence, frames, scale_mm)
     features, targets, masks, images = [], [], [], []
     timing = {"local_cache_read_wall_seconds": 0., "cpu_preprocess_wall_seconds": 0.}
     for index in frames:
+        check_budget()
         started = time.perf_counter()
         raw = cache.read_pair(sequence, index, split=split)
         timing["local_cache_read_wall_seconds"] += time.perf_counter() - started
@@ -165,20 +182,15 @@ def load_clip(cache, plan, sequence, start, *, split, selection_sha256, evidence
         if source == "gt_2d_diagnostic":
             features.append(_gt_features(fields[:2]))
         else:
-            height, width = IMAGE_SIZE[1], IMAGE_SIZE[0]
-            pair = []
-            for side in ("left", "right"):
-                pixels = decode_rgb_payload(raw[side], IMAGE_SIZE, width * height, Image)
-                image = torch.frombuffer(pixels, dtype=torch.uint8).view(height, width, 3)
-                pair.append(image.permute(2, 0, 1).float().div_(255.))
-            images.append(resize_images(torch.stack(pair)[None], frontend_size)[0])
+            images.append(frame_image(raw, frontend_size))
         timing["cpu_preprocess_wall_seconds"] += time.perf_counter() - started
     if source == "predicted_2d":
         started = time.perf_counter()
         device = next(frontend.parameters()).device
         # Small, fixed groups keep native decode and frontend allocation separate.
-        features = [predicted_features(frontend, torch.stack(images[start:start + 2]).to(device)).cpu()
-                    for start in range(0, len(images), 2)]
+        for start in range(0, len(images), 2):
+            check_budget()
+            features.append(predicted_features(frontend, torch.stack(images[start:start + 2]).to(device)).cpu())
         features = torch.cat(features)
         timing["frontend_transfer_and_inference_wall_seconds"] = time.perf_counter() - started
     else:
