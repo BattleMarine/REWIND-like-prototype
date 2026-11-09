@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-09 실제 GPU 결과 갱신: 준비 복원 후 A100에서 train1,000·validation2,236의 MSE/CE 각1epoch·500update를 완료했다. 학습 구간은약0.143초/페어, 평가 포함두실행약36.3분이다. CE validation359.584px는중앙baseline360.405px와비슷해전체학습승인은발급하지않았다. 아래실제1,000GPU미실행표현은당시기록이며 [결과·wall-clock·확대조건](ARCHVIS1000_RESULTS.md)을최신기준으로한다.
+
 2026-11-09 실제 준비 결과: ArchVis train1,000·validation2,236페어의 hash·PNG·pose 수치 검사가 완료됐고, 학습 전 연결 문제로 중단됐다. 회수3파일의 pin·상호참조를 root가 확인하고 기존 소스를 유지하는 준비 결과 복원본을 로컬 검증했다. 실제 학습·새 Colab 복원은 미실행이며, 아래 실제1,000페어 미검증 표현 중 준비 검사 부분만 갱신한다. [결과·복원·시간 분석 경계](ARCHVIS_PREPARED_RESTORE.md).
 
 2026-11-09 2D 학습 연결: 직접 추출본 loader를 기존 RGB 학습·epoch 순회·저장/재개에 연결하고, 기본 MSE를 보존한 Gaussian cross-entropy 옵션과 train/validation 진단 지표를 추가했다. 약1,000페어 pilot의 운영 결과 및 학습 신호 검토 후 전체 train으로 확대한다. 코드·합성 CPU 검증까지이며 실제 자료 검증·GPU 실행은 후속이며, [고정 Colab 준비·인계 묶음](ARCHVIS_COLAB_HANDOFF.md)을 추가했다. [계약·실행 템플릿](ARCHVIS_DIRECT_RGB2D.md).

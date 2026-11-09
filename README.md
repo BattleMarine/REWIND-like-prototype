@@ -11,12 +11,12 @@
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
 | M0 데이터 | ArchVis train1,000·validation2,236페어 준비 검사 완료, 추출본 로더 구현 | 실제 영상·원본 motion 정합과 독립 평가 검토 |
-| M1 비교 모델 | 102페어 CPU 진단·합성 GPU 재개 검증, 추출본2D trainer·CE 옵션 구현 | 2D 정확도 개선, 독립 평가와 실제 GPU 학습 |
+| M1 비교 모델 | ArchVis1,000페어 A100 MSE·CE 각1epoch 완료 | 중앙 집중 개선, 독립 평가·전체 확대 검토 |
 | M2·M3 teacher | Causal body diffusion·body–hand cascade 구현과 합성 검증 | 실제 데이터 학습과 성능 비교 |
 | M4~M6 | Student 증류·개선 실험·통합 계획 | 후속 구현·평가 |
 | 이미지·동영상 | 저장된 진단 모델의 stereo 이미지 2D 추론·표시 | GT 없는 3D 결과 연결, 동영상 decoder·시간 정합·UI |
 
-실제 102페어의 train-fit 진단 지표는 측정했지만 정확도가 낮고 독립 평가는 미완료입니다. Joyful Jump 3프레임의 실제 예측도 관절이 화면 중앙에 몰리는 실패를 보였습니다. 추가 로컬 Joyful Jump 57페어는 중복·split 검토 전이므로 기존 371개와 합산하지 않습니다. 해당 57프레임의 GT 관절점 이미지 171장은 **정답 시각화이며 모델 예측 결과가 아닙니다.**
+ArchVis1,000페어 GPU 진단은 완료했으나 CE validation 오차359.584px로 중앙 고정 baseline360.405px와 비슷합니다. 학습 구간은 약0.143초/페어이며 독립 평가는 미완료입니다. [실측·성능·전체 시간 추정](docs/ARCHVIS1000_RESULTS.md). 이전102페어 CPU 진단도 정확도가 낮았습니다. Joyful Jump 3프레임의 실제 예측도 관절이 화면 중앙에 몰리는 실패를 보였습니다. 추가 로컬 Joyful Jump 57페어는 중복·split 검토 전이므로 기존 371개와 합산하지 않습니다. 해당 57프레임의 GT 관절점 이미지 171장은 **정답 시각화이며 모델 예측 결과가 아닙니다.**
 
 ## 데이터 사용 방식
 
@@ -25,7 +25,7 @@
 - 좌우 RGB와 pose를 sequence/frame 키로 대조하고 파일 무결성·관절·단위·좌표·시간 정합을 검증합니다.
 - Sequence와 원본 motion 중복을 고려해 train/validation을 분리합니다. Test set으로 튜닝하지 않습니다.
 - 필요한 subset을 Colab에서 준비·재사용하고 manifest·설정·결과·checkpoint는 영구 보관합니다.
-- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 추출본 manifest·T1 로더는 구현했으며 2D trainer 연결은 로컬 검증했으며 실제 검증·GPU 학습은 미완료입니다. [입력 계약](docs/EXTRACTED_STEREO_INPUT.md)을 참조합니다.
+- Drive 업로드 완료·정확한 경로·전체 내용은 확인 전이며, 추출본 manifest·T1 로더는 구현했으며 2D trainer의1,000페어 GPU 실행은 완료했으며 전체 데이터 내용 검증·학습은 미완료입니다. [입력 계약](docs/EXTRACTED_STEREO_INPUT.md)을 참조합니다.
 
 자세한 준비 기준은 [데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md)을 따릅니다.
 
@@ -38,7 +38,7 @@
 | Drive 추출본 검사·누락 복구·시퀀스 업로드 | [단독 Colab 노트북](notebooks/unrealego2_drive_upload.ipynb) · [실행 안내](docs/UNREALEGO2_DRIVE_UPLOAD.md) |
 | Colab 환경과 결과 보관 | [Colab 준비](docs/COLAB_SETUP.md) |
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
-| 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) · [준비 결과 복원](docs/ARCHVIS_PREPARED_RESTORE.md) — 학습 전 연결 중단, 복원 후 진행 |
+| 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) · [준비 결과 복원](docs/ARCHVIS_PREPARED_RESTORE.md) — 복원 후1,000페어 GPU 진단 완료 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |
