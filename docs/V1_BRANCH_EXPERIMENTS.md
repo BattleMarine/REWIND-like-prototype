@@ -49,3 +49,13 @@ v1.1은별도 `epoch-expansion` CLI/config와고정notebook생성기를구현했
 Root는관련28개검사를실행했다. 27개통과, 기존checkpoint재개검사1개는Windows sandbox의원자적파일교체권한오류후동일검사를격리제한밖에서재실행해통과했다. 검사를생략하거나코드가드를우회하지않았다. 실제A100의5,400update는아직실행하지않았다.
 
 v1.2 metadata계산은payload읽기없이완료했다. 전체train20,888 real frames는564개post-padded clip으로계획되며padding7,312자리,실제프레임중복0이다. 완전clip281개외에short156개/4,244frames와tail127개/2,594frames가있다. Train번호gap1개가있고gap을가로지르지않는다. 이는학습로더구현완료가아닌coverage계획이다. 기존validation평가조건은별도로유지한다.
+
+## v1.2 전체 파일 검사 구현
+
+`rewind_prepare.full_archvis`와 `scripts/build_archvis_v12_prepare.py`를 추가했다. 고정 보존 목록의 train 20,888·validation 2,236페어(파일 69,372개)를 대상으로 목록/stat 검사 후 source plan SHA를 고정해 내용 검사를 수행한다. RGB·pose만 읽으며 원본을 수정하지 않는다. 기존 3,236페어의 파일 해시도 보존한다. 목록 밖 업로드나 누락이 발견되면 임의로 범위를 변경하지 않고 보고한다.
+
+Colab CPU·Pillow 환경이며 목록 검사 15분/16MiB, 내용 검사 6시간/65GiB, Linux 주소공간 3GiB를 상한으로 둔다. 외부 실행 제한은 각각 930초/21,630초다. 로컬 보고서·회수 예산 512MiB와 여유 1GiB가 필요하다. 실제 전송·속도·메모리는 Colab에서 확인해야 한다. 최초 검사 약54.26GB는 학습 시간 추정에서 제외한 별도 비용이다.
+
+진행 상태는 첫 페어와 250페어마다 저장한다. 일반 실패에서는 마지막 파일 경로와 원인을 보존하고, 강제 종료에서는 마지막 게시 상태까지만 남는다. 마지막 셀은 상태·목록·coverage·완성 manifest와 파일별 해시가 있는 회수 ZIP을 생성한다. 원본 이미지나 캐시는 포함하지 않는다. 내용 검사 이어읽기는 아직 지원하지 않으며 실패 후 자동 재시도하지 않는다.
+
+Root가 새 검사 5개와 기존 추출본 검사 7개, 총12개를 재실행해 통과했다. 개발자는 추가 temporal/audit 회귀 7개도 통과했다. 실제 Drive 전수 내용 검사·확대 GPU 학습은 미실행이다. 검사 성공 시에도 `train_ready=false`, `temporal_ready=false`를 유지하며, 짧은 구간의 mask/padding 학습 로더와 전체 캐시·학습 연결은 후속 작업이다.

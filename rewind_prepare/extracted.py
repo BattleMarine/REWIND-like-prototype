@@ -196,7 +196,7 @@ def _code_identity():
 def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, split_dir,
                          motion_map, spec_path, calibration_path, output_dir, limits,
                          train_limit=1000, seed=0, inventory=None, inventory_sha256=None,
-                         plan_only=False, expected_plan_sha256=None):
+                         plan_only=False, expected_plan_sha256=None, on_progress=None):
     """Plan from metadata or audit selected payloads and publish a pinned manifest."""
 
     if "/" in _path(environment) or not isinstance(dataset_version, str) or not dataset_version.strip() or len(dataset_version) > 128:
@@ -231,6 +231,9 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
             indexed[key][role] = path
     incomplete = {key: sorted(set(ROLES) - roles.keys()) for key, roles in indexed.items() if set(roles) != set(ROLES)}
     usable = indexed.keys() - duplicates - incomplete.keys()
+    if on_progress is not None:
+        on_progress("inventory", entries=budget.entries, usable=usable, duplicates=duplicates,
+                    incomplete=incomplete, ignored=ignored)
     train = sorted(key for key in usable if owners[key[0]] == "train")
     validation = sorted(key for key in usable if owners[key[0]] == "validation")
     if not train or not validation or (train_limit is not None and len(train) < train_limit):
@@ -288,6 +291,9 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
         for role in ROLES:
             relative = indexed[sequence, frame][role]
             root = roots["pose" if role == "pose" else "rgb"]
+            if on_progress is not None:
+                on_progress("file", key=(sequence, frame), role=role, path=relative,
+                            read_bytes=budget.bytes, pairs_verified=len(records), pairs_total=len(selected))
             raw = budget.read(_payload_path(root, relative),
                               spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES,
                               sizes[sequence, frame, role] if plan is not None else None)
@@ -312,6 +318,9 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
             raise ValueError("extracted_triplet_content_split_overlap")
         records.append({"sequence_id": sequence, "frame_index": frame, "split": split,
                         "motion_id": motions[sequence]["motion_id"], "files": payloads})
+        if on_progress is not None:
+            on_progress("pair", record=records[-1], read_bytes=budget.bytes,
+                        pairs_verified=len(records), pairs_total=len(selected))
 
     body = {
         "schema": SCHEMA, "source_kind": "direct_extracted_files", "dataset_version": dataset_version,
