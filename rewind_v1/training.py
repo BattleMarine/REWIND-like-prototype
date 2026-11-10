@@ -25,6 +25,14 @@ FORMAT = "rewind_v1_teacher_checkpoint_v1"
 MAX_CHECKPOINT_BYTES = 256 * 1024**2
 
 
+def gradient_l2(model):
+    norms = [parameter.grad.detach().norm() for parameter in model.parameters() if parameter.grad is not None]
+    value = float(torch.stack(norms).norm()) if norms else 0.
+    if not 0 <= value < float("inf"):
+        raise ValueError("rewind_v1_nonfinite_gradient_norm")
+    return value
+
+
 def _source():
     root = Path(__file__).resolve().parent.parent
     hashes = {**m2_identity()["code_sha256"], **producer_identity()}
@@ -55,6 +63,7 @@ class TeacherRun:
                             "cuda_runtime": torch.version.cuda, "accelerator": accelerator,
                             "precision": "float32", "threads": torch.get_num_threads()}
         self.runtime = {}
+        self.measure_gradient = False
         self.model = (V1Hand(config, joints, edges, upper_joints) if upper_joints else
                       V1Body(config, joints, edges)).to(self.device)
         self.diffusion = DiffusionSchedule(config["diffusion_steps"], config["beta_start"], config["beta_end"])
@@ -131,12 +140,16 @@ class TeacherRun:
         self.scaler.unscale_(self.optimizer)
         if any(p.grad is not None and not torch.isfinite(p.grad).all() for p in self.model.parameters()):
             raise ValueError("rewind_v1_nonfinite_teacher_gradient")
+        gradient = gradient_l2(self.model) if self.measure_gradient else None
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.scheduler.step()
         self.step += 1
         self.checkpoint_sha256 = None
-        return {name: float(value.detach()) for name, value in metrics.items()}
+        result = {name: float(value.detach()) for name, value in metrics.items()}
+        if gradient is not None:
+            result["first_update_gradient_l2"] = gradient
+        return result
 
     @torch.no_grad()
     def predict(self, clip, noise, *, upper=None):

@@ -1,0 +1,14 @@
+{
+  "seed": 71,
+  "epochs": {"frontend": 10, "body": 10, "hand": 10},
+  "frontend": {"size": [128, 128], "batch_size": 2, "learning_rate": 0.0001, "scheduler_step": 1, "scheduler_gamma": 1.0},
+  "teacher": {
+    "hidden": 512, "heads": 4, "graph_layers": 3, "temporal_layers": 3, "attention_past_frames": 20,
+    "diffusion_steps": 1000, "dropout": 0.0, "beta_start": 0.0001, "beta_end": 0.02, "sampling_steps": 10,
+    "learning_rate": 0.00005, "scheduler_step": 1, "scheduler_gamma": 1.0, "target_scale_mm": 100.0,
+    "frame_loss_weight": 1.0, "velocity_loss_weight": 0.0
+  },
+  "limits": {"max_seconds": 7200, "max_updates": 5400, "output_bytes": 2147483648,
+             "cache_restore_bytes": 12884901888, "feature_bytes": 134217728, "checkpoint_bytes": 268435456,
+             "checkpoint_every": 25}
+}

@@ -14,11 +14,13 @@ from rewind_archive.contracts import canonical, digest
 from rewind_prepare import temporal_cache as cache
 from rewind_prepare.converter import sha
 from rewind_prepare.temporal_selection import SCHEMA, seal
-from rewind_v1.__main__ import main, recover
+from rewind_v1.__main__ import main, recover, restore_expansion
 from rewind_v1.data import EVIDENCE_SCHEMA, REQUIRED_EVIDENCE
+from rewind_v1.expansion import MILESTONE_EPOCHS, RUN_ID, validate_expansion
 from rewind_v1.frontend import PaperHeatmapFrontend, frontend_fingerprint
 from rewind_v1.run_data import ActualData, FixtureData
-from rewind_v1.runner import Budget, LAST, REPORT
+from rewind_v1.run_stages import CascadeStages
+from rewind_v1.runner import Budget, LAST, REPORT, Pipeline
 import test_extracted_stereo
 
 
@@ -102,6 +104,68 @@ class PipelineTests(unittest.TestCase):
         resumed = self.launch("stopped", resume=pin)
         self.assertEqual(resumed["cursor"], full["cursor"])
         self.assert_checkpoint_equal("full", "stopped")
+
+    @patch("rewind_v1.runner.MILESTONE_EPOCHS", (1, 2))
+    @patch("rewind_v1.__main__.MILESTONE_EPOCHS", (1, 2))
+    def test_expansion_preserves_milestones_across_recovery_and_resume(self):
+        config = json.loads(CONFIG.read_bytes())
+        run = self.root / "expansion"
+        run.mkdir()
+
+        def make(folder):
+            data = FixtureData()
+            data.identity["run_id"] = RUN_ID
+            return Pipeline(config, digest(config), data, torch.device("cpu"), folder, Budget(config["limits"]))
+
+        report = make(run).run(stop_after_updates=9)
+        self.assertEqual(report["status"], "paused")
+        self.assertEqual(set(report["cursor"]["milestones"]["frontend"]), {"1", "2"})
+        self.assertEqual(report["cursor"]["stage"], "body")
+        archive = self.root / "expansion.zip"
+        receipt = recover(run, archive, 64 * 1024**2)
+        resumed = self.root / "restored"
+        restored = restore_expansion(archive, receipt["sha256"], resumed)
+        interrupted = make(resumed)
+        with patch.object(interrupted, "_make_stage", side_effect=TimeoutError("rewind_v1_run_time_limit")):
+            timed_out = interrupted.run(restored["last_sha256"])
+        self.assertEqual(timed_out["status"], "paused")
+        self.assertEqual(timed_out["cursor"], report["cursor"])
+        self.assertEqual(timed_out["last_checkpoint"]["sha256"], restored["last_sha256"])
+        report = make(resumed).run(restored["last_sha256"])
+        self.assertEqual((report["status"], report["cursor"]["updates"]), ("completed", 16))
+        cursor = report["cursor"]
+        for stage, milestones in cursor["milestones"].items():
+            self.assertEqual(set(milestones), {"1", "2"})
+            for milestone in milestones.values():
+                checkpoint = torch.load(resumed / milestone["name"], weights_only=True, map_location="cpu")
+                self.assertEqual(checkpoint["dependencies"], milestone["dependencies"])
+                self.assertEqual(sha((resumed / milestone["name"]).read_bytes()), milestone["sha256"])
+        self.assertEqual(set(cursor["milestones"]), {"frontend", "body", "hand"})
+        self.assertEqual(cursor["milestones"]["hand"]["1"]["dependencies"]["body"], cursor["best"]["body"]["sha256"])
+        for epoch in cursor["history"]:
+            self.assertGreater(epoch["train_sums"]["first_update_gradient_l2"], 0)
+            self.assertIn("collapse_diagnostics", epoch["validation"])
+
+    def test_expansion_config_is_separate_from_fixed_pilot(self):
+        from rewind_v1.diagnostic import PILOT_CONFIG, validate_pilot
+
+        path = ROOT / "configs/rewind_v1_epoch_expansion.json"
+        config = json.loads(path.read_bytes())
+        validate_expansion(config)
+        self.assertEqual(MILESTONE_EPOCHS, (1, 5, 10))
+        self.assertEqual(config["limits"]["max_updates"], 5400)
+        with self.assertRaisesRegex(ValueError, "diagnostic_pilot_config"):
+            validate_pilot(config)
+        with self.assertRaisesRegex(ValueError, "epoch_expansion_config"):
+            validate_expansion(json.loads(PILOT_CONFIG.read_bytes()))
+
+    def test_expansion_shape_metrics_use_valid_joints_and_bone_endpoints(self):
+        points = torch.tensor([[[[0., 0., 0.], [4., 0., 0.], [300., 0., 0.]]]])
+        clip = SimpleNamespace(target_mm=points * 2, target_valid=torch.tensor([[[True, True, False]]]),
+                               time_valid=torch.tensor([[True]]))
+        sums = CascadeStages._shape(points, clip, [(0, 1), (1, 2)])
+        self.assertEqual(sums, {"frames": 1, "bones": 1, "predicted_spread": 2., "target_spread": 4.,
+                                "predicted_bone": 4., "target_bone": 8.})
 
     def test_checkpoint_and_frozen_dependency_mutation_fail_closed(self):
         paused = self.launch("mutated", stop=8)

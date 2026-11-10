@@ -12,17 +12,23 @@ from rewind_m1.local_rgb import _hash
 from rewind_prepare.converter import sha
 from rewind_v1.audit import load_inputs
 from rewind_v1.diagnostic import HISTORICAL, validate_bundle, validate_pilot
+from rewind_v1.expansion import HARD_SECONDS, RUN_ID, expansion_decision, validate_expansion
 from rewind_v1.runner import validate_config
 from scripts.archvis_pilot_bootstrap import extract_pinned_zip
 from scripts.build_archvis_pilot_handoff import _cell
 from scripts.build_archvis_v1_handoff import CONFIG, MIB, notebook_document as audit_notebook
 
 
+EXPANSION_CONFIG = "configs/rewind_v1_epoch_expansion.json"
+
+
 def notebook_document(pins):
+    expansion = "expansion_decision" in pins
+    work_name = "archvis_v1_epoch_expansion" if expansion else "archvis_v1_diagnostic_001"
     original = audit_notebook(pins)
     bootstrap = "".join(next(cell["source"] for cell in original["cells"] if cell["id"] == "bootstrap"))
     for before, after in (
-        ('Path("/content/archvis_v1_fixed")', 'Path("/content/archvis_v1_diagnostic_001")'),
+        ('Path("/content/archvis_v1_fixed")', f'Path("/content/{work_name}")'),
         ('("approval", 16, 32, 16)', '("diagnostic_bundle", 16, 32, 16)'),
         ('APPROVAL = verified / "approval"', 'DIAGNOSTIC_BUNDLE = verified / "diagnostic_bundle"'),
     ):
@@ -82,12 +88,43 @@ Drive의 보존 raw cache를 로컬 SSD로 복원하며 원본 추출 RGB·pose 
 원본 motion 독립성은 미확인이고 공식 validation 수치는 참고 지표입니다.
 frontend, body, hand를 각각 1 epoch 진단 학습합니다. 실패·중단 뒤 마지막 셀에서 결과를 회수합니다.
 """), _cell("code", "bootstrap", bootstrap), _cell("code", "diagnostic", launch), _cell("code", "recover", recover)]
+    if expansion:
+        cells[0] = _cell("markdown", "guide", f"""# {RUN_ID}
+고정 소스·입력·기존 진단 근거 ZIP을 /content에 올립니다. A100에서 동일한 train 1,000페어를 처음부터 단계별 10epoch 학습합니다.
+Drive의 기존 raw cache를 로컬에 재사용합니다. 명목 25FPS 가정과 참고용 validation 표시는 기존 진단과 같습니다.
+단계별 epoch 1·5·10 모델과 재개용 last.pt를 별도로 보존합니다. 각 모델의 앞 단계 의존성은 checkpoint와 run.json에서 확인합니다.
+학습 호출 상한은 2시간입니다. 중단 시 마지막 셀에서 ZIP과 SHA를 회수합니다. 새 런타임에서는 ZIP 경로와 SHA를 학습 셀에 입력합니다.
+같은 런타임에서는 회수 결과의 last_sha256을 RESUME_SHA256에 입력합니다. 시작 전 로컬 여유 공간 12GiB를 확보합니다.
+""")
+        launch = launch.replace("RUN_DIAGNOSTIC", "RUN_EPOCH_EXPANSION").replace(
+            'RESUME_SHA256 = ""', '''RESUME_SHA256 = ""
+RESUME_ARCHIVE = ""
+RESUME_ARCHIVE_SHA256 = ""
+EXPANSION_DECISION = verified / "epoch_expansion_decision.json"
+EXPANSION_DECISION.write_text(json.dumps(PINS["expansion_decision"]), encoding="utf-8")''').replace(
+            '    command = [', '''    if RESUME_ARCHIVE or RESUME_ARCHIVE_SHA256:
+        if not (RESUME_ARCHIVE and RESUME_ARCHIVE_SHA256) or RESUME_SHA256:
+            raise ValueError("회수 ZIP 경로·SHA 또는 기존 last SHA 중 한 방식만 사용합니다.")
+        restored = tracked_child("epoch_restore", [sys.executable, "-m", "rewind_v1", "restore-epoch-expansion",
+                                 "--archive", RESUME_ARCHIVE, "--archive-sha256", RESUME_ARCHIVE_SHA256,
+                                 "--output", str(RUN)], timeout=600, phase="restore", capture_output=True)
+        RESUME_SHA256 = json.loads(restored.stdout)["last_sha256"]
+    command = [''').replace('"rewind_v1", "diagnostic",', '"rewind_v1", "epoch-expansion",').replace(
+            'PINS["decision_sha256"]]', '''PINS["decision_sha256"],
+               "--expansion-decision", str(EXPANSION_DECISION), "--expansion-decision-sha256",
+               PINS["expansion_decision"]["content_sha256"]]''').replace(
+            'phase="nominal_25fps_diagnostic"', 'phase="same_1000_pairs_epoch_expansion"')
+        recover = recover.replace("v1_diagnostic_001", "v1_epoch_expansion").replace(
+            '''            subprocess.run([sys.executable, "-m", module,''', '''            result = subprocess.run([sys.executable, "-m", module,''').replace(
+            'cwd=SOURCE, timeout=600, check=True)', 'cwd=SOURCE, timeout=600, check=True, capture_output=True, text=True)\n            print(result.stdout.strip())')
+        cells[2] = _cell("code", "epoch-expansion", launch)
+        cells[3] = _cell("code", "recover", recover)
     for cell in cells[1:]:
         compile("".join(cell["source"]), cell["id"], "exec")
     return {**original, "cells": cells}
 
 
-def build(args):
+def build(args, *, expansion=False):
     output = Path(args.output)
     if output.exists() or not all(_hash(pin) for pin in (
         args.source_sha256, args.input_sha256, args.evidence_sha256, args.decision_sha256
@@ -108,35 +145,41 @@ def build(args):
                 pins[key]["revision"] = revision
         plan, _ = load_inputs(root / "inputs", HISTORICAL["selection_sha256"])
         validate_bundle(root / "diagnostic_bundle", args.decision_sha256, plan)
-        config_raw = (root / "source" / CONFIG).read_bytes()
+        config_path = EXPANSION_CONFIG if expansion else CONFIG
+        config_raw = (root / "source" / config_path).read_bytes()
         config = validate_config(json.loads(config_raw))
-        validate_pilot(config)
+        (validate_expansion if expansion else validate_pilot)(config)
         child = subprocess.run([sys.executable, "-m", "rewind_v1", "source"], cwd=root / "source",
                                timeout=60, capture_output=True, text=True, check=True)
         source_identity = json.loads(child.stdout)["source_sha256"]
         if not _hash(source_identity):
             raise ValueError("archvis_v1_diagnostic_builder_source")
-        pins.update(source_code_sha256=source_identity, config_path=CONFIG, config_sha256=sha(config_raw),
+        pins.update(source_code_sha256=source_identity, config_path=config_path, config_sha256=sha(config_raw),
                     selection_sha256=HISTORICAL["selection_sha256"], cache_sha256=HISTORICAL["cache_sha256"],
                     decision_sha256=args.decision_sha256, prior_audit_source_sha256=HISTORICAL["audit_source_sha256"],
-                    training_hard_seconds=config["limits"]["max_seconds"]+120)
+                    training_hard_seconds=HARD_SECONDS if expansion else config["limits"]["max_seconds"]+120)
+        if expansion:
+            pins["expansion_decision"] = expansion_decision(args.decision_sha256, pins["config_sha256"])
     raw = (json.dumps(notebook_document(pins), ensure_ascii=False, indent=1) + "\n").encode()
     output.mkdir()
-    name = "archvis_v1_diagnostic_001.ipynb"
+    name = "archvis_v1_epoch_expansion.ipynb" if expansion else "archvis_v1_diagnostic_001.ipynb"
     (output / name).write_bytes(raw)
-    receipt = {"schema": "archvis_v1_diagnostic_handoff_v1", "pins": pins,
+    receipt = {"schema": "archvis_v1_epoch_expansion_handoff_v1" if expansion else "archvis_v1_diagnostic_handoff_v1", "pins": pins,
                "notebook": {"name": name, "sha256": sha(raw), "bytes": len(raw)}}
-    (output / "diagnostic_handoff_receipt.json").write_bytes(canonical(receipt) + b"\n")
+    receipt_name = "epoch_expansion_handoff_receipt.json" if expansion else "diagnostic_handoff_receipt.json"
+    if expansion:
+        (output / "epoch_expansion_decision.json").write_bytes(canonical(pins["expansion_decision"]) + b"\n")
+    (output / receipt_name).write_bytes(canonical(receipt) + b"\n")
     return receipt
 
 
-def main():
+def main(*, expansion=False):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("source-zip", "input-zip", "evidence-zip", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     for name in ("source-sha256", "input-sha256", "evidence-sha256", "decision-sha256", "revision"):
         parser.add_argument("--" + name, required=True)
-    print(canonical(build(parser.parse_args())).decode("utf-8"))
+    print(canonical(build(parser.parse_args(), expansion=expansion)).decode("utf-8"))
 
 
 if __name__ == "__main__":

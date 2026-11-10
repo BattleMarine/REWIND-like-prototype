@@ -18,9 +18,30 @@ from rewind_prepare.extracted import _local
 from rewind_prepare.temporal_cache import _atomic, _check_part, _hash_file, _locked
 from .device import require_a100
 from .diagnostic import DiagnosticData, POLICY, validate_pilot
+from .expansion import ExpansionData, MILESTONE_EPOCHS, RECOVERY_BYTES, RUN_ID, validate_expansion
 from .run_data import ActualData, FixtureData
 from .runner import Budget, FORMAT, LAST, MIB, REPORT, STAGES, Pipeline, _read_checkpoint, validate_config
 from .training import MAX_CHECKPOINT_BYTES, _source
+
+
+def _model_receipts(state):
+    progress = state["progress"]
+    receipts = {}
+    for role, item in progress["best"].items():
+        if role not in STAGES or item["name"] != f"best-{role}-e{item['epoch']:03d}.pt":
+            raise ValueError("rewind_v1_recovery_best_name")
+        receipts[item["name"]] = {k: item[k] for k in ("name", "bytes", "sha256")}
+    if state["binding"].get("input", {}).get("run_id") != RUN_ID:
+        return receipts
+    for role, milestones in progress["milestones"].items():
+        for epoch, item in milestones.items():
+            if (role not in STAGES or item["epoch"] not in MILESTONE_EPOCHS or epoch != str(item["epoch"])
+                    or item["name"] not in {f"{label}-{role}-e{item['epoch']:03d}.pt" for label in ("best", "milestone")}):
+                raise ValueError("rewind_v1_recovery_milestone_name")
+            entry = {k: item[k] for k in ("name", "bytes", "sha256")}
+            if receipts.setdefault(item["name"], entry) != entry:
+                raise ValueError("rewind_v1_recovery_milestone_pin")
+    return receipts
 
 
 def recover(root, output, max_bytes):
@@ -46,10 +67,7 @@ def recover(root, output, max_bytes):
             if state["binding"]["format"] != FORMAT:
                 raise ValueError("rewind_v1_recovery_checkpoint_format")
             receipts[LAST] = {"name": LAST, "bytes": size, "sha256": pin}
-            for role, item in state["progress"]["best"].items():
-                if role not in STAGES or item["name"] != f"best-{role}-e{item['epoch']:03d}.pt":
-                    raise ValueError("rewind_v1_recovery_best_name")
-                receipts[item["name"]] = {k: item[k] for k in ("name", "bytes", "sha256")}
+            receipts.update(_model_receipts(state))
             del state
         if not receipts:
             raise ValueError("rewind_v1_recovery_empty")
@@ -75,9 +93,47 @@ def recover(root, output, max_bytes):
             "last_sha256": receipts.get(LAST, {}).get("sha256")}
 
 
+def restore_expansion(archive, archive_sha256, output):
+    from scripts.archvis_pilot_bootstrap import extract_pinned_zip
+
+    output = Path(output).absolute()
+    parent = _local(output.parent, directory=True)
+    if output.exists() or output.is_symlink() or shutil.disk_usage(parent).free < RECOVERY_BYTES:
+        raise ValueError("rewind_v1_epoch_restore_destination")
+    with tempfile.TemporaryDirectory(dir=parent, prefix=".v1-epoch-restore-") as directory:
+        staged = Path(directory) / "training"
+        extract_pinned_zip(_local(archive), archive_sha256, staged, max_zip_bytes=RECOVERY_BYTES,
+                           max_output_bytes=RECOVERY_BYTES, max_members=20)
+        receipt_path = staged / "recovery_receipt.json"
+        receipt = read_json(_regular_read(receipt_path, MIB))
+        if receipt["schema"] != "rewind_v1_recovery_v1":
+            raise ValueError("rewind_v1_epoch_restore_receipt")
+        files = receipt["files"]
+        pin = files[LAST]["sha256"]
+        state = _read_checkpoint(staged / LAST, pin, MAX_CHECKPOINT_BYTES)
+        if state["binding"]["format"] != FORMAT or state["binding"]["input"].get("run_id") != RUN_ID:
+            raise ValueError("rewind_v1_epoch_restore_binding")
+        models = _model_receipts(state)
+        del state
+        if (set(files) - {LAST, REPORT, "launch_error.json"} != set(models)
+                or any(files[name] != item for name, item in models.items())
+                or {p.name for p in staged.iterdir()} != set(files) | {receipt_path.name}):
+            raise ValueError("rewind_v1_epoch_restore_members")
+        for name, item in files.items():
+            if name != item["name"]:
+                raise ValueError("rewind_v1_epoch_restore_name")
+            _check_part(staged / name, item)
+        receipt_path.unlink()
+        if output.exists() or output.is_symlink():
+            raise ValueError("rewind_v1_epoch_restore_destination")
+        staged.rename(output)
+    return {"output": str(output), "last_sha256": pin}
+
+
 def launch(args):
-    diagnostic = args.command == "diagnostic"
-    real_data = args.command in ("actual", "diagnostic")
+    expansion = args.command == "epoch-expansion"
+    diagnostic = args.command == "diagnostic" or expansion
+    real_data = args.command == "actual" or diagnostic
     device = torch.device(require_a100(args.device)["device"] if real_data else "cpu")
     if real_data and digest(_source()) != args.source_sha256:
         raise ValueError("rewind_v1_launch_source_pin")
@@ -86,12 +142,14 @@ def launch(args):
         raise ValueError("rewind_v1_launch_config_pin")
     cfg = validate_config(read_json(raw))
     if diagnostic:
-        validate_pilot(cfg)
+        (validate_expansion if expansion else validate_pilot)(cfg)
         torch.cuda.reset_peak_memory_stats(device)
-    budget = Budget(cfg["limits"])
+    budget = Budget(cfg["limits"], shutdown_reserve=120 if expansion else 0)
     output = Path(args.output).absolute()
     if real_data:
         paths = [args.cache, args.cache_local, args.diagnostic_bundle if diagnostic else args.review_dir]
+        if expansion:
+            paths.append(args.expansion_decision)
         if any(output.is_relative_to(Path(path).absolute()) or Path(path).absolute().is_relative_to(output)
                for path in paths if path is not None):
             raise ValueError("rewind_v1_launch_output_overlap")
@@ -101,7 +159,7 @@ def launch(args):
     output = _local(output, directory=True)
     seed_run(cfg["seed"])
     try:
-        data_type = {"actual": ActualData, "diagnostic": DiagnosticData}
+        data_type = {"actual": ActualData, "diagnostic": DiagnosticData, "epoch-expansion": ExpansionData}
         data = data_type[args.command](args, cfg, budget) if real_data else FixtureData()
         pipeline = Pipeline(cfg, args.config_sha256, data, device, output, budget)
     except BaseException as exc:
@@ -111,6 +169,8 @@ def launch(args):
                         "type": type(exc).__name__, "reason": str(exc)[:512]}
                 if diagnostic:
                     info.update(POLICY, run_kind="nominal_25fps_diagnostic", decision_sha256=args.decision_sha256)
+                if expansion:
+                    info.update(run_id=RUN_ID, expansion_decision_sha256=args.expansion_decision_sha256)
                 _atomic(output / "launch_error.json", canonical(info) + b"\n")
         raise
     report = pipeline.run(args.resume_sha256, args.stop_after_updates)
@@ -120,6 +180,8 @@ def launch(args):
     if diagnostic:
         result.update(run_kind="nominal_25fps_diagnostic", validation_reference_only=True,
                       time_basis=POLICY["time_basis"], decision_sha256=args.decision_sha256)
+    if expansion:
+        result.update(run_id=RUN_ID, expansion_decision_sha256=args.expansion_decision_sha256)
     return result
 
 
@@ -127,7 +189,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("source")
-    for name in ("synthetic", "actual", "diagnostic"):
+    for name in ("synthetic", "actual", "diagnostic", "epoch-expansion"):
         run = commands.add_parser(name)
         for arg in ("config", "output"):
             run.add_argument("--" + arg, type=Path, required=True)
@@ -141,17 +203,26 @@ def main(argv=None):
             for arg in ("selection-sha256", "cache-sha256", "source-sha256",
                         "evidence-sha256" if name == "actual" else "decision-sha256"):
                 run.add_argument("--" + arg, required=True)
-            run.add_argument("--cache-local", type=Path, required=name == "diagnostic")
+            run.add_argument("--cache-local", type=Path, required=name != "actual")
             run.add_argument("--device", default="cuda")
+        if name == "epoch-expansion":
+            run.add_argument("--expansion-decision", type=Path, required=True)
+            run.add_argument("--expansion-decision-sha256", required=True)
     rec = commands.add_parser("recover")
     rec.add_argument("--run", type=Path, required=True)
     rec.add_argument("--output", type=Path, required=True)
     rec.add_argument("--max-bytes", type=int, required=True)
+    restore = commands.add_parser("restore-epoch-expansion")
+    restore.add_argument("--archive", type=Path, required=True)
+    restore.add_argument("--archive-sha256", required=True)
+    restore.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "source":
         result = {"source_sha256": digest(_source())}
     elif args.command == "recover":
         result = recover(args.run, args.output, args.max_bytes)
+    elif args.command == "restore-epoch-expansion":
+        result = restore_expansion(args.archive, args.archive_sha256, args.output)
     else:
         result = launch(args)
     print(canonical(result).decode("utf-8"))

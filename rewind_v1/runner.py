@@ -21,6 +21,7 @@ from rewind_m1.training import restore_rng, rng_state, seed_run
 from rewind_m2.training import validate_config as validate_teacher
 from rewind_prepare.converter import sha
 from rewind_prepare.temporal_cache import _atomic, _hash_file, _locked
+from .expansion import MILESTONE_EPOCHS, RUN_ID
 from .frontend import frontend_fingerprint
 from .run_stages import CascadeStages, FrameStage, accumulate, evaluate_frontend, frame_batch, preserve_rng
 from .training import MAX_CHECKPOINT_BYTES, _source
@@ -67,12 +68,13 @@ def validate_config(config):
 
 
 class Budget:
-    def __init__(self, limits):
+    def __init__(self, limits, *, shutdown_reserve=0):
         self.limits = limits
         self.start = time.monotonic()
+        self.shutdown_reserve = shutdown_reserve
 
     def remaining(self):
-        remaining = self.limits["max_seconds"] - (time.monotonic() - self.start)
+        remaining = self.limits["max_seconds"] - self.shutdown_reserve - (time.monotonic() - self.start)
         if remaining <= 0:
             raise TimeoutError("rewind_v1_run_time_limit")
         return remaining
@@ -164,6 +166,9 @@ class Pipeline:
                                         "cuda_runtime": torch.version.cuda, "precision": "fp32", "threads": torch.get_num_threads()}}
         self.progress = {"stage": "frontend", "epoch": 0, "batch": 0, "updates": 0, "history": [],
                          "best": {}, "partial_loss_sums": {}}
+        self.epoch_expansion = data.identity.get("run_id") == RUN_ID
+        if self.epoch_expansion:
+            self.progress["milestones"] = {}
         self.last, self.cascade, self.frozen_body = None, None, None
         self.durable_progress = None
         self.timing = {}
@@ -205,17 +210,26 @@ class Pipeline:
         accumulate(self.timing, {"checkpoint_wall_seconds": time.monotonic()-start})
         self._report("running")
 
-    def _save_best(self, role, stage, metrics):
-        epoch = self.progress["epoch"]
+    def _save_epoch_model(self, role, stage, metrics):
+        epoch = self.progress["epoch"] + 1
         old = self.progress["best"].get(role)
-        if old is None or metrics["score"] < old["score"]:
-            start = time.monotonic()
-            name = f"best-{role}-e{epoch+1:03d}.pt"
-            pin = _publish(self.root / name, {"binding": self.binding, "stage": role, "epoch": epoch+1,
-                                            "score": metrics["score"], "model": stage.model.state_dict(),
-                                            "dependencies": self._dependencies(role)}, self.budget)
-            accumulate(self.timing, {"checkpoint_wall_seconds": time.monotonic()-start})
-            self.progress["best"][role] = {**pin, "score": metrics["score"], "epoch": epoch+1}
+        best = old is None or metrics["score"] < old["score"]
+        milestone = self.epoch_expansion and epoch in MILESTONE_EPOCHS
+        if not (best or milestone):
+            return
+        start = time.monotonic()
+        label = "best" if best else "milestone"
+        name = f"{label}-{role}-e{epoch:03d}.pt"
+        dependencies = self._dependencies(role)
+        pin = _publish(self.root / name, {"binding": self.binding, "stage": role, "epoch": epoch,
+                                         "score": metrics["score"], "model": stage.model.state_dict(),
+                                         "dependencies": dependencies}, self.budget)
+        accumulate(self.timing, {"checkpoint_wall_seconds": time.monotonic()-start})
+        pin.update(score=metrics["score"], epoch=epoch)
+        if best:
+            self.progress["best"][role] = pin
+        if milestone:
+            self.progress["milestones"].setdefault(role, {})[str(epoch)] = {**pin, "dependencies": dependencies}
 
     def _dependencies(self, role):
         return {stage: self.progress["best"][stage]["sha256"] for stage in STAGES[:STAGES.index(role)]}
@@ -292,6 +306,7 @@ class Pipeline:
                 return False
             self.budget.check()
             batch = p["batch"]
+            stage.measure_gradient = self.epoch_expansion and batch == 0
             start = time.monotonic()
             if role == "frontend":
                 tensors = frame_batch(self.data, order[batch*size:(batch+1)*size], "train", self.frontend_size,
@@ -310,11 +325,13 @@ class Pipeline:
         start = time.monotonic()
         with preserve_rng():
             if role == "frontend":
-                metrics = evaluate_frontend(stage, self.data, self.cfg["frontend"], self.budget, self.timing)
+                metrics = evaluate_frontend(stage, self.data, self.cfg["frontend"], self.budget, self.timing,
+                                            diagnostics=self.epoch_expansion)
             else:
-                metrics = self.cascade.evaluate(role, stage, self.budget, self.timing, self.frozen_body)
+                metrics = self.cascade.evaluate(role, stage, self.budget, self.timing, self.frozen_body,
+                                                diagnostics=self.epoch_expansion)
         accumulate(self.timing, {role + "_validation_wall_seconds": time.monotonic()-start})
-        self._save_best(role, stage, metrics)
+        self._save_epoch_model(role, stage, metrics)
         p["history"].append({"stage": role, "epoch": p["epoch"]+1, "updates": p["updates"],
                              "train_sums": p["partial_loss_sums"], "validation": metrics})
         p.update(epoch=p["epoch"]+1, batch=0, partial_loss_sums={})
@@ -365,6 +382,9 @@ class Pipeline:
                         return self._report("paused")
                 return self._report("completed")
             except BaseException as exc:
+                if self.epoch_expansion and self.last and isinstance(exc, TimeoutError) and str(exc) == "rewind_v1_run_time_limit":
+                    self.progress = copy.deepcopy(self.durable_progress)
+                    return self._report("paused", {"type": type(exc).__name__, "reason": str(exc)})
                 with suppress(BaseException):
                     self._report("stopped" if isinstance(exc, (TimeoutError, KeyboardInterrupt)) else "failed",
                                  {"type": type(exc).__name__, "reason": str(exc)[:512]})

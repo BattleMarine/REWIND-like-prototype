@@ -1,6 +1,7 @@
 """Frame pretraining and stage operations for the bounded v1 runner."""
 
 from contextlib import contextmanager
+import math
 import time
 
 import torch
@@ -13,7 +14,7 @@ from rewind_m3.cascade import UpperCondition
 from rewind_prepare.extracted import IMAGE_SIZE
 from .data import attach_predicted_hands, gt_upper_train, hand_clip
 from .frontend import PaperHeatmapFrontend
-from .training import TeacherRun
+from .training import TeacherRun, gradient_l2
 
 
 @contextmanager
@@ -33,6 +34,7 @@ class FrameStage:
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, cfg["scheduler_step"], cfg["scheduler_gamma"])
         self.scaler = torch.amp.GradScaler("cuda", enabled=False)
         self.runtime = {}
+        self.measure_gradient = False
 
     @contextmanager
     def measure(self, key):
@@ -63,10 +65,14 @@ class FrameStage:
         self.scaler.unscale_(self.optimizer)
         if any(p.grad is not None and not torch.isfinite(p.grad).all() for p in self.model.parameters()):
             raise ValueError("rewind_v1_frontend_nonfinite_gradient")
+        gradient = gradient_l2(self.model) if self.measure_gradient else None
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.scheduler.step()
-        return {"cross_entropy": float(loss.detach()), "supervised_joint_views": int(inside.sum())}
+        metrics = {"cross_entropy": float(loss.detach()), "supervised_joint_views": int(inside.sum())}
+        if gradient is not None:
+            metrics["first_update_gradient_l2"] = gradient
+        return metrics
 
 
 def _inside(xy, valid, size):
@@ -91,20 +97,30 @@ def frame_batch(data, keys, split, size, budget, timing):
 
 
 @torch.no_grad()
-def evaluate_frontend(stage, data, config, budget, timing):
+def evaluate_frontend(stage, data, config, budget, timing, *, diagnostics=False):
     stage.model.eval()
     size = config["size"]
     destination = IMAGE_SIZE if data.identity["data_kind"] == "dataset_sample" else size
     keys = data.frames["validation"]
-    sums = {}
+    sums, collapse = {}, {}
     for start in range(0, len(keys), config["batch_size"]):
         batch = frame_batch(data, keys[start:start+config["batch_size"]], "validation", size, budget, timing)
         with stage.measure("frontend_evaluation_input_transfer_wall_seconds"):
             images, xy, valid = (v.to(stage.device) for v in batch)
         with stage.measure("frontend_evaluation_compute_wall_seconds"):
-            _, pred, _ = stage.model(images)
+            logits, pred, _ = stage.model(images)
             inside = _inside(xy, valid, size)
             error = torch.linalg.vector_norm(scale_xy(pred - xy, size, destination), dim=-1)
+            if diagnostics and start < 32:
+                take = min(len(images), 32 - start)
+                logp = logits[:take].flatten(-2).log_softmax(-1)
+                entropy = -(logp.exp() * logp).sum(-1) / math.log(logp.shape[-1])
+                centered = pred[:take] - pred.new_tensor([(n-1)/2 for n in size])
+                center_distance = torch.linalg.vector_norm(scale_xy(centered, size, destination), dim=-1)
+                mask = inside[:take]
+                accumulate(collapse, {"joint_views": int(mask.sum()),
+                                      "entropy": float(entropy[mask].double().sum()),
+                                      "center_distance": float(center_distance[mask].double().sum())})
         accumulate(timing, stage.runtime, "frontend_evaluation_")
         if not torch.isfinite(error[inside]).all():
             raise ValueError("rewind_v1_frontend_validation_nonfinite")
@@ -112,8 +128,14 @@ def evaluate_frontend(stage, data, config, budget, timing):
                           "valid_count": int(valid.sum())})
     if not sums["inside_count"]:
         raise ValueError("rewind_v1_frontend_validation_no_inside_joints")
-    return {"score": sums["inside_error"] / sums["inside_count"], "unit": "native_px" if size != destination else "input_px",
-            "frames": len(keys), "inside_joint_views": sums["inside_count"], "valid_joint_views": sums["valid_count"]}
+    result = {"score": sums["inside_error"] / sums["inside_count"], "unit": "native_px" if size != destination else "input_px",
+              "frames": len(keys), "inside_joint_views": sums["inside_count"], "valid_joint_views": sums["valid_count"]}
+    if diagnostics:
+        count = int(collapse["joint_views"])
+        result["collapse_diagnostics"] = {"frames": min(len(keys), 32), "inside_joint_views": count,
+                                         "mean_normalized_heatmap_entropy": collapse["entropy"]/count if count else None,
+                                         "mean_predicted_center_distance_px": collapse["center_distance"]/count if count else None}
+    return result
 
 
 class CascadeStages:
@@ -129,9 +151,12 @@ class CascadeStages:
         self.body_validation = {}
         self.retained_bytes = feature_bytes
 
+    def _edges(self, names):
+        return [(names.index(a), names.index(b)) for a, b in self.spec["edges"] if a in names and b in names]
+
     def make(self, role, body_pin=None):
         names = self.body_names if role == "body" else self.fingers
-        edges = [(names.index(a), names.index(b)) for a, b in self.spec["edges"] if a in names and b in names]
+        edges = self._edges(names)
         kwargs = {} if role == "body" else dict(upper_joints=len(self.upper_idx), body_checkpoint_sha256=body_pin)
         return TeacherRun(self.cfg["teacher"], joints=len(names), edges=edges, source="predicted_2d",
                           input_sha256=self.input_sha256, device=self.device, **kwargs)
@@ -148,15 +173,19 @@ class CascadeStages:
                             for i in range(start, start + self.data.width)])[None]
 
     @torch.no_grad()
-    def evaluate(self, role, stage, budget, timing, frozen_body=None):
+    def evaluate(self, role, stage, budget, timing, frozen_body=None, *, diagnostics=False):
         stage.model.eval()
-        sums = {}
+        sums, collapse = {}, {}
+        if diagnostics:
+            edges = self._edges(self.body_names if role == "body" else self.fingers)
         for key, clip in self.clips["validation"].items():
             budget.check()
             body_clip = clip.select_joints(self.body_idx)
             if role == "body":
                 predicted = stage.predict(body_clip, self._noise(key, len(self.body_names), 100)).cpu()
                 self._errors(sums, "body", predicted, body_clip)
+                if diagnostics:
+                    accumulate(collapse, self._shape(predicted, body_clip, edges))
             else:
                 if key not in self.body_validation:
                     reserve = self.data.width * len(self.body_names) * 3 * 4
@@ -174,6 +203,8 @@ class CascadeStages:
                 local = hand_clip(clip, self.spec)
                 predicted = stage.predict(local, self._noise(key, len(self.fingers), 200), upper=upper).cpu()
                 self._errors(sums, "hand_local", predicted, local)
+                if diagnostics:
+                    accumulate(collapse, self._shape(predicted, local, edges))
                 self._errors(sums, "hand_global", attach_predicted_hands(body, predicted, self.spec),
                              clip.select_joints(self.finger_idx))
                 self._errors(sums, "frozen_body", body, body_clip)
@@ -184,10 +215,37 @@ class CascadeStages:
         score = metrics["body" if role == "body" else "hand_global"]["mpjpe_mm"]
         if score is None:
             raise ValueError("rewind_v1_teacher_validation_no_targets")
-        return {"score": score, "unit": "mm", "frames": len(self.clips["validation"]) * self.data.width,
-                "clips": len(self.clips["validation"]), "joint_metrics": metrics,
-                "upper_source": "predicted_frozen_body" if role == "hand" else None,
-                "body_checkpoint_sha256": frozen_body.checkpoint_sha256 if frozen_body else None}
+        result = {"score": score, "unit": "mm", "frames": len(self.clips["validation"]) * self.data.width,
+                  "clips": len(self.clips["validation"]), "joint_metrics": metrics,
+                  "upper_source": "predicted_frozen_body" if role == "hand" else None,
+                  "body_checkpoint_sha256": frozen_body.checkpoint_sha256 if frozen_body else None}
+        if diagnostics:
+            frames, bones = int(collapse["frames"]), int(collapse["bones"])
+            result["collapse_diagnostics"] = {
+                "scope": "body" if role == "body" else "wrist_relative_fingers_without_wrists",
+                "frames_with_two_valid_joints": frames, "valid_bone_instances": bones,
+                **{f"{label}_mean_joint_spread_mm": collapse[f"{label}_spread"]/frames if frames else None
+                   for label in ("predicted", "target")},
+                **{f"{label}_mean_bone_length_mm": collapse[f"{label}_bone"]/bones if bones else None
+                   for label in ("predicted", "target")}}
+        return result
+
+    @staticmethod
+    def _shape(predicted, clip, edges):
+        valid = clip.target_valid & clip.time_valid[..., None]
+        count = valid.sum(-1, keepdim=True)
+        frames = count[..., 0] >= 2
+        first, second = zip(*edges) if edges else ([], [])
+        bone_valid = valid[..., first] & valid[..., second]
+        result = {"frames": int(frames.sum()), "bones": int(bone_valid.sum())}
+        for label, points in (("predicted", predicted), ("target", clip.target_mm)):
+            center = torch.where(valid[..., None], points, 0.).sum(-2) / count.clamp_min(1)
+            square_distance = (points - center[..., None, :]).square().sum(-1)
+            spread = (torch.where(valid, square_distance, 0.).sum(-1) / count[..., 0].clamp_min(1)).sqrt()
+            length = (points[..., first, :] - points[..., second, :]).norm(dim=-1)
+            result[f"{label}_spread"] = float(spread[frames].double().sum())
+            result[f"{label}_bone"] = float(length[bone_valid].double().sum())
+        return result
 
     @staticmethod
     def _errors(sums, label, predicted, clip):
