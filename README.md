@@ -8,6 +8,8 @@
 
 2026-11-10 기준입니다.
 
+v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. Timestamp와 영상·motion 검토 근거가 남아 A100 학습은 보류 중입니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
+
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
 | M0 데이터 | ArchVis train1,000·validation2,236페어 준비 검사 완료, 추출본 로더 구현 | 실제 영상·원본 motion 정합과 독립 평가 검토 |

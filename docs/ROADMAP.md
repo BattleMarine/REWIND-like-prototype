@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-10 실제 감사 결과: Colab CPU에서 새 train1,000·validation2,236의 파일·카메라 수치 감사가 완료됐다. Timestamp는 발견되지 않았고 영상/원본 motion 검토가 남아 학습은 보류했다. Root가 회수96개 파일과 내부content pin을 확인했다. Raw cache65개 본문의 Drive 보존은 미확인이다. [결과·한계·다음 판단](V1_ACTUAL_001_RESULTS.md).
+
 2026-11-10 실제 시험 준비: 고정1,000 train·2,236 validation의 원본 사전검사·raw pack 재사용·카메라/시간/영상 검토 자료 생성과 결과 회수, 조건부 A100 학습 notebook을 준비했다. Root 관련20개 로컬 검사 통과. 실제 timestamp와 원본 motion 근거가 없으면 학습은 보류하며 수치 감사와 실제 학습 성공을 구분한다. [V1-ACTUAL-001 인계](V1_ACTUAL_TEST_HANDOFF.md).
 
 2026-11-10 실행 연결 구현: frontend 사전학습→고정 예측 특징→body→hand teacher의 epoch 학습·평가·저장/재개와 CLI·Colab 진입점을 추가했다. 동일 로컬 raw pack 재사용과 실제 A100/입력 근거 확인을 분리한다. 실제 데이터/GPU 학습 결과는 아직 없다. [실행·캐시·검증 범위](V1_TRAINING_RUNNER.md).
