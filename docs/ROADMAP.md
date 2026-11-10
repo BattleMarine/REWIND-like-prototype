@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-10 진단 실행 결과: A100에서 frontend/body/hand 각1epoch·540update가 완료됐다. 전체850.846초, body543.357mm·hand global551.690mm로 정확도는 낮다. Root가 회수 파일 해시와4개 checkpoint 로드·유한값을 확인했다. 명목25FPS·참고 validation 조건이며 엄격 정합 검증 완료나 M2/M3 전체 완료가 아니다. [결과·시간·다음 판단](V1_DIAGNOSTIC_001_RESULTS.md). 아래 미실행 표현은 당시 기록이다.
+
 2026-11-10 후속 사용자 승인: GT overlay89장 전체의 사용자 시각 검토 보고를 반영하고, 명목25FPS·validation 독립성 미확인을 명시한 별도1epoch 진단 학습을 준비한다. 고유 train1,000 유지, velocity/foot loss 미사용, 기존 엄격 검증 경로는 보존한다. [승인 범위](V1_ACTUAL_001_RESULTS.md#2026-11-10-후속-사용자-결정-별도-진단-학습). 실제 실행 전이다.
 
 2026-11-10 실제 감사 결과: Colab CPU에서 새 train1,000·validation2,236의 파일·카메라 수치 감사가 완료됐다. Timestamp는 발견되지 않았고 영상/원본 motion 검토가 남아 학습은 보류했다. Root가 회수96개 파일과 내부content pin을 확인했다. 후속 테스트 세션 보고로 raw cache65개와 metadata2개의 사용자 Drive 보관·복사 후 검증을 확인했다. 이후 고정 hash로 로컬 복원하며 학습 보류는 유지한다. [결과·한계·다음 판단](V1_ACTUAL_001_RESULTS.md).

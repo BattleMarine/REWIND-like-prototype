@@ -8,13 +8,13 @@
 
 2026-11-10 기준입니다.
 
-v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. 사용자가 GT overlay89장을 확인했으며, 실제 timestamp·motion 독립성 미확인을 명시한 별도 A100 진단 학습을 준비 중입니다. Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
+v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. 사용자가 GT overlay89장을 확인했으며, 실제 timestamp·motion 독립성 미확인을 명시한 별도 A100 진단 학습을 완료했습니다. Frontend/body/hand 각1epoch, 총540update·약14분11초이며 정확도 개선은 남아 있습니다. [진단 결과](docs/V1_DIAGNOSTIC_001_RESULTS.md). Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
 
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
 | M0 데이터 | ArchVis train1,000·validation2,236페어 준비 검사 완료, 추출본 로더 구현 | 실제 영상·원본 motion 정합과 독립 평가 검토 |
 | M1 비교 모델 | ArchVis1,000페어 v0 T4 20epoch 완료 | 손·관절 정확도 개선, 독립 평가·전체 확대 준비 |
-| M2·M3 teacher | Causal body diffusion·body–hand cascade 구현과 합성 검증 | 실제 데이터 학습과 성능 비교 |
+| M2·M3 teacher | Causal body diffusion·body–hand cascade 구현, 실제 A100 각1epoch 진단 | 정확도 개선·독립 평가·성능 비교 |
 | M4~M6 | Student 증류·개선 실험·통합 계획 | 후속 구현·평가 |
 | 이미지·동영상 | 저장된 진단 모델의 stereo 이미지 2D 추론·표시 | GT 없는 3D 결과 연결, 동영상 decoder·시간 정합·UI |
 
