@@ -46,3 +46,5 @@ Root는 ZIP2개의 CRC, receipt7개 항목의 크기/SHA, 고정 실행 소스·
 - Root 확인: `root_result_review.json`. 모델별 hash는 ZIP의 `recovery_receipt.json`과 `run.json`에 보존한다.
 
 이번 시험의 반복 실행은 필요하지 않다. 다음 개발 후보는 저장 모델의 고정 clip 예측 시각화와 입력 준비 최적화다. 추가 epoch·데이터 확대·새 사용자 시험은 별도 범위와 고정 실행본을 준비한 뒤 진행한다. 엄격 검증 경로의 미해결 근거와 M2/M3 전체 완료 조건은 유지한다.
+
+2026-11-10 후속: [중앙 집중·3D 붕괴 원인 검토](V1_COLLAPSE_DIAGNOSIS.md)에서 거의 균일한heatmap·teacher20회 update·raw3D뭉침을 확인했다. 단위/복원 오류는 확인되지 않았으나 구현 전체의 무결성을 뜻하지 않는다.
