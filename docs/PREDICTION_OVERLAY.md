@@ -1,5 +1,23 @@
 # 저장 모델의 RGB 관절 예측 표시
 
+## 2026-11-10 최신 v1 저장 모델 시각화
+
+`python -m scripts.visualize_archvis_v1`은 V1-DIAGNOSTIC-001의 고정 회수 ZIP·best frontend/body/hand를 검사하고 실제 RGB에서2D·3D 예측을 생성한다. 기존102페어 모델 도구는 별도로 보존한다. 추가 학습은 없다.
+
+로컬 Getting_Up__1_ frame1·10의 좌우 RGB·pose를 사용했다. 이 sequence는 v1 고정 train/validation 선택 밖이며 원본 motion 독립성까지 검증한 별도 평가 세트는 아니다. 두 프레임은 불연속이므로 각각T1로 초기화하고 애니메이션으로 연결하지 않았다. 50frame 문맥을 사용한 학습 평가 점수 재현 결과가 아니다.
+
+출력은 Git 제외 `outputs/archvis_v1_diagnostic_001/local_prediction_release/`의 `frame-000001.png`, `frame-000010.png`, `predictions.json`이다. 위 행은 모델2D, 가운데는GT2D, 아래 왼쪽은 모델3D·오른쪽은GT3D다. 몸은 주황색·손가락은 하늘색이며3D는 동일 투영·축척으로 비교하고 예측을 정답 위치에 맞춰 정렬하지 않는다.
+
+입력 RGB는 학습과 동일128px 전처리를 거친다. Body와hand는 예측2D 특징을 사용하며 hand 상체 조건도 예측body에서 가져온다. 카메라 외부파라미터는 pose JSON의 메타데이터에서 얻으며, 관절GT는 카메라 수치 감사와 비교 표시에 사용한다. RGB만으로 카메라까지 추정한 시스템이 아니다. 명목25FPS·미검증 실제 동기 조건을 유지한다.
+
+현재 그림에서2D 관절은 중앙에 집중되고3D 관절은 작은 영역에 뭉쳐 정상적인 인체 형태를 재현하지 못한다. 정답으로 대체하거나 보기 좋게 보정하지 않았다. 이번 시각화는 저장 모델의 실제 출력을 보여주며 성공적인 자세 추정 시연을 의미하지 않는다.
+
+실행 인자는 `--training`(고정 학습 회수 ZIP), `--audit`(고정 감사 ZIP), `--spec`(고정 LF spec), `--prepared`(보존 로컬 추출 묶음), `--sequence`, `--frames 1 10`, `--independent-frames`, `--output`(새 폴더)다. `--no-3d`는 frontend만 표시한다. 정확한 입력 해시와 출력 좌표는 결과JSON에 기록한다.
+
+Root가 실제 CPU CLI를 독립 재실행하여 두 프레임의2D·3D 좌표와confidence가 개발 실행과 정확히 일치함을 확인했다. 입력6파일의SHA 불변·PNG decode와 두 패널의 시각적 표시도 확인했다. 최종 비교 근거는 `outputs/archvis_v1_diagnostic_001/root_prediction_review/`에 있다.
+
+아래는 이전 모델과GT 표시 도구의 기록이다.
+
 2026-11-04 발표 자료 준비용으로 `scripts/predict_stereo_overlay.py`를 추가했다. 기존102쌍 진단 `StereoHeatmapNet` weights를 고정 SHA와 계약으로 확인하고 stereo PNG 한 쌍에서62개2D관절·confidence를 추론한다. 정답 입력·추가 학습·GT fallback은 없다. M2/M3 또는 학습 완료된 REWIND 전체 모델의 시연이 아니다.
 
 사용자가 요청한 `ArchVisInterior_ArchVis_RT/Day/rp_adanna_rigged_003_ue4/SKM_MenReadingGlasses_Shape_01/001/Joyful_Jump__16_`는 Drive 업로드 대기 후 사용자가 제공한 로컬 Downloads의 `json`·`fisheye_final_image`로 확인했다. 좌우 RGB 각57장과 pose57개, frame0~56의 파일 번호 대응·PNG1024×1024 RGB decode·JSON frame값(문자열)을 확인했다. 총139,403,456bytes이며 파일별SHA를 `outputs/joyful_jump_presentation_20261104/local_input_review/manifest.json`에 보존했다. 로컬 경로에 sequence 계층이 없어 해당 sequence 출처는 사용자 지정에 근거하며 timestamp·정밀정합 검증을 대신하지 않는다.
