@@ -181,6 +181,17 @@ class Pipeline:
                   "planned_updates": self.total, "timing_this_invocation": self.timing,
                   "elapsed_this_invocation_seconds": time.monotonic() - self.budget.start,
                   "cache_restore": getattr(self.data, "restore_metrics", None), "failure": failure}
+        if self.data.identity.get("run_kind") == "nominal_25fps_diagnostic":
+            report["frontend_no_supervision_batches"] = sum(
+                row["train_sums"].get("no_supervision_batches", 0) for row in self.progress["history"]
+                if row["stage"] == "frontend"
+            ) + (self.progress["partial_loss_sums"].get("no_supervision_batches", 0)
+                 if self.progress["stage"] == "frontend" else 0)
+            if self.device.type == "cuda":
+                report["gpu_peak_this_invocation"] = {
+                    "allocated_bytes": torch.cuda.max_memory_allocated(self.device),
+                    "reserved_bytes": torch.cuda.max_memory_reserved(self.device),
+                }
         payload = canonical(report) + b"\n"
         self.budget.storage(self.root, len(payload))
         _atomic(self.root / REPORT, payload)

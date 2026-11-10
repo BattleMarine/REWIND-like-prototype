@@ -138,6 +138,16 @@ def load_clip(cache, plan, sequence, start, *, split, selection_sha256, evidence
     """Read one reviewed clip wholly inside the train or fixed validation selection."""
     check_pin(plan, SELECTION_SCHEMA, selection_sha256)
     _checked_evidence(plan, evidence, evidence_sha256)
+    return _load_clip(cache, plan, sequence, start, split=split, selection_sha256=selection_sha256,
+                      context_sha256=evidence_sha256, time_context=lambda frames: reviewed_clip(
+                          evidence, sequence, frames, scale_mm),
+                      spec_path=spec_path, scale_mm=scale_mm, source=source, frontend=frontend,
+                      frontend_size=frontend_size, frontend_sha256=frontend_sha256, check_budget=check_budget)
+
+
+def _load_clip(cache, plan, sequence, start, *, split, selection_sha256, context_sha256, time_context,
+               spec_path, scale_mm, source, frontend, frontend_size, frontend_sha256, check_budget,
+               context_label="evidence"):
     if split not in ("train", "validation") or cache.manifest["selection_sha256"] != selection_sha256:
         raise ValueError("rewind_v1_clip_not_selected")
     if split == "train" and [sequence, start] not in plan["train_clip_starts"]:
@@ -163,10 +173,10 @@ def load_clip(cache, plan, sequence, start, *, split, selection_sha256, evidence
     ):
         raise ValueError("rewind_v1_clip_frontend_shape")
     input_sha256 = digest({"selection": selection_sha256, "cache": cache.manifest["content_sha256"],
-                           "evidence": evidence_sha256, "source": source, "scale_mm": scale_mm,
+                           context_label: context_sha256, "source": source, "scale_mm": scale_mm,
                            "frontend": ARCHITECTURE if frontend else None, "frontend_size": frontend_size,
                            "frontend_sha256": frontend_sha256, "preprocessing": "rgb_float_bilinear_align_corners_v1"})
-    cameras, seconds = reviewed_clip(evidence, sequence, frames, scale_mm)
+    cameras, seconds = time_context(frames)
     features, targets, masks, images = [], [], [], []
     timing = {"local_cache_read_wall_seconds": 0., "cpu_preprocess_wall_seconds": 0.}
     for index in frames:

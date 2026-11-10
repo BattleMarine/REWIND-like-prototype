@@ -36,8 +36,14 @@ Raw pack은65개, 합7,554,249,675bytes이며 cache content SHA는 `70241b27f665
 ## 남은 근거와 다음 판단
 
 1. **시간·stereo 동기:** 실제 timestamp가 없으며 명목 FPS는 적용하지 않았다. 동일 자료를 반복 감사해 timestamp가 생기지는 않는다. 공식 export 시간 규칙의 근거를 확보하거나, 명목 시간 기반 진단을 별도 가정으로 채택할지 판단해야 한다. 현재 recorded-timestamp 학습 gate는 바꾸지 않았다.
-2. **영상/pose·좌우 정합:** 89개 GT overlay의 시각 검토가 남아 있다. Root가 이번에 확인한 것은 파일 무결성과 보고서이며 전체 overlay를 검토해 승인한 것이 아니다.
+2. **영상/pose·좌우 정합:** 후속 사용자 검토에서89개 GT overlay 전체에 문제가 없다고 보고했다(테스트 세션 전달). 사용자 시각 검토 범위의 근거로 기록하며, root의 독립 전수 시각 검토나 모델 예측·실제 stereo 시간 동기 증거로 확대하지 않는다.
 3. **원본 motion 독립성:** Train20·validation30 sequence 모두 `declared_unverified`. Boxing/Cross Punch 이름 기반 후보2그룹이 있으나 동일 motion이라는 결론은 아니다. 정확히 같은 stereo+pose 바이트 묶음의 cross-split 중복0개도 원본 motion 독립성을 증명하지 않는다.
 4. **A100 학습:** 승인 묶음이 없어 미실행이다. 보존된 자료의 근거 검토 후, 검증된 실제 학습 또는 한계를 명시한 별도 진단 시험을 결정한다. 이번 결과를 이유로 1,000페어 규모·split·시간 가정·검증 gate를 자동 변경하지 않는다.
 
 이 결과는 [실제 시험 인계](V1_ACTUAL_TEST_HANDOFF.md)의 감사 단계에 해당한다. [전체 실행 연결](V1_TRAINING_RUNNER.md)의 A100 성능·속도·정확도는 아직 확인하지 않았다.
+
+## 2026-11-10 후속 사용자 결정: 별도 진단 학습
+
+사용자가 공식 명목25FPS를 가정하고 validation을 독립 성능의 증거가 아닌 참고 지표로 사용하는1epoch 진단 학습 준비를 명시 승인했다. [공식 UnrealEgo2 논문 §3](https://openaccess.thecvf.com/content/CVPR2024/papers/Akada_3D_Human_Pose_Perception_from_Egocentric_Stereo_Videos_CVPR_2024_paper.pdf)의 공개 검색 본문에서25FPS 렌더링 설명을 재확인했다. PDF 직접 열기는403으로 실패했으며 전체 PDF를 새로 열람했다고 기록하지 않는다. [공식 데이터 안내](https://unrealego.mpi-inf.mpg.de/)는 RGB·JSON frame index의 대응을 설명하지만 해당50개 sequence의 원본 motion 독립성 근거까지 확보한 것은 아니다.
+
+새 시험은 `V1-DIAGNOSTIC-001`로 분리한다. `derived_from_dataset_fps` 시간, frame-key 기반 stereo 대응 가정, 원본 motion 미확인, `validation_reference_only`를 명시한다. Train1,000·validation2,236, frontend/body/hand 각1epoch를 유지하고 velocity·foot loss는 사용하지 않는다. 기존 감사의 blocked 상태와 recorded-timestamp 엄격 검증 경로를 소급 변경하지 않는다. 승인된 것은 진단 시험 준비이며 아직 새 GPU 학습을 실행하지 않았다.

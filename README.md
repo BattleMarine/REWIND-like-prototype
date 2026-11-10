@@ -8,7 +8,7 @@
 
 2026-11-10 기준입니다.
 
-v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. Timestamp와 영상·motion 검토 근거가 남아 A100 학습은 보류 중입니다. Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
+v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. 사용자가 GT overlay89장을 확인했으며, 실제 timestamp·motion 독립성 미확인을 명시한 별도 A100 진단 학습을 준비 중입니다. Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
 
 | 항목 | 확인한 내용 | 남은 작업 |
 | --- | --- | --- |
@@ -42,10 +42,11 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 | Pose JSON 감사·관절·좌표 검토 | [M0 도구](docs/M0_JSON_TOOLS.md), [좌표계·학습 관절 검토](docs/COORDINATE_AND_TRAINING_REVIEW.md) |
 | 추출본 2D 학습·재개 준비 | [학습 계약](docs/ARCHVIS_DIRECT_RGB2D.md) · [Colab 인계](docs/ARCHVIS_COLAB_HANDOFF.md) · [준비 결과 복원](docs/ARCHVIS_PREPARED_RESTORE.md) — 복원 후1,000페어 GPU 진단 완료 |
 | 1,000페어 v0 2D 학습 | [모델·설정·저장/재개](docs/ARCHVIS_V0_TRAINING.md) — 20epoch 결과 검토 완료 |
-| v1 연속 구간·입력 묶음 준비 | [선택·병렬 준비·복원](docs/V1_INPUT_PREPARATION.md) — 로컬 검증, 실제 Drive 실행 전 |
+| v1 연속 구간·입력 묶음 준비 | [선택·병렬 준비·복원](docs/V1_INPUT_PREPARATION.md) — 실제 준비·감사 완료, Drive 보존 캐시 재사용 |
 | v1 논문 기반 teacher 후보 | [구조·검증·남은 연결](docs/V1_TEACHER_IMPLEMENTATION.md) — 합성 CPU 검증, 실제 학습 전 |
 | v1 frontend·teacher 전체 실행 | [학습·재개·캐시 가이드](docs/V1_TRAINING_RUNNER.md) · [Colab 진입점](notebooks/archvis_v1_pipeline.ipynb) — 실제 입력 근거와 고정 인계 필요 |
 | v1 실제 입력·A100 시험 | [고정 테스트 인계](docs/V1_ACTUAL_TEST_HANDOFF.md) — 입력 감사 후 근거 충족 시 학습 |
+| 명목25FPS v1 진단 학습 | [V1-DIAGNOSTIC-001](docs/V1_DIAGNOSTIC_001.md) — 사용자 승인 가정·참고 validation을 명시한 별도 시험 |
 | 실제 데이터 학습 준비 | [전체 학습 준비](docs/FULL_TRAINING_READINESS.md) — 지원 기능과 미완료 adapter 구분 |
 | 저장된 진단 모델의 예측·GT 표시 | [이미지 실행 안내](docs/PREDICTION_OVERLAY.md) — 두 결과를 별도로 생성 |
 | 데이터 없는 합성 학습·개발 검증 | [M1](docs/M1_BASELINE.md), [M2](docs/M2_BODY_TEACHER.md), [M3](docs/M3_WHOLE_BODY_TEACHER.md) |

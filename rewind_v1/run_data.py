@@ -44,7 +44,7 @@ class RunData:
             raise ValueError("rewind_v1_run_clip_coverage")
 
 
-class ActualData(RunData):
+class _CacheData(RunData):
     width = WINDOW_FRAMES
 
     def __init__(self, args, cfg, budget):
@@ -54,12 +54,6 @@ class ActualData(RunData):
         _checked_plan(self.plan, args.selection_sha256)
         if self.plan["validation_keys_sha256"] != VALIDATION:
             raise ValueError("rewind_v1_run_frozen_validation")
-        self.evidence = read_json(_regular_read(_local(args.evidence), MAX_MANIFEST_BYTES))
-        _checked_evidence(self.plan, self.evidence, args.evidence_sha256)
-        review = _local(args.review_dir, directory=True)
-        for key in REQUIRED_EVIDENCE:
-            if sha(_regular_read(_local(review / (key + ".json")), 4 * 1024**2)) != self.evidence["review_artifact_sha256"][key]:
-                raise ValueError("rewind_v1_run_review_pin:" + key)
         spec_raw = _regular_read(self.spec_path, 256 * 1024)
         if sha(spec_raw) != self.plan["spec_sha256"]:
             raise ValueError("rewind_v1_run_spec_pin")
@@ -71,10 +65,7 @@ class ActualData(RunData):
                           self.frames["validation"], seed=self.plan["seed"], width=self.width))}
         self._validate_membership()
         self.scale = cfg["teacher"]["target_scale_mm"]
-        for split in self.clips:
-            for sequence, start in self.clips[split]:
-                budget.check()
-                reviewed_clip(self.evidence, sequence, range(start, start + self.width), self.scale)
+        context_identity = self._time_identity(args)
         local_ready = args.cache_local is not None and (args.cache_local / MANIFEST).exists()
         self.cache = RawCache(args.cache_local if local_ready else args.cache, args.cache_sha256)
         manifest = self.cache.manifest
@@ -92,6 +83,7 @@ class ActualData(RunData):
                 for role in ROLES
             ):
                 raise ValueError("rewind_v1_run_cache_pair_pin")
+        self._check_cache(manifest)
         if args.cache_local and not local_ready:
             self.restore_metrics = restore(args.cache, expected_sha256=args.cache_sha256, output=args.cache_local,
                                            max_disk_bytes=cfg["limits"]["cache_restore_bytes"],
@@ -105,9 +97,11 @@ class ActualData(RunData):
             self.restore_metrics = {"mode": "use_existing_cache", "copied_bytes": 0,
                                     "verification_wall_seconds": time.monotonic()-start}
         self.identity = {"data_kind": "dataset_sample", "selection_sha256": args.selection_sha256,
-                         "cache_sha256": args.cache_sha256, "evidence_sha256": args.evidence_sha256,
-                         "spec_sha256": sha(spec_raw), "review_pins": self.evidence["review_artifact_sha256"],
-                         "cache_producer_sha256": manifest["producer_code_sha256"]}
+                         "cache_sha256": args.cache_sha256, "spec_sha256": sha(spec_raw),
+                         "cache_producer_sha256": manifest["producer_code_sha256"], **context_identity}
+
+    def _check_cache(self, manifest):
+        pass
 
     def frame(self, key, split, size):
         start = time.monotonic()
@@ -118,6 +112,21 @@ class ActualData(RunData):
         xy, valid = zip(*(_field(field, 2) for field in fields[:2]))
         inputs = frame_image(raw, size), scale_xy(torch.stack(xy), IMAGE_SIZE, size), torch.stack(valid)
         return inputs, {"local_cache_read_wall_seconds": read, "cpu_preprocess_wall_seconds": time.monotonic()-start}
+
+
+class ActualData(_CacheData):
+    def _time_identity(self, args):
+        self.evidence = read_json(_regular_read(_local(args.evidence), MAX_MANIFEST_BYTES))
+        _checked_evidence(self.plan, self.evidence, args.evidence_sha256)
+        review = _local(args.review_dir, directory=True)
+        for key in REQUIRED_EVIDENCE:
+            if sha(_regular_read(_local(review / (key + ".json")), 4 * 1024**2)) != self.evidence["review_artifact_sha256"][key]:
+                raise ValueError("rewind_v1_run_review_pin:" + key)
+        for split in self.clips:
+            for sequence, start in self.clips[split]:
+                self.budget.check()
+                reviewed_clip(self.evidence, sequence, range(start, start + self.width), self.scale)
+        return {"evidence_sha256": args.evidence_sha256, "review_pins": self.evidence["review_artifact_sha256"]}
 
     def clip(self, key, split, frontend, size, pin):
         return load_clip(self.cache, self.plan, *key, split=split, selection_sha256=self.identity["selection_sha256"],

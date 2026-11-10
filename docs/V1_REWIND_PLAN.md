@@ -1,5 +1,7 @@
 # v1: 1,000페어에서 REWIND 구조 재현
 
+2026-11-10 후속 사용자 승인: GT overlay89장 전체의 사용자 시각 검토 보고를 반영하고, 명목25FPS·validation 독립성 미확인을 명시한 별도1epoch 진단 학습을 준비한다. 고유 train1,000 유지, velocity/foot loss 미사용, 기존 엄격 검증 경로는 보존한다. [승인 범위](V1_ACTUAL_001_RESULTS.md#2026-11-10-후속-사용자-결정-별도-진단-학습). 실제 실행 전이다.
+
 2026-11-10 실제 감사 결과: Colab CPU에서 새 train1,000·validation2,236의 파일·카메라 수치 감사가 완료됐다. Timestamp는 발견되지 않았고 영상/원본 motion 검토가 남아 학습은 보류했다. Root가 회수96개 파일과 내부content pin을 확인했다. 후속 테스트 세션 보고로 raw cache65개와 metadata2개의 사용자 Drive 보관·복사 후 검증을 확인했다. 이후 고정 hash로 로컬 복원하며 학습 보류는 유지한다. [결과·한계·다음 판단](V1_ACTUAL_001_RESULTS.md).
 
 2026-11-10 실제 시험 준비: 고정1,000 train·2,236 validation의 원본 사전검사·raw pack 재사용·카메라/시간/영상 검토 자료 생성과 결과 회수, 조건부 A100 학습 notebook을 준비했다. Root 관련20개 로컬 검사 통과. 실제 timestamp와 원본 motion 근거가 없으면 학습은 보류하며 수치 감사와 실제 학습 성공을 구분한다. [V1-ACTUAL-001 인계](V1_ACTUAL_TEST_HANDOFF.md).
