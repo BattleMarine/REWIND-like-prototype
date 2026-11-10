@@ -29,13 +29,15 @@ Raw pack은65개, 합7,554,249,675bytes이며 cache content SHA는 `70241b27f665
 
 원본 읽기 예약 추정은7,550,764,961bytes, 감사 로컬 읽기 예약량은15,105,014,701bytes다. 후자는 pack hash와 member 재읽기를 포함하며 Drive 실제 네트워크 전송량이 아니다.
 
-사용자 Drive 영구 보존은 아직 확인되지 않았다. 테스트 세션에 런타임 삭제·전환 전 `/content/archvis_v1_fixed/cache/`의 manifest·진행 기록과65개 part를 사용자 주도로 보존하도록 안내를 요청했다. 제안 위치는 `reports/v1_actual_001/raw_cache/`이며 업로드 완료·원격 무결성을 확인한 상태가 아니다.
+2026-11-10 후속 보관 보고: 사용자가 Drive의 `REWIND-like prototype/reports/v1_actual_001/raw_cache/`에 보관했다. 테스트 세션은 복사 후 읽기 검증 출력에서 `part-0000.zip`~`part-0064.zip` 65개와 `cache_manifest.json`, `progress.json` 검증 완료를 확인했고, 별도 Drive 목록에서도67개 파일과 part 합계7,554,249,675bytes를 확인했다고 보고했다. Cache content SHA는 위 고정값과 같다. 이 보관 확인의 근거는 테스트 세션 보고이며, root가 Drive의7.55GB 본문을 다시 읽어 독립 검증한 것은 아니다.
+
+후속 실행은 이 폴더를 고정 cache SHA로 지정해 Colab 로컬 디스크로 복원한다. 복원 시 manifest·part hash를 다시 확인하고 동일한 로컬 보존본이 있으면 재사용한다. 원본 이미지·pose에서 pack을 다시 만들 필요는 없지만, 새 런타임의 묶음 전송·로컬 검증 비용은 발생한다. 시간·영상·원본 motion 검토와 학습 gate는 캐시 보존과 별개로 유지한다.
 
 ## 남은 근거와 다음 판단
 
 1. **시간·stereo 동기:** 실제 timestamp가 없으며 명목 FPS는 적용하지 않았다. 동일 자료를 반복 감사해 timestamp가 생기지는 않는다. 공식 export 시간 규칙의 근거를 확보하거나, 명목 시간 기반 진단을 별도 가정으로 채택할지 판단해야 한다. 현재 recorded-timestamp 학습 gate는 바꾸지 않았다.
 2. **영상/pose·좌우 정합:** 89개 GT overlay의 시각 검토가 남아 있다. Root가 이번에 확인한 것은 파일 무결성과 보고서이며 전체 overlay를 검토해 승인한 것이 아니다.
 3. **원본 motion 독립성:** Train20·validation30 sequence 모두 `declared_unverified`. Boxing/Cross Punch 이름 기반 후보2그룹이 있으나 동일 motion이라는 결론은 아니다. 정확히 같은 stereo+pose 바이트 묶음의 cross-split 중복0개도 원본 motion 독립성을 증명하지 않는다.
-4. **A100 학습:** 승인 묶음이 없어 미실행이다. 자료 보존과 근거 검토 후, 검증된 실제 학습 또는 한계를 명시한 별도 진단 시험을 결정한다. 이번 결과를 이유로 1,000페어 규모·split·시간 가정·검증 gate를 자동 변경하지 않는다.
+4. **A100 학습:** 승인 묶음이 없어 미실행이다. 보존된 자료의 근거 검토 후, 검증된 실제 학습 또는 한계를 명시한 별도 진단 시험을 결정한다. 이번 결과를 이유로 1,000페어 규모·split·시간 가정·검증 gate를 자동 변경하지 않는다.
 
 이 결과는 [실제 시험 인계](V1_ACTUAL_TEST_HANDOFF.md)의 감사 단계에 해당한다. [전체 실행 연결](V1_TRAINING_RUNNER.md)의 A100 성능·속도·정확도는 아직 확인하지 않았다.
