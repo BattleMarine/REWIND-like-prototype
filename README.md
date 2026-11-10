@@ -8,6 +8,8 @@
 
 2026-11-10 기준입니다.
 
+v1.1 동일 조건 재실행을 준비하며, 종료 후 결과 ZIP의 Drive 보관·해시 확인을 보완합니다. [재실행 준비](docs/V11_RERUN_PREPARATION.md).
+
 v1.1 동일1,000페어의 각10epoch 실행은 완료 로그를 확보했습니다. 2D 오차는205.27px로 줄었으나3D 형태 축소는 남았으며 모델 ZIP 다운로드 실패로 checkpoint는 미확보입니다. [결과와 복원 한계](docs/V11_EPOCH_EXPANSION_RESULTS.md).
 
 v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. 사용자가 GT overlay89장을 확인했으며, 실제 timestamp·motion 독립성 미확인을 명시한 별도 A100 진단 학습을 완료했습니다. Frontend/body/hand 각1epoch, 총540update·약14분11초이며 정확도 개선은 남아 있습니다. [진단 결과](docs/V1_DIAGNOSTIC_001_RESULTS.md). Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
