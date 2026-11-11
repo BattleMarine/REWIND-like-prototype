@@ -59,3 +59,21 @@ Journal22,400,111bytes, binding `e485c8dc60a5b62f58cccdfa22c822f2dd92ff82ebfc2f1
 이번 실제 실행의 재사용·전진은 확인했다. Root의 검토는 회수 증거와 로컬 복원이며 현재 Drive 본문을 새로 읽거나 실시간 metadata를 검사한 것은 아니다. 완료 당시 hash와 재개 시 path/size/mtime 대조의 한계는 유지한다.
 
 동일 폴더 `root_review.py/json`, `root_restore_stdout.txt`, `RESTART_HANDOFF.md`에 근거와 다음1회재개 인계를 저장했다. 새 WORK에 이번 ZIP을 복원하고 pairs_reused=12419에서 전진하는지 확인한다. 기존6시간/65GiB/RAM3GiB와 저장 상한을 유지하며 자동 반복·새 preflight·구9678카운트 병합은 하지 않는다.
+
+## 2026-11-12 전체 파일 감사 완료
+
+고정 e94c64d의 마지막 호출은 full_file_audit_complete로 종료했다. 기존12,419페어를 재사용하고10,705페어를 추가하여 train20,888·validation2,236, 총23,124페어를 완료했다. 이전 고정3,236페어의 파일 identity도 대조됐다. 사전 고정 제외 중복키1개는 유지했으며 누락 공식sequence·불완전페어·목록상 누락은 없었다. 이는 고정 ArchVis 범위의 완료이지 UnrealEgo2 전체 데이터 감사가 아니다.
+
+회수 위치는 `outputs/restart_20261111/v12_resume_release/user_test/completed_003/`다. reports.zip은10,114,342bytes, SHA256 `30c46b8d3259d9a48eae7f4b94465a5563e3ad6bf4fb74b6b88ef546da8e4c2f`이고 Drive receipt는 verified/phase_reports다. Root가 CRC와 내부13개 파일의 크기/SHA, 외부 receipt와 journal binding을 확인했다.
+
+Root는 이전12,419행 journal이 새 journal의 바이트 prefix와 일치함을 확인했다. 고정 source/input ZIP의 restore-audit CLI로23,124개 전체 chain/order/geometry/motion/split/prior hash 검증을 수행했다. 최종 manifest의 모든 record가 journal record와 정확히 일치하고 train/validation 수·미완료 가드가 유지됨을 별도 확인했다. Root가 현재 Drive의 원본 본문을 다시 읽은 것은 아니다. 독립 검토는 같은 폴더 root_review.py/json과 root_restore_stdout.txt에 보존했다.
+
+최종 `verified/manifest.json`은24,179,570bytes, content SHA256 `fc78e2a43e3b178f8b86abbe64c6221755ed4aa5bb309ea13e34d8cc08cb8877`다. Content SHA와 파일 바이트 SHA는 구분한다. Journal은41,703,418bytes·23,124행, last `9c04bab9c12f9bf366c50c485cb8b41c2c550f95545db7f6fbdf7cd53e1445fa`이며 미확정 tail은0이다.
+
+기하 검사는 항목별4,023,576개이며 최대 projection 잔차는약0.00008997px다. 이는 annotation 좌표와 카메라 projection 수치의 일관성으로 모델 예측 오차가 아니다. RGB에서 관절을 제대로 인식한다는 시각 검증이나 실제 stereo 시간 동기 검증을 대체하지 않는다. 단위는 기존 채택한 metric anchor 추론 근거를 유지한다.
+
+마지막 호출16,796.443초(약4시간39분56초), 앞선 두 invocation의 저장된7,636.519초·11,564.517초와 합하면35,997.479초(약599.96분)다. 저장 경계가 다른 계측의 근사 합이며 사전검사·재연결 대기·백업을 포함한 전체 소요시간이 아니다. 누적 관측 read54,429,931,608bytes는 첫 중단 호출의 하한을 포함한다. 마지막 호출 peak RSS339,800,064bytes다.
+
+재개 시 완료 본문은 다시 hash하지 않고 고정 경로·size·mtime를 대조했다. 같은 메타데이터를 유지한 내용 변경을 검출하지 못할 수 있으며 단일 시점 원자적 snapshot 증명도 아니다. 실제 timestamp·stereo 동기·원본 motion 독립성은 미검증이다. train_ready=false, temporal_ready=false를 유지한다.
+
+전체 파일 감사의 추가 재실행은 필요하지 않다. 이 결과를 v1.2 입력 근거로 보존하고, short/tail mask·전체 coverage를 포함한 학습 로더와 캐시 준비 및 고정 학습/평가 인계를 후속 검토한다. 현재 학습이 완료됐거나 모델 성능이 개선됐다는 뜻은 아니다. v1.4 한 클립 진단은 별도 개발 범위로 계속한다.
