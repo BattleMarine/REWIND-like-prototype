@@ -31,6 +31,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from contextlib import suppress
 
 UPLOADS = Path("/content")
@@ -162,13 +163,40 @@ else:
 '''
     audit = '''
 RUN_PAYLOAD_AUDIT = False
-SOURCE_PLAN_SHA256 = ""
+SOURCE_PLAN_SHA256 = globals().get("RESTORED_SOURCE_PLAN_SHA256", "")
+RESUME_AUDIT = bool(globals().get("RESTORED_SOURCE_PLAN_SHA256", ""))
 if RUN_PAYLOAD_AUDIT:
     if WORK is None or not re.fullmatch(r"[0-9a-f]{64}", SOURCE_PLAN_SHA256):
         raise ValueError("v12_reviewed_source_plan_pin_required")
-    tracked_phase("audit", WORK, DATA_ARGS + ["--source-plan-sha256", SOURCE_PLAN_SHA256])
+    arguments = DATA_ARGS + ["--source-plan-sha256", SOURCE_PLAN_SHA256]
+    if RESUME_AUDIT:
+        arguments += ["--resume"]
+    tracked_phase("audit", WORK, arguments)
 else:
     print("목록 검사 보고와 실제 읽기 예산을 확인한 뒤 source_plan_sha256을 입력합니다.")
+'''
+    restore = '''
+RUN_RESTORE = False
+RESUME_ARCHIVE = ""
+RESUME_ARCHIVE_SHA256 = ""
+RESUME_SOURCE_PLAN_SHA256 = ""
+if RUN_RESTORE:
+    if not RGB_ROOT or not POSE_ROOT or not all(re.fullmatch(r"[0-9a-f]{64}", pin) for pin in
+                                               (RESUME_ARCHIVE_SHA256, RESUME_SOURCE_PLAN_SHA256)):
+        raise ValueError("v12_restore_roots_and_pins_required")
+    if MOUNT_DRIVE:
+        from google.colab import drive
+        drive.mount("/content/drive")
+    restored_work = BASE / ("attempt-" + uuid.uuid4().hex)
+    command = [sys.executable, "-m", "rewind_prepare.full_archvis", "restore-audit", "--work", str(restored_work),
+               "--inputs", str(INPUTS), "--archive", RESUME_ARCHIVE, "--archive-sha256", RESUME_ARCHIVE_SHA256,
+               "--snapshot-sha256", PINS["snapshot_sha256"], "--source-plan-sha256", RESUME_SOURCE_PLAN_SHA256]
+    subprocess.run(command, cwd=SOURCE, timeout=TIMEOUTS["recover"]+30, check=True)
+    WORK = restored_work
+    RESTORED_SOURCE_PLAN_SHA256 = RESUME_SOURCE_PLAN_SHA256
+    DATA_ARGS = ["--inputs", str(INPUTS), "--rgb-root", RGB_ROOT, "--pose-root", POSE_ROOT,
+                 "--snapshot-sha256", PINS["snapshot_sha256"]]
+    print(f"복원 경로 {WORK}. 다음 감사 셀에서 RESUME_AUDIT를 확인합니다.")
 '''
     recover = '''
 RUN_RECOVERY = False
@@ -205,10 +233,15 @@ if RUN_RECOVERY:
 보관 작업의 내부 상한은 각각600초이며 외부 호출 상한은630초입니다. 브라우저 다운로드 기본값은False입니다.
 보관에 실패하면 로컬 ZIP을 유지합니다. 마지막 셀에 표시된 ZIP 경로를 넣어 새 attempt로 재시도할 수 있습니다.
 VM 자체가 종료되면 finally를 실행할 수 없습니다. 이미 실행 중인 기존 노트북에는 이번 저장 기능이 소급 적용되지 않습니다.
-실패한 작업에는 이어읽기 지점이 없으므로 결과를 먼저 보관합니다. 검토 이후 새 작업 경로를 사용합니다.
+완료 페어는 매번 journal과 head에 확정합니다. 같은 런타임에서는 감사 셀의 RESUME_AUDIT를 True로 지정해 이어갑니다.
+새 런타임은 복원 셀에 회수 ZIP·ZIP SHA·기존 source_plan SHA를 입력합니다. journal이 없는 구버전 카운트 전용 ZIP은 재개할 수 없습니다.
+재개는 완료 원본의 path·size·mtime_ns를 대조하고 미완료 페어부터 내용을 읽습니다. 완료 SHA는 과거 내용 검사 당시의 증거입니다.
+같은 크기와 mtime을 보존한 내용 변경까지 메타데이터로 검출하지는 못합니다. 마지막 전체 메타데이터 대조도6시간 상한에 포함됩니다.
+VM 강제 종료 전 로컬에만 확정된 기록은 유실될 수 있습니다. 재개는 사용자가 다음 호출을 실행하며 무한 자동 반복하지 않습니다.
 """),
         _cell("code", "bootstrap", bootstrap),
         _cell("code", "metadata-preflight", preflight),
+        _cell("code", "restore-audit", restore),
         _cell("code", "payload-audit", audit),
         _cell("code", "recover-reports", recover),
     ]
@@ -230,6 +263,8 @@ def build(args):
                                         max_members=3000, revision=args.revision)
         if not (source / "scripts/v12_recovery.py").is_file():
             raise ValueError("v12_backup_source_missing")
+        if not (source / "rewind_prepare/full_audit_journal.py").is_file():
+            raise ValueError("v12_audit_resume_source_missing")
         input_pin = extract_pinned_zip(args.input_zip, INPUT_ZIP, inputs, max_zip_bytes=16*MIB,
                                        max_output_bytes=32*MIB, max_members=64)
         command = [sys.executable, "-m", "rewind_prepare.full_archvis", "plan", "--inputs", str(inputs),

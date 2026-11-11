@@ -6,7 +6,9 @@ from contextlib import suppress
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 import time
+import uuid
 import zipfile
 
 from rewind_archive.contracts import canonical, digest
@@ -19,8 +21,9 @@ from .extracted import (
     _Budget, _inventory, _local, prepare_extracted_t1,
 )
 from .spec import validate_spec
-from .temporal_cache import _atomic, _locked
+from .temporal_cache import _atomic, _check_part, _locked
 from .temporal_selection import BLOCKERS, CLIP, check_pin, seal
+from .full_audit_journal import HEAD, MAX_BYTES as JOURNAL_LIMIT, PairJournal, binding as journal_binding
 
 
 ENVIRONMENT = "ArchVisInterior_ArchVis_RT"
@@ -37,7 +40,7 @@ FREE_RESERVE = 1024 * MIB
 RECOVERY_FILES = ("snapshot.json", "coverage.json", "preflight.json", "source_plan.json",
                   "inventory_check.json", "audit_inventory_check.json", "preflight_status.json",
                   "audit_status.json", "notebook_status.json",
-                  "verified/manifest.json")
+                  "verified/manifest.json", "audit_resume/head.json", "audit_resume/pairs.jsonl", "restore_status.json")
 
 
 def _read(path, maximum=MAX_MANIFEST_BYTES):
@@ -254,7 +257,8 @@ def _observe(work, status_path, status, snapshot, prior, started):
             status["current_file"] = {"key": detail["key"], "role": detail["role"], "path": detail["path"]}
         else:
             _verify_prior(detail["record"], prior)
-        status.update({name: detail[name] for name in ("read_bytes", "pairs_verified", "pairs_total")})
+        status.update({name: detail[name] for name in ("read_bytes", "pairs_verified", "pairs_total",
+                                                     "pairs_reused", "pairs_read_this_invocation") if name in detail})
         if event == "pair" and (detail["pairs_verified"] == 1 or detail["pairs_verified"] % 250 == 0):
             status["elapsed_seconds"] = round(time.monotonic() - started, 3)
             _write(status_path, status)
@@ -274,7 +278,10 @@ def run_phase(args):
     work = _local(work, directory=True)
     with _locked(work):
         status_path = work / (args.action + "_status.json")
-        if status_path.exists():
+        resume = args.action == "audit" and getattr(args, "resume", False)
+        if resume and not (work / "audit_resume" / HEAD).is_file():
+            raise ValueError("v12_resume_records_missing_legacy_counts_not_supported")
+        if (status_path.exists() or (args.action == "audit" and (work / "audit_resume").exists())) and not resume:
             raise ValueError("v12_phase_already_attempted_use_new_work")
         started = time.monotonic()
         status = {"status": "started", "phase": args.action, "train_ready": False, "temporal_ready": False}
@@ -290,7 +297,7 @@ def run_phase(args):
             if args.action == "plan":
                 status.update(status="inventory_only", coverage_sha256=coverage["content_sha256"])
             else:
-                pending = work / ".pending_audit"
+                pending = work / (".pending_audit-" + uuid.uuid4().hex)
                 kwargs = _run_kwargs(args.inputs, snapshot, args.rgb_root, args.pose_root, pending)
                 kwargs["on_progress"] = _observe(work, status_path, status, snapshot, prior, started)
                 if args.action == "preflight":
@@ -301,19 +308,40 @@ def run_phase(args):
                     status.update(status=report["status"], preflight_sha256=report["content_sha256"],
                                   source_plan_sha256=plan["content_sha256"])
                 else:
-                    if (work / "verified").exists() or (work / "verified").is_symlink():
+                    published = work / "verified"
+                    if (published.exists() or published.is_symlink()) and not resume:
                         raise ValueError("v12_verified_manifest_already_exists")
                     plan = read_json(_read(work / "source_plan.json"))
                     check_pin(plan, SOURCE_PLAN, args.source_plan_sha256)
                     report = _stat_report(plan, snapshot, prior, work)
                     if report["blockers"]:
                         raise ValueError("v12_payload_preflight_blocked")
+                    used = sum(_local(path).stat().st_size for path in work.rglob("*") if path.is_file())
+                    reserve = JOURNAL_LIMIT + MAX_MANIFEST_BYTES + 4 * MIB
+                    if used + reserve > REPORT_LIMIT:
+                        raise ValueError("v12_audit_report_budget_restore_into_new_work_required")
                     status["source_plan_sha256"] = args.source_plan_sha256
                     _write(status_path, status)
-                    manifest = prepare_extracted_t1(**kwargs, limits=AUDIT_LIMITS,
-                                                    expected_plan_sha256=args.source_plan_sha256)
+                    journal = PairJournal(work / "audit_resume", journal_binding(plan, snapshot),
+                                          lambda row: _verify_prior(row, prior))
+                    try:
+                        manifest = prepare_extracted_t1(**kwargs, limits=AUDIT_LIMITS,
+                                                       expected_plan_sha256=args.source_plan_sha256,
+                                                       audit_journal=journal, publish_manifest=not published.exists())
+                    finally:
+                        if journal.head is not None:
+                            status["durable_audit"] = journal.summary()
                     _verified_manifest(manifest, snapshot, prior)
-                    pending.rename(work / "verified")
+                    if published.exists():
+                        existing = read_json(_read(published / "manifest.json"))
+                        check_pin(existing, SCHEMA, existing.get("content_sha256"))
+                        _verified_manifest(existing, snapshot, prior)
+                        if existing["records"] != manifest["records"]:
+                            raise ValueError("v12_published_manifest_journal_mismatch")
+                        manifest = existing
+                        status["finalized_existing_manifest"] = True
+                    else:
+                        pending.rename(published)
                     status.pop("current_file", None)
                     status.update(status="full_file_audit_complete", manifest_sha256=manifest["content_sha256"],
                                   prior_pinned_pairs_verified=len(prior), file_audit=manifest["audit"])
@@ -340,6 +368,16 @@ def recover(work, output):
         paths = [(name, work / name) for name in RECOVERY_FILES if (work / name).is_file()]
         if not paths or sum(_local(path).stat().st_size for _, path in paths) > REPORT_LIMIT // 2:
             raise ValueError("v12_recovery_budget")
+        resume_pin = None
+        if (work / "audit_resume" / HEAD).is_file():
+            plan = read_json(_read(work / "source_plan.json"))
+            snapshot = read_json(_read(work / "snapshot.json"))
+            check_pin(plan, SOURCE_PLAN, plan.get("content_sha256"))
+            check_pin(snapshot, SNAPSHOT, snapshot.get("content_sha256"))
+            journal = PairJournal(work / "audit_resume", journal_binding(plan, snapshot), lambda row: None)
+            journal.load(plan)
+            resume_pin = {"binding_sha256": digest(journal.binding), "count": journal.head["count"],
+                          "bytes": journal.head["bytes"], "last_sha256": journal.head["last_sha256"]}
         created = False
         try:
             with output.open("xb") as handle:
@@ -347,11 +385,13 @@ def recover(work, output):
                 with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                     entries = {}
                     for name, path in paths:
-                        raw = _read(path)
+                        raw = (b"" if name == "audit_resume/pairs.jsonl" and path.stat().st_size == 0
+                               else _read(path, REPORT_LIMIT // 2))
                         archive.writestr(name, raw)
                         entries[name] = {"bytes": len(raw), "sha256": sha(raw)}
                     archive.writestr("recovery_receipt.json", canonical(seal({
                         "schema": "archvis_v12_preparation_recovery_v1", "files": entries,
+                        "audit_resume": resume_pin,
                         "train_ready": False, "temporal_ready": False,
                     })) + b"\n")
                 if handle.tell() > REPORT_LIMIT // 2:
@@ -362,6 +402,55 @@ def recover(work, output):
                     output.unlink()
             raise
     print(sha(_read(output, REPORT_LIMIT // 2)))
+    return 0
+
+
+def restore_audit(args):
+    from scripts.archvis_pilot_bootstrap import extract_pinned_zip
+
+    output = _local(args.work.parent, directory=True) / args.work.name
+    if output.exists() or output.is_symlink() or shutil.disk_usage(output.parent).free < REPORT_LIMIT + FREE_RESERVE:
+        raise ValueError("v12_restore_fresh_work_and_free_space_required")
+    with tempfile.TemporaryDirectory(dir=output.parent, prefix=".v12-restore-") as directory:
+        staged = Path(directory) / "work"
+        extract_pinned_zip(_local(args.archive), args.archive_sha256, staged,
+                           max_zip_bytes=REPORT_LIMIT // 2, max_output_bytes=REPORT_LIMIT // 2, max_members=32)
+        receipt = read_json(_read(staged / "recovery_receipt.json", MIB))
+        check_pin(receipt, "archvis_v12_preparation_recovery_v1", receipt.get("content_sha256"))
+        actual = {path.relative_to(staged).as_posix() for path in staged.rglob("*") if path.is_file()}
+        if (actual != set(receipt["files"]) | {"recovery_receipt.json"}
+                or not set(receipt["files"]) <= set(RECOVERY_FILES)):
+            raise ValueError("v12_restore_recovery_members")
+        for name, item in receipt["files"].items():
+            _check_part(staged / name, {"bytes": item["bytes"], "sha256": item["sha256"]})
+        if not receipt.get("audit_resume") or not (staged / "audit_resume" / HEAD).is_file():
+            raise ValueError("v12_resume_records_missing_legacy_counts_not_supported")
+        snapshot, _, prior = frozen_snapshot(args.inputs)
+        if args.snapshot_sha256 != snapshot["content_sha256"]:
+            raise ValueError("v12_expected_snapshot_pin")
+        saved_snapshot = read_json(_read(staged / "snapshot.json"))
+        if canonical(saved_snapshot) != canonical(snapshot):
+            raise ValueError("v12_restore_snapshot_changed")
+        plan = read_json(_read(staged / "source_plan.json"))
+        check_pin(plan, SOURCE_PLAN, args.source_plan_sha256)
+        if _stat_report(plan, snapshot, prior, staged)["blockers"]:
+            raise ValueError("v12_restore_source_plan_scope")
+        owners = {sequence: split for split, keys in snapshot["keys"].items() for sequence, _ in keys}
+        motions = motion_entries(read_json(_read(args.inputs / "motion_map.json")), set(owners), owners)
+        journal = PairJournal(staged / "audit_resume", journal_binding(plan, snapshot), lambda row: _verify_prior(row, prior))
+        journal.load(plan, motions)
+        expected = {"binding_sha256": digest(journal.binding), "count": journal.head["count"],
+                    "bytes": journal.head["bytes"], "last_sha256": journal.head["last_sha256"]}
+        if receipt["audit_resume"] != expected:
+            raise ValueError("v12_restore_journal_receipt")
+        summary = journal.summary()
+        _write(staged / "restore_status.json", seal({"schema": "archvis_v12_audit_restore_v1",
+               "archive_sha256": args.archive_sha256, "source_plan_sha256": args.source_plan_sha256,
+               "snapshot_sha256": args.snapshot_sha256, "journal": summary,
+               "live_source_metadata_checked": False, "live_source_content_rehashed": False}))
+        staged.rename(output)
+    print(canonical({"work": str(output), "committed_pairs": summary["committed_pairs"],
+                     "source_plan_sha256": args.source_plan_sha256}).decode())
     return 0
 
 
@@ -381,13 +470,23 @@ def main():
             sub.add_argument("--snapshot-sha256", required=True)
         if action == "audit":
             sub.add_argument("--source-plan-sha256", required=True)
+            sub.add_argument("--resume", action="store_true")
+    restore = commands.add_parser("restore-audit")
+    for name in ("work", "inputs", "archive"):
+        restore.add_argument("--"+name, type=Path, required=True)
+    for name in ("archive-sha256", "snapshot-sha256", "source-plan-sha256"):
+        restore.add_argument("--"+name, required=True)
     args = parser.parse_args()
     if sys.platform == "linux" and args.action in ("preflight", "audit"):
         import resource
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         cap = 3 * 1024 * MIB
         resource.setrlimit(resource.RLIMIT_AS, (min(cap, soft) if soft != resource.RLIM_INFINITY else cap, hard))
-    return recover(args.work, args.output) if args.action == "recover" else run_phase(args)
+    if args.action == "recover":
+        return recover(args.work, args.output)
+    if args.action == "restore-audit":
+        return restore_audit(args)
+    return run_phase(args)
 
 
 if __name__ == "__main__":

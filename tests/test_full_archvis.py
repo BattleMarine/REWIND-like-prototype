@@ -39,7 +39,7 @@ class FullArchVisTests(unittest.TestCase):
                                    for name, values in self.keys.items() for seq in (values[0][0],)],
                      "duplicates": []}
         (inputs / "inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
-        self.snapshot = seal({"keys": self.keys, "dataset_version": "direct_fixture", "excluded_duplicates": [],
+        self.snapshot = seal({"schema": full.SNAPSHOT, "keys": self.keys, "dataset_version": "direct_fixture", "excluded_duplicates": [],
                               "inventory_sha256": sha((inputs / "inventory.json").read_bytes())})
         prior = self.fixture.prepare("prior", train_limit=1)
         prior = {(row["sequence_id"], row["frame_index"]): row for row in prior["records"]}

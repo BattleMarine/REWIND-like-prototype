@@ -147,6 +147,7 @@ class V12RecoveryTests(TestCase):
         namespace["recovery_child"].assert_not_called()
         with patch("subprocess.run") as child, redirect_stdout(io.StringIO()):
             exec(cells["metadata-preflight"], {})
+            exec(cells["restore-audit"], {})
             exec(cells["payload-audit"], {})
             exec(cells["recover-reports"], {})
             child.assert_not_called()

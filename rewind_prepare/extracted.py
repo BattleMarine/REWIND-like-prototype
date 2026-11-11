@@ -2,6 +2,7 @@
 
 import argparse
 from collections import Counter, defaultdict
+from contextlib import nullcontext
 import copy
 from dataclasses import asdict, dataclass
 import os
@@ -12,7 +13,7 @@ import time
 from rewind_archive.contracts import PreparationError, canonical, digest
 from rewind_archive.matching import identify
 from rewind_data.audit import read_json
-from rewind_m1.local_rgb import _hash, _no_link, _path, _regular_read, decode_rgb_payload
+from rewind_m1.local_rgb import _hash, _no_link, _path, _regular_read, _signature, decode_rgb_payload
 from .converter import motion_entries, normalize_pose_fields, official_splits, sha, validate_pose_geometry
 from .provenance import revision_identity
 from .spec import validate_spec
@@ -196,7 +197,8 @@ def _code_identity():
 def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, split_dir,
                          motion_map, spec_path, calibration_path, output_dir, limits,
                          train_limit=1000, seed=0, inventory=None, inventory_sha256=None,
-                         plan_only=False, expected_plan_sha256=None, on_progress=None):
+                         plan_only=False, expected_plan_sha256=None, on_progress=None, audit_journal=None,
+                         publish_manifest=True):
     """Plan from metadata or audit selected payloads and publish a pinned manifest."""
 
     if "/" in _path(environment) or not isinstance(dataset_version, str) or not dataset_version.strip() or len(dataset_version) > 128:
@@ -205,6 +207,8 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
             or type(seed) is not int or not 0 <= seed < 2**64):
         raise ValueError("extracted_selection")
     budget = _Budget(limits)
+    if audit_journal is not None and (plan_only or expected_plan_sha256 is None):
+        raise ValueError("extracted_journal_requires_fixed_plan_audit")
     roots = {"rgb": _local(rgb_root, directory=True), "pose": _local(pose_root, directory=True)}
     output = _local(Path(output_dir).parent, directory=True) / Path(output_dir).name
     if output.exists() or output.is_symlink() or any(output.is_relative_to(root) for root in roots.values()):
@@ -246,6 +250,7 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
         train = sorted(sorted(train, key=lambda key: (digest([seed, *key]), key))[:train_limit])
     selected = train + validation
     plan = None
+    observations = {}
     if plan_only or expected_plan_sha256 is not None:
         sizes = {}
         counts = Counter()
@@ -261,6 +266,8 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
                 if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= maximum:
                     raise ValueError("extracted_planned_file_size")
                 sizes[sequence, frame, role] = info.st_size
+                if audit_journal is not None:
+                    observations[sequence, frame, role] = {"size_bytes": info.st_size, "mtime_ns": info.st_mtime_ns}
                 payload_bytes[owners[sequence]] += info.st_size
         body = {"schema": "direct_extracted_selection_plan_v1", "dataset_version": dataset_version,
                 "environment": environment, "roots": {k: str(v) for k, v in roots.items()},
@@ -282,45 +289,9 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
         if plan["content_sha256"] != expected_plan_sha256:
             raise ValueError("extracted_selection_plan_changed")
 
-    from PIL import Image
-
-    records, exact_payloads = [], {}
-    residual_max, residual_counts = {}, Counter()
-    for sequence, frame in selected:
-        payloads = {}
-        for role in ROLES:
-            relative = indexed[sequence, frame][role]
-            root = roots["pose" if role == "pose" else "rgb"]
-            if on_progress is not None:
-                on_progress("file", key=(sequence, frame), role=role, path=relative,
-                            read_bytes=budget.bytes, pairs_verified=len(records), pairs_total=len(selected))
-            raw = budget.read(_payload_path(root, relative),
-                              spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES,
-                              sizes[sequence, frame, role] if plan is not None else None)
-            payloads[role] = {"path": relative, "size_bytes": len(raw), "sha256": sha(raw)}
-            if role == "pose":
-                doc = _raw_pose(raw, frame)
-                residuals = defaultdict(list)
-                validate_pose_geometry(doc, spec, calibration, residuals)
-                if not residuals["projection_px"]:
-                    raise ValueError("extracted_pose_no_reprojection")
-                _pose_targets(doc, spec)
-                for name, values in residuals.items():
-                    if values:
-                        residual_max[name] = max(residual_max.get(name, 0.0), max(values))
-                        residual_counts[name] += len(values)
-            else:
-                decode_rgb_payload(raw, IMAGE_SIZE, 1024**2, Image)
-            budget.check()
-        split = owners[sequence]
-        signature = tuple(payloads[role]["sha256"] for role in ROLES)
-        if exact_payloads.setdefault(signature, split) != split:
-            raise ValueError("extracted_triplet_content_split_overlap")
-        records.append({"sequence_id": sequence, "frame_index": frame, "split": split,
-                        "motion_id": motions[sequence]["motion_id"], "files": payloads})
-        if on_progress is not None:
-            on_progress("pair", record=records[-1], read_bytes=budget.bytes,
-                        pairs_verified=len(records), pairs_total=len(selected))
+    records, residual_max, residual_counts, reused = _audit_pairs(
+        selected, indexed, roots, owners, motions, spec, calibration, plan, budget, on_progress,
+        audit_journal, observations)
 
     body = {
         "schema": SCHEMA, "source_kind": "direct_extracted_files", "dataset_version": dataset_version,
@@ -353,17 +324,97 @@ def prepare_extracted_t1(rgb_root, pose_root, *, environment, dataset_version, s
     }
     if plan is not None:
         body["provenance"]["selection_plan_sha256"] = plan["content_sha256"]
+    if audit_journal is not None:
+        body["audit"].update(pairs_reused=reused, pairs_content_read_this_invocation=len(records)-reused,
+                             resume=audit_journal.summary())
     manifest = {**body, "content_sha256": digest(body)}
     encoded = canonical(manifest) + b"\n"
     budget.check()
     if len(encoded) > MAX_MANIFEST_BYTES:
         raise ValueError("extracted_manifest_size")
+    if not publish_manifest:
+        return manifest
     output.mkdir()
     pending = output / "manifest.json.partial"
     with pending.open("xb") as handle:
         handle.write(encoded)
     pending.replace(output / "manifest.json")
     return manifest
+
+
+def _audit_pairs(selected, indexed, roots, owners, motions, spec, calibration, plan, budget, progress,
+                 journal, observations):
+    from PIL import Image
+
+    session = journal.session(plan, motions, observations, budget) if journal is not None else nullcontext([])
+    records, exact_payloads = [], {}
+    residual_max, residual_counts = {}, Counter()
+    with session as reused_entries:
+        reused = len(reused_entries)
+        for ordinal, (sequence, frame) in enumerate(selected):
+            budget.check()
+            maxima, counts = {}, Counter()
+            if ordinal < reused:
+                entry = reused_entries[ordinal]
+                row = entry["record"]
+                maxima, counts = entry["geometry_max"], Counter(entry["geometry_counts"])
+            else:
+                payloads, observed = {}, {}
+                planned_sizes = {r: size for r, _, size in plan["selection"][ordinal][3]} if plan else {}
+                for role in ROLES:
+                    relative = indexed[sequence, frame][role]
+                    root = roots["pose" if role == "pose" else "rgb"]
+                    path = _payload_path(root, relative)
+                    before = _no_link(path) if journal is not None else None
+                    if progress is not None:
+                        progress("file", key=(sequence, frame), role=role, path=relative,
+                                 read_bytes=budget.bytes, pairs_verified=len(records), pairs_total=len(selected),
+                                 pairs_reused=reused, pairs_read_this_invocation=len(records)-reused)
+                    raw = budget.read(path, spec["limits"]["max_file_bytes"] if role == "pose" else MAX_FILE_BYTES,
+                                      planned_sizes.get(role))
+                    payloads[role] = {"path": relative, "size_bytes": len(raw), "sha256": sha(raw)}
+                    if role == "pose":
+                        doc = _raw_pose(raw, frame)
+                        residuals = defaultdict(list)
+                        validate_pose_geometry(doc, spec, calibration, residuals)
+                        if not residuals["projection_px"]:
+                            raise ValueError("extracted_pose_no_reprojection")
+                        _pose_targets(doc, spec)
+                        for name, values in residuals.items():
+                            if values:
+                                maxima[name], counts[name] = max(values), len(values)
+                    else:
+                        decode_rgb_payload(raw, IMAGE_SIZE, 1024**2, Image)
+                    if journal is not None:
+                        after = _no_link(path)
+                        if _signature(before) != _signature(after):
+                            raise ValueError("extracted_source_changed_during_audit")
+                        observed[role] = {"size_bytes": after.st_size, "mtime_ns": after.st_mtime_ns}
+                    budget.check()
+                row = {"sequence_id": sequence, "frame_index": frame, "split": owners[sequence],
+                       "motion_id": motions[sequence]["motion_id"], "files": payloads}
+            signature = tuple(row["files"][role]["sha256"] for role in ROLES)
+            if exact_payloads.setdefault(signature, row["split"]) != row["split"]:
+                raise ValueError("extracted_triplet_content_split_overlap")
+            if journal is not None and ordinal >= reused:
+                journal.append(row, observed, maxima, counts, budget)
+            records.append(row)
+            for name, value in maxima.items():
+                residual_max[name] = max(residual_max.get(name, 0.), value)
+                residual_counts[name] += counts[name]
+            if progress is not None:
+                progress("pair", record=row, read_bytes=budget.bytes, pairs_verified=len(records),
+                         pairs_total=len(selected), pairs_reused=reused,
+                         pairs_read_this_invocation=max(0, len(records)-reused))
+        if journal is not None:
+            for entry in journal.entries:
+                for role, expected in entry["observations"].items():
+                    budget.check()
+                    item = entry["record"]["files"][role]
+                    info = _no_link(_payload_path(roots["pose" if role == "pose" else "rgb"], item["path"]))
+                    if {"size_bytes": info.st_size, "mtime_ns": info.st_mtime_ns} != expected:
+                        raise ValueError("extracted_completed_source_metadata_changed_at_finalize")
+    return records, residual_max, residual_counts, reused
 
 
 class ExtractedStereoT1:

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 
 from rewind_archive.contracts import canonical
 from rewind_m1.local_rgb import _hash, _regular_read
@@ -76,8 +77,12 @@ def package(base, work, context_path):
     size = archive.stat().st_size
     if not _hash(pin) or not 0 < size <= ARCHIVE_LIMIT:
         raise ValueError("v12_backup_archive_pin")
+    with zipfile.ZipFile(archive) as bundle:
+        if bundle.getinfo("recovery_receipt.json").file_size > MIB:
+            raise ValueError("v12_backup_recovery_receipt_size")
+        audit_resume = json.loads(bundle.read("recovery_receipt.json")).get("audit_resume")
     receipt = {"schema": SCHEMA, "archive": archive.name, "kind": "phase_reports",
-               "bytes": size, "sha256": pin, "context": context}
+               "bytes": size, "sha256": pin, "context": context, "audit_resume": audit_resume}
     _atomic(local / "local_receipt.json", canonical(receipt) + b"\n")
     return {**receipt, "local_zip": str(archive)}
 
