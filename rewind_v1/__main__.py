@@ -16,7 +16,7 @@ from rewind_m1.training import seed_run
 from rewind_prepare.converter import sha
 from rewind_prepare.extracted import _local
 from rewind_prepare.temporal_cache import _atomic, _check_part, _hash_file, _locked
-from .device import require_a100
+from .device import require_cuda_training
 from .diagnostic import DiagnosticData, POLICY, validate_pilot
 from .expansion import ExpansionData, MILESTONE_EPOCHS, RECOVERY_BYTES, RUN_ID, validate_expansion
 from .run_data import ActualData, FixtureData
@@ -134,7 +134,7 @@ def launch(args):
     expansion = args.command == "epoch-expansion"
     diagnostic = args.command == "diagnostic" or expansion
     real_data = args.command == "actual" or diagnostic
-    device = torch.device(require_a100(args.device)["device"] if real_data else "cpu")
+    device = torch.device(require_cuda_training(args.device)["device"] if real_data else "cpu")
     if real_data and digest(_source()) != args.source_sha256:
         raise ValueError("rewind_v1_launch_source_pin")
     raw = _regular_read(_local(args.config), 256*1024)

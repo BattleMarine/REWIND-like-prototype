@@ -19,7 +19,7 @@ from rewind_v1.data import (
     Clip, EVIDENCE_SCHEMA, REQUIRED_EVIDENCE, _checked_evidence, attach_predicted_hands, gt_upper_train, hand_clip,
     load_clip,
 )
-from rewind_v1.device import require_a100
+from rewind_v1.device import require_a100, require_cuda_training
 from rewind_v1.frontend import PaperHeatmapFrontend, frontend_fingerprint, predicted_features
 from rewind_v1.teacher import motion_losses
 from rewind_v1.training import TeacherRun
@@ -221,15 +221,30 @@ class RewindV1Tests(unittest.TestCase):
         predicted = attach_predicted_hands(target[..., :2, :] + 10, local.target_mm, spec)
         self.assertEqual(predicted.tolist(), [[[[15., 17., 19.], [14., 15., 16.]]]])
 
-    def test_a100_device_and_missing_real_evidence(self):
+    def test_cuda_training_and_a100_benchmark_devices(self):
         reports = []
         with patch("torch.cuda.is_available", return_value=True), patch("torch.cuda.current_device", return_value=1):
-            with patch("torch.cuda.get_device_properties", return_value=SimpleNamespace(name="Tesla T4", total_memory=16)):
-                with self.assertRaisesRegex(RuntimeError, "a100_required"):
-                    require_a100(report=reports.append)
+            for name in ("Tesla T4", "NVIDIA GeForce RTX 4090", "NVIDIA L4"):
+                with self.subTest(name=name), patch("torch.cuda.get_device_properties", return_value=SimpleNamespace(name=name, total_memory=16)) as props:
+                    self.assertEqual(require_cuda_training(report=reports.append),
+                                     {"device": "cuda:1", "gpu_name": name, "vram_bytes": 16})
+                    props.assert_called_with(1)
+                    self.assertEqual(require_cuda_training("cuda:0", report=reports.append)["device"], "cuda:0")
+                    props.assert_called_with(0)
+                    with self.assertRaisesRegex(RuntimeError, "a100_required"):
+                        require_a100(report=reports.append)
             with patch("torch.cuda.get_device_properties", return_value=SimpleNamespace(name="NVIDIA A100-SXM4-40GB", total_memory=40)):
                 self.assertEqual(require_a100(report=reports.append)["device"], "cuda:1")
         self.assertIn("Tesla T4", reports[0])
         self.assertIn("vram_bytes", reports[0])
+        with patch("torch.cuda.is_available", return_value=False), patch("torch.cuda.get_device_properties") as props:
+            with self.assertRaisesRegex(RuntimeError, "cuda_required"):
+                require_cuda_training(report=reports.append)
+            props.assert_not_called()
+        self.assertIn('"cuda_available": false', reports[-1])
+        with self.assertRaisesRegex(ValueError, "training_requires_cuda"):
+            require_cuda_training("cpu")
+
+    def test_missing_real_evidence(self):
         with self.assertRaisesRegex(ValueError, "timestamp_and_stereo_sync"):
             _checked_evidence({}, None, None)

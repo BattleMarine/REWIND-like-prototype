@@ -103,7 +103,7 @@ if RUN_EPOCH_EXPANSION:
         command += ["--resume-sha256", RESUME_SHA256]
     try:
         tracked_child("training", [sys.executable, "-m", "rewind_v1.device"],
-                      timeout=60, phase="a100_preflight")
+                      timeout=60, phase="cuda_preflight")
         tracked_child("training", command, timeout=PINS["training_hard_seconds"], phase="same_1000_pairs_epoch_expansion")
     finally:
         training_failed = sys.exc_info()[0] is not None
@@ -124,7 +124,7 @@ if RUN_RECOVERY:
     save_recovery(prepare_recovery(MOUNT_RECOVERY_DRIVE), RECOVERY_LOCAL_ZIP, BROWSER_DOWNLOAD)
 '''
     guide = f"""# {RUN_ID} 재실행
-고정 소스·입력·기존 진단 근거 ZIP을 /content에 올립니다. A100에서 동일한 train 1,000페어를 처음부터 단계별 10epoch 학습합니다.
+고정 소스·입력·기존 진단 근거 ZIP을 /content에 올립니다. CUDA GPU에서 동일한 train 1,000페어를 처음부터 단계별 10epoch 학습합니다.
 기존 Drive raw cache를 로컬에 재사용합니다. 명목 25FPS 가정과 참고용 validation 표시는 기존 진단과 같습니다.
 단계별 epoch 1·5·10 모델과 재개용 last.pt를 별도로 보존합니다. 각 모델의 앞 단계 의존성은 checkpoint와 run.json에서 확인합니다.
 학습 호출 상한은 2시간입니다. RUN을 켜면 먼저 Drive 결과 폴더의 쓰기를 확인합니다.
@@ -158,7 +158,7 @@ RESUME_SHA256 = ""
 
 if RUN_DIAGNOSTIC:
     tracked_child("training", [sys.executable, "-m", "rewind_v1.device"],
-                  timeout=60, phase="a100_preflight")
+                  timeout=60, phase="cuda_preflight")
     if MOUNT_DRIVE:
         from google.colab import drive
         drive.mount("/content/drive")
@@ -197,7 +197,7 @@ if RUN_RECOVERY:
             print(f"{name}: {type(exc).__name__}: {exc}")
 '''
     cells = [_cell("markdown", "guide", """# V1-DIAGNOSTIC-001
-고정 소스 ZIP, 입력 ZIP, 진단 근거 ZIP을 /content에 올립니다. 학습은 A100에서만 시작합니다.
+고정 소스 ZIP, 입력 ZIP, 진단 근거 ZIP을 /content에 올립니다. 학습은 CUDA GPU에서 시작합니다. 실제 GPU 이름과 VRAM을 기록합니다.
 Drive의 보존 raw cache를 로컬 SSD로 복원하며 원본 추출 RGB·pose 재읽기나 감사 재실행은 없습니다.
 시간은 frame index ÷ 25라는 명목 가정입니다. 시간과 stereo 동기는 측정 검증되지 않았습니다.
 원본 motion 독립성은 미확인이고 공식 validation 수치는 참고 지표입니다.

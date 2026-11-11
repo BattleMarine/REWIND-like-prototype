@@ -139,7 +139,7 @@ elif RUN_TRAINING:
         cache_arg = command.index("--cache") + 1
         command[cache_arg] = RETAINED_CACHE
         command += ["--cache-local", str(WORK / "cache")]
-    tracked_child("training", command, timeout=PINS["training_hard_seconds"], phase="a100_pilot")
+    tracked_child("training", command, timeout=PINS["training_hard_seconds"], phase="cuda_pilot")
 '''
     recover = '''
 RUN_RECOVERY = False
@@ -168,7 +168,7 @@ if RUN_RECOVERY:
 고정 소스와 입력 ZIP을 /content에 올립니다. 준비 단계는 CPU로도 실행할 수 있습니다.
 Python의 PyTorch·Pillow·psutil이 필요합니다. 의존성이 없으면 인계 환경을 확인합니다.
 고정 선택은 train 1,000페어와 공식 validation 2,236페어입니다. Raw cache가 있으면 고정 해시로 복원합니다.
-시간 후보 필드, 카메라 검산, GT 오버레이, motion 비교는 검토용 근거입니다. 학습은 별도 고정 승인 묶음과 A100이 필요합니다.
+시간 후보 필드, 카메라 검산, GT 오버레이, motion 비교는 검토용 근거입니다. 학습은 별도 고정 승인 묶음과 CUDA GPU가 필요합니다. 실제 GPU 이름과 VRAM을 기록합니다.
 정상 차단·오류·중단 뒤에도 마지막 셀에서 보고를 회수합니다. Raw pack 파일은 결과 ZIP에 포함되지 않습니다.
 기존 회수 ZIP은 보존하고 새 회수에는 번호를 붙입니다.
 """), _cell("code", "bootstrap", bootstrap), _cell("code", "prepare", prep),

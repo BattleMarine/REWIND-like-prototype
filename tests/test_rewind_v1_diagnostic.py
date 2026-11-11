@@ -1,6 +1,7 @@
 import io
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -9,7 +10,7 @@ import torch
 from rewind_archive.contracts import canonical
 from rewind_prepare.temporal_selection import seal
 from rewind_v1 import audit, diagnostic
-from rewind_v1.__main__ import main
+from rewind_v1.__main__ import launch, main
 from rewind_v1.runner import Pipeline
 from scripts.build_archvis_v1_diagnostic import notebook_document
 
@@ -105,16 +106,16 @@ class DiagnosticTests(TestCase):
             with self.assertRaisesRegex(ValueError, "resume_binding"):
                 pipeline._resume("b"*64)
 
-    def test_a100_guard_and_default_notebook_no_launch(self):
+    def test_cuda_guard_and_default_notebook_no_launch(self):
         args = ["diagnostic"]
         for name in ("output", "config", "selection", "spec", "cache", "cache-local", "diagnostic-bundle",
                      "config-sha256", "selection-sha256", "cache-sha256", "source-sha256", "decision-sha256"):
             args += ["--"+name, "missing"]
         with (
-            patch("rewind_v1.__main__.require_a100", side_effect=RuntimeError("A100 required")),
+            patch("rewind_v1.__main__.require_cuda_training", side_effect=RuntimeError("CUDA required")),
             patch("rewind_v1.__main__._regular_read") as read,
         ):
-            with self.assertRaisesRegex(RuntimeError, "A100 required"):
+            with self.assertRaisesRegex(RuntimeError, "CUDA required"):
                 main(args)
             read.assert_not_called()
         cells = {cell["id"]: "".join(cell["source"]) for cell in notebook_document({})["cells"]}
@@ -122,3 +123,18 @@ class DiagnosticTests(TestCase):
             exec(cells["diagnostic"], {})
             exec(cells["recover"], {})
             child.assert_not_called()
+
+    def test_all_real_training_commands_accept_t4_then_enforce_source_pin(self):
+        for command in ("actual", "diagnostic", "epoch-expansion"):
+            with (
+                self.subTest(command=command),
+                patch("torch.cuda.is_available", return_value=True),
+                patch("torch.cuda.current_device", return_value=0),
+                patch("torch.cuda.get_device_properties", return_value=SimpleNamespace(name="Tesla T4", total_memory=16*1024**3)),
+                patch("rewind_v1.__main__._source", return_value={}),
+                patch("rewind_v1.__main__._regular_read") as read,
+                patch("sys.stdout", new_callable=io.StringIO),
+            ):
+                with self.assertRaisesRegex(ValueError, "launch_source_pin"):
+                    launch(SimpleNamespace(command=command, device="cuda", source_sha256="invalid"))
+                read.assert_not_called()

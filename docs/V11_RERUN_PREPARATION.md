@@ -6,7 +6,7 @@
 
 동일 train1,000페어, frontend/body/hand 각각10epoch, 총5,400update를 유지한다. 기존 config의 seed71·FP32·batch2·frontend LR1e-4·teacher LR5e-5·모델 구조를 변경하지 않는다. Frontend validation2,236 및 teacher validation29clip/1,450frame도 유지한다. 명목25FPS·frame-key stereo 대응과 원본 motion 독립성 미확인에 따른 참고 지표 조건은 같다. 기존1epoch/10epoch 실행과 결과를 분리한다.
 
-A100을 실제 확인한 후 시작한다. 학습 호출2시간, cooperative 종료 여유120초, run2GiB·회수 ZIP1GiB 등 기존 학습 상한을 유지한다. 이전 실제 경과88분31초는 참고치이며 이번 완료 시간을 보장하지 않는다. 입력 raw cache는 사용자 Drive의 기존 보존본을 검증해 재사용하고 캐시 업로드를 자동 수행하지 않는다.
+2026-11-11 사용자 결정에 따라 학습의 A100 이름 제한을 제거한다. 지원되는 CUDA GPU(T4·RTX 등)를 확인하고 장치명·VRAM을 기록한 후 시작한다. A100은 추후 추론 레이턴시 비교 조건으로 분리한다. 다른 GPU에서는 메모리와 처리 시간이 달라질 수 있으며 기존 상한을 자동 확대하지 않는다. 학습 호출2시간, cooperative 종료 여유120초, run2GiB·회수 ZIP1GiB 등 기존 학습 상한을 유지한다. 이전 실제 경과88분31초는 참고치이며 이번 완료 시간을 보장하지 않는다. 입력 raw cache는 사용자 Drive의 기존 보존본을 검증해 재사용하고 캐시 업로드를 자동 수행하지 않는다.
 
 ## 보관 절차 변경
 
@@ -27,3 +27,5 @@ A100을 실제 확인한 후 시작한다. 학습 호출2시간, cooperative 종
 Drive receipt의 `state=verified`, `kind=training`, `last_sha256`과 실제 ZIP 본문을 확인한다. `kind=status`는 모델 확보가 아니다. 마운트 파일시스템을 통해 복사본을 재읽는 검증이며 독립 Drive 서버 조회나 강제 VM 종료에 대한 내구성 보장은 아니다.
 
 Root가 기존 진단 및 새 회수 검사9개를 재실행해 통과했다. 실제 core recover의 작은 checkpoint ZIP 생성·복사, 덮어쓰기 방지, 손상/시간초과 후 로컬 보존, 새 attempt 재시도, mount 누락 및 기본 no-op, 학습 오류와 회수 오류 분리를 검사했다. 실제 Colab GPU·Drive 파일시스템 시험은 아직이며 재학습 성공으로 표시하지 않는다.
+
+2026-11-11 후속 변경: 학습 gate는 T4·RTX·L4를 허용하며 실제 CUDA 사용 여부를 유지한다. 개발 검증31개에서 장치 gate와 기존 입력·재개 검사를 확인했다. 실제 해당 GPU에서의 학습 성공·VRAM 적합성은 미검증이며 이전 A100 시간과 구분해 실측한다.

@@ -17,7 +17,7 @@ from rewind_m2.training import source_identity as m2_identity
 from rewind_m3.cascade import UpperCondition
 from rewind_m3.models import BoundHand
 from rewind_prepare.temporal_cache import producer_identity
-from .device import require_a100
+from .device import require_cuda_training
 from .teacher import V1Body, V1Hand, motion_losses
 
 
@@ -48,7 +48,7 @@ class TeacherRun:
         self.device = torch.device(device)
         accelerator = None
         if self.device.type != "cpu":
-            accelerator = require_a100(self.device)
+            accelerator = require_cuda_training(self.device)
             self.device = torch.device(accelerator["device"])
         if source not in ("gt_2d_diagnostic", "predicted_2d") or not _hash(input_sha256):
             raise ValueError("rewind_v1_training_input_identity")

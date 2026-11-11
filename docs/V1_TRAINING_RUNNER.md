@@ -23,7 +23,9 @@ Frontend batch에 화면 안 유효 GT가 전혀 없으면 모델 gradient updat
 
 ## 명령과 재개
 
-프로젝트 루트에서 `python -m rewind_v1 --help`로 `source`, `synthetic`, `actual`, `recover` 명령을 확인한다. `synthetic`은 별도 CPU fixture이며 실제 1,000페어 실행이나 성능 근거가 아니다. `actual`은 실제 A100 이름·VRAM을 먼저 확인하고 source/config/selection/cache/evidence pin을 요구한다. CPU 입력 팩 준비·복원에는 GPU가 필요하지 않다.
+2026-11-11 사용자 결정으로 학습의 A100 모델명 제한을 제거했다. `python -m rewind_v1.device`는 CUDA GPU를 확인하며, `--benchmark-a100`을 명시한 경우에만 추론 레이턴시 비교용 A100 조건을 검사한다. 이 옵션은 학습 진입점에서 사용하지 않는다. 기존 고정 소스 ZIP은 변경되지 않으므로 테스트 세션의 새 고정 인계본을 사용한다. GPU가 달라진 실행은 환경을 구분해 기록하고 기존 checkpoint 재개 검사를 우회하지 않는다.
+
+프로젝트 루트에서 `python -m rewind_v1 --help`로 `source`, `synthetic`, `actual`, `recover` 명령을 확인한다. `synthetic`은 별도 CPU fixture이며 실제 1,000페어 실행이나 성능 근거가 아니다. `actual`은 지원되는 CUDA GPU의 이름·VRAM을 먼저 확인하고 source/config/selection/cache/evidence pin을 요구한다. CPU 입력 팩 준비·복원에는 GPU가 필요하지 않다.
 
 실행 인자는 `python -m rewind_v1 actual --help`로 확인한다. 경로와 hash는 실제 보존 자료에서 고정해 전달하며, 임의 timestamp나 승인 근거를 만들어 채우지 않는다. `--resume-sha256`는 해당 실행의 `last.pt` 파일 SHA256이며 변경된 코드·환경·입력·설정으로 같은 실행을 재개하지 않는다. `--stop-after-updates`는 이번 호출에서 추가 진행할 update 수를 제한한다.
 

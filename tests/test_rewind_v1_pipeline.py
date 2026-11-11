@@ -186,10 +186,10 @@ class PipelineTests(unittest.TestCase):
                 "--evidence-sha256", "unused", "--review-dir", "missing", "--spec", "missing",
                 "--source-sha256", "unused"]
         with (
-            patch("rewind_v1.__main__.require_a100", side_effect=RuntimeError("rewind_v1_a100_required")),
+            patch("rewind_v1.__main__.require_cuda_training", side_effect=RuntimeError("rewind_v1_cuda_required")),
             patch("rewind_v1.__main__._regular_read") as read,
         ):
-            with self.assertRaisesRegex(RuntimeError, "a100_required"):
+            with self.assertRaisesRegex(RuntimeError, "cuda_required"):
                 main(args)
             read.assert_not_called()
         self.assertFalse((self.root/"forbidden").exists())
