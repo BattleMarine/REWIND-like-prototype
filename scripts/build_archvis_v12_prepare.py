@@ -12,16 +12,18 @@ from rewind_prepare.converter import sha
 from rewind_prepare.full_archvis import AUDIT_LIMITS, INPUT_ZIP, MIB, REPORT_LIMIT, STAT_LIMITS
 from scripts.archvis_pilot_bootstrap import extract_pinned_zip
 from scripts.build_archvis_pilot_handoff import _cell
+from scripts.v12_recovery import SECONDS
 
 
 NOTEBOOK = "archvis_v12_prepare.ipynb"
 TIMEOUTS = {"preflight": int(STAT_LIMITS.max_seconds) + 30,
             "audit": int(AUDIT_LIMITS.max_seconds) + 30, "recover": 600}
+BACKUP_TIMEOUTS = {"prepare": 60, "package": SECONDS + 30, "publish": SECONDS + 30}
 
 
 def notebook_document(pins):
     bootstrap = Path(__file__).with_name("archvis_pilot_bootstrap.py").read_text(encoding="utf-8")
-    bootstrap += f"\nPINS = {pins!r}\nTIMEOUTS = {TIMEOUTS!r}\n"
+    bootstrap += f"\nPINS = {pins!r}\nTIMEOUTS = {TIMEOUTS!r}\nBACKUP_TIMEOUTS = {BACKUP_TIMEOUTS!r}\n"
     bootstrap += '''
 import json
 import shutil
@@ -29,6 +31,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import suppress
 
 UPLOADS = Path("/content")
 BASE = UPLOADS / "archvis_v12_prepare"
@@ -45,8 +48,62 @@ for key, zipped, unpacked, count in (("source", 64, 192, 3000), ("inputs", 16, 3
                        max_members=count, revision=pin.get("revision"))
 SOURCE = VERIFIED / "source"
 INPUTS = VERIFIED / "inputs"
+RECOVERY_BASE = BASE / "recovery"
+RECOVERY_BASE.mkdir(exist_ok=True)
+DRIVE_ROOT = Path("/content/drive/MyDrive")
+
+def recovery_child(action, **paths):
+    command = [sys.executable, "-m", "scripts.v12_recovery", action]
+    for name, value in paths.items():
+        command += ["--" + name.replace("_", "-"), str(value)]
+    child = subprocess.run(command, cwd=SOURCE, timeout=BACKUP_TIMEOUTS[action], capture_output=True, text=True)
+    if child.returncode:
+        raise RuntimeError(f"{action}: {child.stderr.strip()[-1500:]}")
+    return json.loads(child.stdout)
+
+def backup_context(phase, work):
+    if phase not in ("preflight", "audit"):
+        raise ValueError("v12_backup_phase")
+    context = {"phase": phase, "original_work": str(work.resolve()),
+               "source_revision": PINS["source"]["revision"], "source_zip_sha256": PINS["source"]["sha256"],
+               "input_zip_sha256": PINS["inputs"]["sha256"], "snapshot_sha256": PINS["snapshot_sha256"],
+               "coverage_sha256": PINS["coverage_sha256"]}
+    path = work / ("backup_context-" + phase + ".json")
+    path.write_text(json.dumps(context), encoding="utf-8")
+    return path
+
+def prepare_backup(phase, mount):
+    if mount:
+        from google.colab import drive
+        drive.mount("/content/drive")
+    if not DRIVE_ROOT.parent.is_mount() or not DRIVE_ROOT.is_dir():
+        raise FileNotFoundError(f"Drive를 먼저 마운트해야 합니다. {DRIVE_ROOT}")
+    attempt = recovery_child("prepare", drive_root=DRIVE_ROOT, phase=phase)["attempt"]
+    print(f"Drive 결과 폴더 {attempt}")
+    return attempt
+
+def save_backup(work, context_path, attempt, local_zip="", browser_download=False):
+    try:
+        if not local_zip:
+            local_zip = recovery_child("package", base=RECOVERY_BASE, work=work, context=context_path)["local_zip"]
+        print(f"로컬 회수 ZIP {local_zip}")
+        result = recovery_child("publish", base=RECOVERY_BASE, local_zip=local_zip, attempt=attempt, context=context_path)
+    except Exception as error:
+        failure = work / (Path(attempt).name + "-backup-error.json")
+        with suppress(OSError), failure.open("x", encoding="utf-8") as stream:
+            json.dump({"state": "failed", "type": type(error).__name__, "reason": str(error)[:512],
+                       "local_zip": str(local_zip), "context_path": str(context_path), "drive_attempt": str(attempt)},
+                      stream, ensure_ascii=False)
+        print(f"회수 또는 Drive 보관 실패. 로컬 ZIP과 실패 영수증을 확인하고 마지막 셀에서 재시도하세요. {local_zip} {failure}")
+        raise
+    print(json.dumps(result, ensure_ascii=False))
+    if browser_download:
+        from google.colab import files
+        files.download(local_zip)
 
 def tracked_phase(name, work, arguments):
+    context_path = backup_context(name, work)
+    attempt = prepare_backup(name, MOUNT_DRIVE)
     status_path = work / "notebook_status.json"
     state = {"phase": name, "status": "started", "timeout_seconds": TIMEOUTS[name],
              "source_revision": PINS["source"]["revision"], "source_zip_sha256": PINS["source"]["sha256"],
@@ -58,9 +115,11 @@ def tracked_phase(name, work, arguments):
     save()
     started = time.monotonic()
     command = [sys.executable, "-m", "rewind_prepare.full_archvis", name, "--work", str(work), *arguments]
+    phase_error = None
     try:
         subprocess.run(command, cwd=SOURCE, timeout=TIMEOUTS[name], check=True)
     except BaseException as exc:
+        phase_error = exc
         state.update(status="stopped" if isinstance(exc, (KeyboardInterrupt, subprocess.TimeoutExpired)) else "failed",
                      error=type(exc).__name__, reason=str(exc)[:512])
         raise
@@ -68,20 +127,31 @@ def tracked_phase(name, work, arguments):
         state["status"] = "complete"
     finally:
         state["elapsed_seconds"] = round(time.monotonic() - started, 3)
-        save()
+        status_error = None
+        try:
+            save()
+        except Exception as error:
+            status_error = error
+            print(f"단계 상태 저장 실패. {type(error).__name__} {error}")
+        try:
+            save_backup(work, context_path, attempt, browser_download=BROWSER_DOWNLOAD)
+        except Exception as error:
+            if phase_error is None:
+                raise
+            print(f"원래 단계 오류와 별도로 보관에도 실패했습니다. {type(error).__name__} {error}")
+        if status_error is not None and phase_error is None:
+            raise status_error
 '''
     preflight = '''
 RUN_PREFLIGHT = False
-MOUNT_DRIVE = False
+MOUNT_DRIVE = True
+BROWSER_DOWNLOAD = False
 RGB_ROOT = ""
 POSE_ROOT = ""
 WORK = None
 if RUN_PREFLIGHT:
     if not RGB_ROOT or not POSE_ROOT:
         raise ValueError("v12_rgb_and_pose_roots_required")
-    if MOUNT_DRIVE:
-        from google.colab import drive
-        drive.mount("/content/drive")
     WORK = Path(tempfile.mkdtemp(prefix="attempt-", dir=BASE))
     print(f"결과 경로: {WORK}")
     DATA_ARGS = ["--inputs", str(INPUTS), "--rgb-root", RGB_ROOT, "--pose-root", POSE_ROOT,
@@ -103,8 +173,10 @@ else:
     recover = '''
 RUN_RECOVERY = False
 RECOVER_ATTEMPT = ""
+RECOVERY_LOCAL_ZIP = ""
+MOUNT_RECOVERY_DRIVE = True
+BROWSER_DOWNLOAD = False
 if RUN_RECOVERY:
-    from google.colab import files
     recovery_work = WORK
     if RECOVER_ATTEMPT:
         if not re.fullmatch(r"attempt-[a-z0-9_]+", RECOVER_ATTEMPT):
@@ -112,14 +184,14 @@ if RUN_RECOVERY:
         recovery_work = BASE / RECOVER_ATTEMPT
     if recovery_work is None:
         raise ValueError("v12_recovery_work_required")
-    output = next((UPLOADS / f"archvis_v12_prepare-{index:02d}.zip" for index in range(1, 101)
-                   if not (UPLOADS / f"archvis_v12_prepare-{index:02d}.zip").exists()), None)
-    if output is None:
-        raise ValueError("v12_recovery_slots_exhausted")
-    command = [sys.executable, "-m", "rewind_prepare.full_archvis", "recover",
-               "--work", str(recovery_work), "--output", str(output)]
-    subprocess.run(command, cwd=SOURCE, timeout=TIMEOUTS["recover"], check=True)
-    files.download(str(output))
+    if RECOVERY_LOCAL_ZIP:
+        receipt = json.loads((Path(RECOVERY_LOCAL_ZIP).parent / "local_receipt.json").read_text(encoding="utf-8"))
+        phase = receipt["context"]["phase"]
+    else:
+        phase = json.loads((recovery_work / "notebook_status.json").read_text(encoding="utf-8"))["phase"]
+    context_path = backup_context(phase, recovery_work)
+    save_backup(recovery_work, context_path, prepare_backup(phase, MOUNT_RECOVERY_DRIVE),
+                RECOVERY_LOCAL_ZIP, BROWSER_DOWNLOAD)
 '''
     cells = [
         _cell("markdown", "guide", """# ArchVis v1.2 전체 입력 준비
@@ -128,7 +200,11 @@ if RUN_RECOVERY:
 목록 검사는 stat만 실행합니다. 일치하면 보고의 파일 수와 읽기 예상량을 확인하고 `source_plan_sha256`을 실제 파일 감사 셀에 입력합니다.
 실제 감사는 선택된 파일을 직접 읽고 PNG·pose·기하 수치·기존 해시를 검사합니다. 상한은 읽기 65 GiB, 목록 검사 120분, 감사 6시간입니다.
 로컬 결과와 회수 ZIP에는 최대 512 MiB 예산 및 1 GiB 여유 공간을 둡니다. 준비에 raw cache나 GPU 학습은 포함되지 않습니다.
-중단·실패 시 마지막 셀에서 회수 ZIP을 다운로드합니다. 강제 종료 시 가장 최근에 게시한 진행 상태가 남습니다.
+각 검사 실행 전에 Drive 마운트와 새 결과 폴더의 쓰기를 확인합니다. 성공·실패·시간 초과·일반 중단 후 회수 ZIP을 자동 보관합니다.
+결과는 Drive의 reports/v1_branch_experiments/v12_recovery 아래 단계별 새 attempt에 저장합니다. 복사본 크기와 SHA를 다시 읽어 확인한 뒤 receipt.json을 기록합니다.
+보관 작업의 내부 상한은 각각600초이며 외부 호출 상한은630초입니다. 브라우저 다운로드 기본값은False입니다.
+보관에 실패하면 로컬 ZIP을 유지합니다. 마지막 셀에 표시된 ZIP 경로를 넣어 새 attempt로 재시도할 수 있습니다.
+VM 자체가 종료되면 finally를 실행할 수 없습니다. 이미 실행 중인 기존 노트북에는 이번 저장 기능이 소급 적용되지 않습니다.
 실패한 작업에는 이어읽기 지점이 없으므로 결과를 먼저 보관합니다. 검토 이후 새 작업 경로를 사용합니다.
 """),
         _cell("code", "bootstrap", bootstrap),
@@ -152,6 +228,8 @@ def build(args):
         source_pin = extract_pinned_zip(args.source_zip, args.source_sha256, source,
                                         max_zip_bytes=64*MIB, max_output_bytes=192*MIB,
                                         max_members=3000, revision=args.revision)
+        if not (source / "scripts/v12_recovery.py").is_file():
+            raise ValueError("v12_backup_source_missing")
         input_pin = extract_pinned_zip(args.input_zip, INPUT_ZIP, inputs, max_zip_bytes=16*MIB,
                                        max_output_bytes=32*MIB, max_members=64)
         command = [sys.executable, "-m", "rewind_prepare.full_archvis", "plan", "--inputs", str(inputs),
@@ -165,6 +243,7 @@ def build(args):
     args.output.mkdir()
     (args.output / NOTEBOOK).write_bytes(raw)
     receipt = {"schema": "archvis_v12_preparation_handoff_v1", "pins": pins, "timeouts": TIMEOUTS,
+               "backup_timeouts": BACKUP_TIMEOUTS,
                "read_cap_bytes": AUDIT_LIMITS.max_read_bytes, "report_cap_bytes": REPORT_LIMIT,
                "notebook": {"name": NOTEBOOK, "sha256": sha(raw), "bytes": len(raw)}}
     (args.output / "handoff_receipt.json").write_bytes(canonical(receipt) + b"\n")
