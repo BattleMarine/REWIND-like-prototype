@@ -18,6 +18,10 @@
 
 v1.1 학습2시간, v1.2 사전검사120분·내용검사6시간 및 기존 데이터/읽기/RAM/디스크 범위를 유지한다. 자동 회수·복사는 별도의 제한된 보관 작업이다. 캐시 업로드 규칙은 바꾸지 않는다. 이번 보완으로 v1.2의 이전6시간 검사에 이어읽기가 생기지 않으며, 단순 재실행을 자동 시작하지 않는다.
 
+## 실제 v1.1 보관 결과
+
+2026-11-11 T4 재실행에서 Drive receipt가 verified/training인 ZIP 본문을 확보했다. Root가14개 파일 CRC/SHA와13checkpoint 로드를 확인했다. 이는 정상 종료 후 보관 성공이며 강제 VM 종료 중간 복구나 v1.2 보관 검증을 대신하지 않는다. [결과](V11_CUDA_RERUN_RESULTS.md).
+
 ## 구현과 로컬 검증
 
 v1.2는 `scripts/v12_recovery.py`와 notebook의 단계 종료 처리에 연결했다. Drive 결과는 `REWIND-like prototype/reports/v1_branch_experiments/v12_recovery/{preflight,audit}/attempt-*`의 reports.zip·receipt.json이다. Receipt에는 phase·original_work·source revision/ZIP hash·input hash·snapshot/coverage pin을 남긴다. 로컬 ZIP은 BASE/recovery/local-*에 보존하며 수동 회수 셀의 RECOVERY_LOCAL_ZIP으로 새 attempt에 재시도한다.

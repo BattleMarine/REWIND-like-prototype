@@ -1,6 +1,14 @@
 # 저장 모델의 RGB 관절 예측 표시
 
-## 2026-11-10 최신 v1 저장 모델 시각화
+## 2026-11-11 v1.1 best 비교
+
+T4 재실행에서 확보한 v1.1 best 모델(frontend e9/body e9/hand e8)을 이전1epoch·GT와 같은 로컬 frame1·10에서 비교했다. [결과·파일·한계](V11_CUDA_RERUN_RESULTS.md#실제-예측-시각화)를 참고한다. 저장 위치는 `outputs/v11_rerun_20261110/user_test/cuda_70accf2/visualization/`다.
+
+기존 CLI에 `--run-id V1.1-EPOCH-EXPANSION-001`과 `--training-sha256`을 명시하면 고정1,000페어10epoch 완료 모델을 검사해 사용한다. `--compare-training`에 기존 고정1epoch ZIP을 지정하면 같은 입력의3열 비교 PNG를 생성한다. `--selection`은 `--prepared` 로컬 샘플에 한해 고정 selection의 content pin으로 membership를 판정하며 `--audit`와 둘 중 하나를 사용한다. 감사ZIP을 읽지 않은 실행은 결과에 명시한다. 재현 경로·인자는 시각화 폴더의 실행 기록을 따른다.
+
+각 checkpoint의 binding·stage·epoch·upstream 의존성을 검사하고, 임의로 같은 epoch 모델들을 조합하지 않는다. `--checkpoint-epoch`는 기록된hand milestone과 upstream best를 선택하며 `--no-3d`에서는frontend milestone을 고른다. 이번3열 비교는best선택을 사용했다. 기존1epoch 기본 경로는 유지한다.
+
+## 2026-11-10 v1 저장 모델 시각화
 
 `python -m scripts.visualize_archvis_v1`은 V1-DIAGNOSTIC-001의 고정 회수 ZIP·best frontend/body/hand를 검사하고 실제 RGB에서2D·3D 예측을 생성한다. 기존102페어 모델 도구는 별도로 보존한다. 추가 학습은 없다.
 

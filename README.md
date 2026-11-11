@@ -12,9 +12,9 @@
 
 v1.2 전체 사전검사는 통과했으나 내용 감사는6시간 제한에서9,678/23,124페어 진행 후 중단됐습니다. 전체 입력 검증은 미완료이며 새 감사 기록부터 저장·재개를 지원하도록 보완하고 로컬 검증했습니다. 실제 Drive 재개 시험은 남아 있습니다. 구버전 카운트는 재개점으로 사용할 수 없습니다. [과거 결과](docs/V12_FULL_AUDIT_RESULTS.md) · [저장·재개 계약](docs/V12_AUDIT_RESUME.md).
 
-v1.1 동일 조건 재실행을 준비하며, 종료 후 결과 ZIP의 Drive 보관·해시 확인을 보완합니다. [재실행 준비](docs/V11_RERUN_PREPARATION.md).
+v1.1 T4 재실행은 동일1,000페어·각10epoch를 완료했고, Drive 자동 보관본의 모델13개를 회수·검토했습니다. 전체약97분24초, frontend best214.84px이며3D 형태 축소는 남았습니다. [재실행 결과](docs/V11_CUDA_RERUN_RESULTS.md).
 
-v1.1 동일1,000페어의 각10epoch 실행은 완료 로그를 확보했습니다. 2D 오차는205.27px로 줄었으나3D 형태 축소는 남았으며 모델 ZIP 다운로드 실패로 checkpoint는 미확보입니다. [결과와 복원 한계](docs/V11_EPOCH_EXPANSION_RESULTS.md).
+이전 v1.1 동일1,000페어의 각10epoch 실행은 완료 로그만 확보했습니다. 2D 오차는205.27px로 줄었으나3D 형태 축소는 남았으며 모델 ZIP 다운로드 실패로 checkpoint는 미확보입니다. [결과와 복원 한계](docs/V11_EPOCH_EXPANSION_RESULTS.md).
 
 v1 새 train1,000·validation2,236의 실제 파일·카메라 수치 감사가 완료됐습니다. 사용자가 GT overlay89장을 확인했으며, 실제 timestamp·motion 독립성 미확인을 명시한 별도 A100 진단 학습을 완료했습니다. Frontend/body/hand 각1epoch, 총540update·약14분11초이며 정확도 개선은 남아 있습니다. [진단 결과](docs/V1_DIAGNOSTIC_001_RESULTS.md). Raw cache는 사용자 Drive에 보관됐으며 후속 실행에서 복원해 재사용합니다. [감사 결과](docs/V1_ACTUAL_001_RESULTS.md).
 

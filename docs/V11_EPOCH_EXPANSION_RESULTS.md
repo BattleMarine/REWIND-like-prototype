@@ -1,4 +1,6 @@
-# v1.1 학습량 확대 결과 — 모델 파일 미회수
+# v1.1 학습량 확대 결과 — 이전 실행의 모델 파일 미회수
+
+2026-11-11 T4 재실행에서는 모델 본문 회수·독립 검토를 완료했다. [새 실행 결과](V11_CUDA_RERUN_RESULTS.md)를 참고한다. 아래 미회수 기록은 이전 실행에만 해당한다.
 
 2026-11-10. 실행 소스 revision `18c4fb2d3900d9f65ad6bad733ad5e3bce9f5a8f`. 동일 train1,000·frontend/body/hand 각10epoch 진단. 명목25FPS·stereo frame-key 가정과 원본 motion 독립성 미확인을 유지하며 validation은 참고 지표다.
 
