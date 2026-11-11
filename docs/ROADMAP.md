@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-11 v1.2 중단 검토: 새e94c64d 실행이KeyboardInterrupt 후4,921페어 완료 기록을 회수했다. Root가11파일 CRC/SHA와 고정 소스의 로컬 restore-audit를 검증했다. 전체23,124중18,203개가 남으며 실제 Drive metadata 대조·재개 전진은 후속이다. 구9678카운트와 합산하지 않는다. [기록·재개 기준](V12_AUDIT_RESUME.md#2026-11-11-실제-중단-기록-검토).
+
 2026-11-11 v1.1 T4 재실행 결과: 동일1,000·각10epoch/5,400update를97분24초에 완료하고 Drive 보관 ZIP과13checkpoint를 회수했다. Root가14파일 CRC/SHA·가중치 유한값·모델 구조/의존성/재개 상태를 확인했다. 2D best214.84px이나3D 형태 축소는 남으며 독립 성능·GPU 재개 검증은 아니다. [결과·시간 분석](V11_CUDA_RERUN_RESULTS.md). v1.2 진행 결과는 별도로 기다린다.
 
 2026-11-10 v1.2 전체 준비 구현: 고정 train20,888·validation2,236페어의 목록/파일 감사와 보고서 회수 노트북 생성기를 추가했다. Root12개 로컬 검사 통과. 실제 Drive 감사와 확대 학습은 미실행이며 학습 로더의 short/tail 지원은 후속이다. [범위·예산·제약](V1_BRANCH_EXPERIMENTS.md#v12-전체-파일-검사-구현).

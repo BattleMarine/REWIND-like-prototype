@@ -31,3 +31,17 @@ Journal 상한128MiB, 완성 manifest64MiB, 회수 대상 합계 및 단일 ZIP2
 실제 Drive의 전체 내용 감사·새 런타임 재개·확대 학습은 아직 미실행이다. 완료 기록의 SHA는 과거 내용 검사 증거이며 재개 시 새 전체 해시 검증을 한 것으로 보고하지 않는다. 최종 성공도 전체 내용 감사 완료까지이며 temporal 로더와 전체 학습 준비 완료를 의미하지 않는다.
 
 Root가 저장·재개12개와 기존 전체 준비·추출본·회수 검사를 합쳐30개 로컬 검사를 통과했다. 완료 기록 손상·원본 변경·코드 변경·기존 해시 대조·split 중복 거부, 저장 중 head 교체 실패, 0페어/부분 ZIP 복원, manifest 게시 실패 뒤 본문 재읽기 없는 마무리를 확인했다. 실제 Drive에서의 mtime 안정성과 전체 실행 비용은 테스트 세션에서 확인한다.
+
+## 2026-11-11 실제 중단 기록 검토
+
+고정 소스 `e94c64d8689adc6186979b56906e1008b53fb76c` 실행은 notebook 기록상7,638.2초(2시간7분18초)에 KeyboardInterrupt로 중단됐다. 6시간 상한 도달이 아니다. 테스트 세션은 연결 단절 후 프로세스 종료와 수동 회수를 보고했으며, 브라우저 연결 단절 자체가 원인인지는 로그만으로 확정하지 않는다.
+
+`outputs/restart_20261111/v12_resume_release/user_test/interrupted_001/reports.zip`은1,939,269bytes, SHA256 `9f514c4171e4ea8483628489f2e7814d686276afa555cba804ea292016f2df9e`다. Drive attempt `attempt-hwquttrq`의 verified receipt와 local receipt가 일치한다. Root가 ZIP CRC 및 내부11개 파일 크기/SHA를 독립 확인하고, 고정 source/input ZIP을 풀어 실제 `restore-audit` CLI를 새 로컬 WORK에 실행했다.
+
+복원 검증은 성공했다. Journal의4,921개는 모두 train이며 전체23,124개 중약21.3%, 남은18,203개다. 고정 plan/snapshot/producer, 순서·hash chain·geometry 기록·motion·기존 파일 해시 및 split 충돌 검사에 통과했다. 확정 journal8,862,573bytes, 미확정 tail0bytes다. 저장된 완료 payload 크기 합계는11,571,683,696bytes이며 원본 본문을 로컬에서 다시 읽은 것은 아니다.
+
+`audit_status`의4,750은250페어 간격으로 게시한 이전 상태이고, 매페어 확정 head의4,921이 재개 기준이다. Head invocation의status=running은 중단 전 마지막 저장 상태이며 현재 프로세스 생존을 뜻하지 않는다. 다음 audit 진입 시 이전 invocation을 interrupted로 기록한다. 누적 관측 read11,573,815,121bytes는 저장 경계의 하한이므로 정확한 최종 전송량으로 보고하지 않는다.
+
+재개 source_plan SHA는 `df9f5fca3139de9e3f94d2ce9d86857d676a75f556b9d3b777c2ae4ed32a5401`이다. 기존9678 count-only 결과와 합치거나 그 plan을 사용하지 않는다. 검토 내역은 같은 interrupted_001 폴더의 `root_review.json`, 복원본은 `root_restore_review/restored/`다.
+
+테스트 세션에 동일e94c64d 소스·기존 notebook과 위ZIP/pin으로 새 Colab WORK 복원을 인계한다. 재개 전 실제 Drive 목록/크기/mtime 검사는 아직이며, 변경이 감지되면 자동 우회하지 않는다. 재개된 실행이4,921개 기록을 재사용하고 이후 페어로 전진하는지 확인해야 실제 Drive 재개 검증 완료다. 기존6시간/65GiB/RAM3GiB 및 보관 상한은 유지한다. 이번에는 수동 회수 성공을 확인했으며 자동 종료 보관만으로 회수됐다고 기록하지 않는다.
