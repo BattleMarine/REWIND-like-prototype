@@ -28,7 +28,7 @@ Journal 상한128MiB, 완성 manifest64MiB, 회수 대상 합계 및 단일 ZIP2
 
 현재 고정 목록의 가장 긴 sequence와 파일명 자릿수를 적용한 보수적 크기 추산은 journal약44.4MB, manifest records약26.2MB, source plan selection약16.3MB다. snapshot/coverage와8MiB 여유를 합친 회수 대상 추산은약96.4MiB로256MiB 이하다. 실제 전체 산출물의 측정값이나 모든 가능한 입력의 수학적 상한은 아니며 코드의 실제 크기 검사를 유지한다.
 
-실제 Drive의 전체 내용 감사·새 런타임 재개·확대 학습은 아직 미실행이다. 완료 기록의 SHA는 과거 내용 검사 증거이며 재개 시 새 전체 해시 검증을 한 것으로 보고하지 않는다. 최종 성공도 전체 내용 감사 완료까지이며 temporal 로더와 전체 학습 준비 완료를 의미하지 않는다.
+초기 구현 시 실제 Drive 재개는 미실행이었다. 아래 후속 결과에서 실제 재개 전진을 확인했으며 전체 내용 감사·확대 학습은 아직 미완료다. 완료 기록의 SHA는 과거 내용 검사 증거이며 재개 시 새 전체 해시 검증을 한 것으로 보고하지 않는다. 최종 성공도 전체 내용 감사 완료까지이며 temporal 로더와 전체 학습 준비 완료를 의미하지 않는다.
 
 Root가 저장·재개12개와 기존 전체 준비·추출본·회수 검사를 합쳐30개 로컬 검사를 통과했다. 완료 기록 손상·원본 변경·코드 변경·기존 해시 대조·split 중복 거부, 저장 중 head 교체 실패, 0페어/부분 ZIP 복원, manifest 게시 실패 뒤 본문 재읽기 없는 마무리를 확인했다. 실제 Drive에서의 mtime 안정성과 전체 실행 비용은 테스트 세션에서 확인한다.
 
@@ -45,3 +45,17 @@ Root가 저장·재개12개와 기존 전체 준비·추출본·회수 검사를
 재개 source_plan SHA는 `df9f5fca3139de9e3f94d2ce9d86857d676a75f556b9d3b777c2ae4ed32a5401`이다. 기존9678 count-only 결과와 합치거나 그 plan을 사용하지 않는다. 검토 내역은 같은 interrupted_001 폴더의 `root_review.json`, 복원본은 `root_restore_review/restored/`다.
 
 테스트 세션에 동일e94c64d 소스·기존 notebook과 위ZIP/pin으로 새 Colab WORK 복원을 인계한다. 재개 전 실제 Drive 목록/크기/mtime 검사는 아직이며, 변경이 감지되면 자동 우회하지 않는다. 재개된 실행이4,921개 기록을 재사용하고 이후 페어로 전진하는지 확인해야 실제 Drive 재개 검증 완료다. 기존6시간/65GiB/RAM3GiB 및 보관 상한은 유지한다. 이번에는 수동 회수 성공을 확인했으며 자동 종료 보관만으로 회수됐다고 기록하지 않는다.
+
+## 2026-11-11 두 번째 중단·실제 재개 검토
+
+동일 e94c64d 실행은 기존4,921페어를 재사용하고 신규7,498개를 검사하여12,419/23,124페어(약53.7%)까지 전진했다. 모두 train이며 남은10,705개는 train8,469와 validation2,236이다. 전체 감사·temporal 준비·학습 준비는 미완료이고 train_ready/temporal_ready=false다.
+
+이번 호출11,565.397초(약3시간12분45초), read17,582,999,773bytes, peak RSS235,937,792bytes다. 6시간 상한 도달이 아니라 KeyboardInterrupt로 stopped됐다. 사용자 연결 단절 보고와 예외 기록은 확인했으나 단절 자체가 예외를 일으켰다고 확정하지 않는다. Head invocation의 failed는 예외 종료 기록이며 journal 손상 판정이 아니다.
+
+자동 Drive 보관 receipt는 verified, attempt-9tk6zqu2다. `outputs/restart_20261111/v12_resume_release/user_test/interrupted_002/reports.zip`은3,825,010bytes, SHA256 `ebe17d13e1ced56dbb17b181021fec3e6b5e4024ec2a421a9d19cd1887ec742e`다. Root가 CRC와 내부12파일 크기/SHA·receipt binding을 검사했다. 이전4,921행 journal이 새 journal의 동일한 바이트 prefix임을 확인하고, 고정 source/input으로 실제 restore-audit CLI를 새 로컬 WORK에 실행해12,419페어의 chain/order/geometry/motion/split 검증을 통과했다. 미확정 tail은0bytes다.
+
+Journal22,400,111bytes, binding `e485c8dc60a5b62f58cccdfa22c822f2dd92ff82ebfc2f1070de8cacb11c3afb`, last `134c56aa5f9d099215e2b61e3f178855ae9dda461a45107fef0938dcfa12f366`이다. Source plan과 snapshot은 이전과 동일하다. 누적 관측 read29,156,814,894bytes는 첫 호출의 하한을 포함하므로 전체 정확한 전송량이 아니다.
+
+이번 실제 실행의 재사용·전진은 확인했다. Root의 검토는 회수 증거와 로컬 복원이며 현재 Drive 본문을 새로 읽거나 실시간 metadata를 검사한 것은 아니다. 완료 당시 hash와 재개 시 path/size/mtime 대조의 한계는 유지한다.
+
+동일 폴더 `root_review.py/json`, `root_restore_stdout.txt`, `RESTART_HANDOFF.md`에 근거와 다음1회재개 인계를 저장했다. 새 WORK에 이번 ZIP을 복원하고 pairs_reused=12419에서 전진하는지 확인한다. 기존6시간/65GiB/RAM3GiB와 저장 상한을 유지하며 자동 반복·새 preflight·구9678카운트 병합은 하지 않는다.
