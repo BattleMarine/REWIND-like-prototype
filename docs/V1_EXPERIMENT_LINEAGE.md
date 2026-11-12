@@ -17,7 +17,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
-│          [전체 감사 완료 / 학습·캐시·재개 연결 구현 / 실제 확대 학습 시험 전]
+│          [전체 감사 완료 / 입력 준비5,760프레임 보존 보고 / 학습 전]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -244,3 +244,16 @@ Frontend는 전체 train을 사용하고 teacher는 완전281·짧은156·tail12
 고정 selection의50frame/150file 중135개는 경로만,15개는 경로·크기·SHA가 있다. 캐시 생성기는 모든 항목에 크기·SHA를 추가하는데 v1.4는 두 files 사전 전체를 직접 비교했다. 이 비교는 정상적인 정보 추가도 거부한다. 기존 로컬 검사는 이 실제 혼합형 selection 경로를 포괄하지 못했다. 선택 목록에 존재하는 pin을 모두 대조하고 고정 캐시 identity와 실제 바이트 검증은 유지하는 최소수정을 검토한다. 실험조건·예산은 변경하지 않으며 v1.2 진행과 분리한다.
 
 후속 root 검토: 고정 selection·cache manifest의 content pin을 검증하고50frame 전체 및 실제 metadata fixture 일치를 확인했다. 신규pin검사3개와 기존재개1개를8.405초에 통과했다. 개발자의 최초14검사 중 기존 Windows run.json 원자교체 WinError5가1회 있었고 root 단독재개에서는 재현되지 않았다. 원인은 미확정으로 유지한다. 준비 실패는 비교 로직 오류로 판단하며 payload 손상으로 판단하지 않는다. 새 고정 소스로 같은 클립·설정·예산을1회 재시험하고 실제 준비·학습 성공 여부는 후속 결과로 판정한다.
+
+
+### 2026-11-12 v1.2 입력 준비 중단과 조건부 재개
+
+테스트 세션 보고에 따르면 고정7e10201·T4·torch2.14.1+cu130/NumPy2.4.6/Pillow11.3.0에서128→3,712프레임을 준비하고 다음 호출이KeyboardInterrupt로중단됐다. preparation.json은stopped·5,760프레임/45청크이며 해당호출원본읽기4,983,530,786bytes·3,187.145초다. 네트워크단절과동시에중단됐다는사용자보고이지예외발생원인전체를독립입증한것은아니다. 학습은시작전이다.
+
+테스트 세션은45청크prefix의사용자Drive보존·readback, catalog SHA `bca5289eac2a50e58599da7a8e46d9f47ba69da14140dc4b62d0770f8190df05`, 종료status ZIP15,063bytes/SHA `418b095981553b41555f8543ebe0d75bed4933e7d33524934c291c6c8ea8bda4`, ledger3예약/38,672bytes를보고했다. 이 수치는테스트세션근거이며root의ZIP본문독립검증과구분한다.
+
+Root는7e10201의준비·보관코드가유지됨을확인했다. 완료청크는재호출시binding·순서·파일SHA를검사해재사용하고미완료임시청크만다시준비한다. 기존동일런타임/입력/라이브러리/경로를유지하고실행프로세스없음·remote lease해제·ledger보존·저장공간충족을확인한뒤동일예산으로1회재개하도록조건부인계한다. 상태문자열을paused로고치거나cache/ledger를초기화하지않는다. 예외/손상/lease잔류면재시도하지않고근거를보존한다. 정상paused후계속진행조건은기존인계를따른다.
+
+Root 로컬 보완검증: 합성3frame/2frame청크 fixture에서중간KeyboardInterrupt 후stopped2frame을확인하고재호출해3frame완료했다. 기존완료원본재읽기0이며미완료1frame의3파일만읽었다. 근거는 outputs/v12_training_release_20261112/user_test/interrupted_001/root_interrupt_resume_check.json이다. 실제Colab캐시본문검증을대신하지않으며재개호출자체가모든완료청크파일을검증한다.
+
+후속 근거 회수: 테스트 세션이중단ZIP·receipt·catalog·ledger를동일interrupted_001폴더에보존했다. Root가ZIP15,063bytes/SHA/CRC·내부2파일크기/SHA, run.json의stopped/5,760, catalog원본SHA와content seal, ledger seal·3예약/38,672bytes를독립검증했다. Cache pack 본문은읽지않았으며사용자readback보고와재개시파일검증을구분한다. 이검토로이전문단의보고서본문미확인범위만해소됐고실제재개성공은후속이다.
