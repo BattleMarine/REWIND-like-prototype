@@ -18,7 +18,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
-│          [전체 감사 완료 / 입력 준비5,760프레임 보존 보고 / 학습 전]
+│          [전체 감사 완료 / 입력 준비8,192프레임·중단 보고서 검토 / 학습 전]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -274,3 +274,10 @@ Root 로컬 보완검증: 합성3frame/2frame청크 fixture에서중간KeyboardI
 v1.1 train loss감소와유효gradient는학습이작동했음을보여준다. 유력한가설은teacher반복량부족·낮은2D조건품질·hand조건차이의복합영향이다. v1.4는정답조건의암기가능성을확인했으며세원인의상대기여를확정하지않는다.
 
 후속제안은저장모델의동일train클립평가→조건교체민감도평가→같은입력에서update확대→같은반복량에서GT/예측조건통제학습 순으로 필요한분기만선택한다. v1.2의데이터확대와총update증가를구분하고v1.3혼합은보류한다. 보고서의A/B/C/D는계획식별자이며새실험버전·실행승인이아니다. 추가GPU학습·테스트인계·자동실행은이번문서화에서시작하지않았다.
+
+
+### 2026-11-12 v1.2 두 번째 중단 검토
+
+고정7e10201의조건부재개에서5,760→8,192프레임(64청크),2,432프레임전진했다. 해당호출은원본5,546,140,320bytes·3,459.609초후KeyboardInterrupt/stopped이며중단원인은미확정이다. Root가interrupted_002의status ZIP16,921bytes/SHA `c5617d604d1836777f1a1b01b53137187216e18dfcb3607cf1983c2dc9cf0e9a`·CRC·2본문pin·recovery/run seal을확인했다. catalog SHA `427f40be11899c2f5c35d61947cfc9ae4c5197e52a931bf2168f32ec27a8a301`와seal/8,192, ledger seal·4예약/55,593bytes도검증했다. Cache pack 본문은읽지않았으며사용자복사readback과재개시검증을구분한다.
+
+남은결과보관예산20attempt/12,884,846,295bytes는준비와학습이공유한다. 실행직전동일source/라이브러리/경로·프로세스없음·lease없음·free16GiB·기존ledger유지를테스트세션에서확인한후동일예산으로다음1회재개하도록인계했다. 재개성공/중단원인해결을선언하지않으며다시stopped/failed이면자동반복하지않는다. 근거는 outputs/v12_training_release_20261112/user_test/interrupted_002/root_review.json이다.
