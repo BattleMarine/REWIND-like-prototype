@@ -1,0 +1,3 @@
+# v1.2의 bounded memory-mapped float32 입력 캐시용. Colab의 기존 CUDA torch를 우선한다.
+-r requirements-rgb.txt
+numpy>=1.26,<3

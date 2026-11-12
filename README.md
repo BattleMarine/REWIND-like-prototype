@@ -10,7 +10,7 @@
 
 장시간 실행 결과는 Drive 자동 보관을 기본으로 준비합니다. v1.1은 종료 후 모델 ZIP을, 새 v1.2 notebook은 각 단계 종료 후 보고서를 보관합니다. [적용 범위·한계](docs/RESULT_RETENTION.md).
 
-v1.2 ArchVis 전체 파일 감사가 완료됐습니다(train20,888·validation2,236). 최종 manifest와23,124개 journal의 일치·고정 소스 복원을 검토했습니다. 실제 시간 동기·motion 독립성, short/tail 학습 연결과 확대 학습은 남아 있습니다. [완료 근거와 한계](docs/V12_AUDIT_RESUME.md#2026-11-12-전체-파일-감사-완료).
+v1.2 ArchVis 전체 파일 감사가 완료됐습니다(train20,888·validation2,236). 감사 manifest를 사용하는 short/tail 포함 학습·청크 캐시·저장/재개 연결을 구현했으며 실제 전체 입력 준비·GPU 학습은 시험 전입니다. 실제 시간 동기·motion 독립성은 미확인으로 유지합니다. [감사 근거](docs/V12_AUDIT_RESUME.md#2026-11-12-전체-파일-감사-완료) · [전체 학습 연결·실행 조건](docs/V12_TRAINING_CONNECTION.md).
 
 v1.1 T4 재실행은 동일1,000페어·각10epoch를 완료했고, Drive 자동 보관본의 모델13개를 회수·검토했습니다. 전체약97분24초, frontend best214.84px이며3D 형태 축소는 남았습니다. [재실행 결과](docs/V11_CUDA_RERUN_RESULTS.md).
 

@@ -297,6 +297,10 @@ class Pipeline:
         random.Random(f"{self.cfg['seed']}:{role}:{epoch}:v1").shuffle(order)
         return order
 
+    def _after_update(self, role, stage):
+        """Optional experiment-specific artifact hook after the durable cursor candidate advances."""
+        pass
+
     def _epoch(self, role, stage, stop_at):
         p = self.progress
         size = self.batch_sizes[role]
@@ -320,6 +324,7 @@ class Pipeline:
             accumulate(p["partial_loss_sums"], metrics)
             p["batch"] += 1
             p["updates"] += 1
+            self._after_update(role, stage)
             if p["updates"] % self.cfg["limits"]["checkpoint_every"] == 0 or p["updates"] == stop_at or p["batch"] == self.updates[role]:
                 self._save_last(stage)
         start = time.monotonic()

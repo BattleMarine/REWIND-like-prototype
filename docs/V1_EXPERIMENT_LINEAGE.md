@@ -17,7 +17,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
-│          [전체 파일 감사 완료: 23,124/23,124 / 확대 학습 결과 없음]
+│          [전체 감사 완료 / 학습·캐시·재개 연결 구현 / 실제 확대 학습 시험 전]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -225,3 +225,13 @@ v1.3은 CityPack 등 다른 시나리오를 섞어 배경·동작·인물의 다
 Root가 신규11검사를 독립 통과했으며 개발자가 확장29검사를 정상종료로 통과했다. 검토에서 발견한 재개 checkpoint SHA 변수 충돌과 nonfinite loss 사전 차단 누락은 수정·회귀검증했다. Windows cold restore rename의 일회성 권한 오류는 재현되지 않았으며 원인 미확정으로 보존했다. Bootstrap·고정입력metadata 검증은 실제50frame 원본 준비·CUDA수렴·Drive 보관 성공을 뜻하지 않는다.
 
 다음 사용자 시험은 같은 고정클립의 준비→유한예산 학습→종료보관을 한 실행으로 확인한다. 모델 형태 개선과 운영 성공을 별도로 판정하며 실패 시 추가update/설정변경 없이 근거를 회수한다. 정식revision·ZIP/notebook SHA는 배포 폴더의 receipt와 TEST_HANDOFF.md에 고정한다.
+
+### 2026-11-12 v1.2 전체 학습 연결과 시험 설계
+
+사용자가 완료된 감사 결과로 학습을 시작하도록 테스트 세션에 인계할 것을 요청했다. 데이터 확대가 형태 축소를 개선하는지 확인한다는 가설은 유지한다. 원본 파일 감사를 다시 실행하지 않고 고정 manifest로 train20,888·validation2,236을 연결한다. 시간 동기·motion 독립성은 여전히 미확인이며 명목25FPS와 참고 validation을 명시한다.
+
+Frontend는 전체 train을 사용하고 teacher는 완전281·짧은156·tail127개, 총564clip으로 실제20,888frame을 중복 없이 사용한다. 미래/다른 sequence로 채우지 않는 post-padding과 mask를 적용한다. 기존 per-clip valid-joint 평균을 유지하므로 frame별 균등 가중 실험은 아니다. Teacher validation은 기존29clip/1,450frame이며 제외786frame을 보고한다. 모델·LR·precision·seed·각10epoch를 유지하되 데이터 수 증가로 총115,720update가 된다. 동일epoch와 동일update 비교를 구분하고 단계별 비교 checkpoint를 남긴다.
+
+시험 순서는 준비1청크의 원본 변환·hash 확인, 고정 예산 내 나머지 입력 준비, GPU20update pilot, 그 checkpoint에서 고정10epoch까지 유한 호출로 재개다. Pilot은 frontend 연결만 확인하며 teacher 수렴을 입증하지 않는다. 신규 입력 캐시는 약8.47GiB 이미지 tensor와 metadata로 구성하고 사용자 수행 셀로 Drive에 보존한다. 전체 준비 최소7호출과 결과 보관 비용을 별도로 기록하며 실패 시 설정/예산을 자동 확대하지 않는다.
+
+판정은 운영 성공(coverage·재개·보관·유한 loss)과 모델 개선(기존 분기 대비2D오차·3D형태·시간변화)을 분리한다. 실제 준비·CUDA·Drive 결과는 아직 없다. v1.4 oracle 진단과 v1.3 보류 상태는 유지한다. 상세 실행 조건과 로컬 검증은 [v1.2 학습 연결](V12_TRAINING_CONNECTION.md), 고정 소스·notebook·입력 pin은 배포 receipt/TEST_HANDOFF.md를 따른다.
