@@ -11,7 +11,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │  │
 │  └─ v1.4 — 한 train 클립 + GT 2D + hand용 GT 상체
 │             정답 조건에서도 3D 형태를 학습할 수 있는지 분리 진단
-│             [준비 단계 비교 오류 수정·로컬 검토 / 실제 재시험 대기]
+│             [A100 각5,000update 완료 / 동일클립 GT조건 형태복원 확인]
 │             ├─ 복원 성공 → 예측 2D·예측 상체로 하나씩 교체하는 후속 후보
 │             └─ 미수렴    → 최적화·좌표·조건·loss·sampling 원인 재검토
 │
@@ -257,3 +257,10 @@ Root는7e10201의준비·보관코드가유지됨을확인했다. 완료청크�
 Root 로컬 보완검증: 합성3frame/2frame청크 fixture에서중간KeyboardInterrupt 후stopped2frame을확인하고재호출해3frame완료했다. 기존완료원본재읽기0이며미완료1frame의3파일만읽었다. 근거는 outputs/v12_training_release_20261112/user_test/interrupted_001/root_interrupt_resume_check.json이다. 실제Colab캐시본문검증을대신하지않으며재개호출자체가모든완료청크파일을검증한다.
 
 후속 근거 회수: 테스트 세션이중단ZIP·receipt·catalog·ledger를동일interrupted_001폴더에보존했다. Root가ZIP15,063bytes/SHA/CRC·내부2파일크기/SHA, run.json의stopped/5,760, catalog원본SHA와content seal, ledger seal·3예약/38,672bytes를독립검증했다. Cache pack 본문은읽지않았으며사용자readback보고와재개시파일검증을구분한다. 이검토로이전문단의보고서본문미확인범위만해소됐고실제재개성공은후속이다.
+
+
+### 2026-11-12 v1.4 실제 학습 결과와 판정
+
+수정본c05f548에서A100 FP32 각5,000update 완료,runner593.880초. 같은50frame의GT2D/hand GT상체 조건에서body13.71mm·handlocal2.90mm,뼈길이/spread비율약1로형태를복원했다. Root가17파일SHA/CRC·모델5개CPU로드/유한값·초기/최종그림을검토했다. [상세결과·지표와근거](V14_ORACLE_RESULTS.md).
+
+이결과는정답조건의동일클립을학습할수있음을보여주며필연적붕괴가설을약화한다. v1.1대비입력품질·데이터수·반복학습량이함께달라2Dfrontend만의문제나학습량만의문제로단정하지않는다. 일반화·실제예측입력은미검증이고한클립암기가능성도남는다. 다음후보는동일조건에서GT2D와GT상체를각각예측값으로교체하는분리실험이며별도승인전새학습은시작하지않는다. v1.2확대는별도진행한다.

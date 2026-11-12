@@ -118,3 +118,6 @@ Root는 신규11개 로컬 검사를 독립 재실행해 정상 종료로 통과
 신규3개와 기존 oracle11개를 합친14검사는 재확인에서21.258초·정상 종료로 통과했다. 최초 실행에서는 기존 pause/resume 검사의 `run.json` 원자 교체에서 `WinError 5`가1회 발생했다(20.169초). 원인은 미확정이며 비교 수정으로 해결됐다고 주장하지 않는다. Root는 신규3개와 해당 기존 pause/resume1개를 독립 재실행해8.405초에 통과했다. 실패 로그는 `outputs/v14_oracle_development/file_pin_fix/regression.log`, 재확인 로그는 `regression_recheck.log`에 보존했다.
 
 수정·검증 후 코드를 동결한다. 커밋·새 고정 source ZIP/notebook 발급과 테스트 재인계는 root가 담당하며, 실제 클립 준비와 GPU 학습 성공은 새 고정본의 시험 결과로 별도 확인한다.
+
+
+2026-11-12 후속: 수정본c05f548의실제A100학습이완료됐으며동일클립GT조건형태복원을확인했다. 앞선미실행표현은당시개발기록이고최신판정은 [실제결과](V14_ORACLE_RESULTS.md)를따른다.

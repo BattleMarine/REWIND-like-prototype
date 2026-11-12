@@ -12,6 +12,8 @@
 
 v1.2 ArchVis 전체 파일 감사가 완료됐습니다(train20,888·validation2,236). 감사 manifest를 사용하는 short/tail 포함 학습·청크 캐시·저장/재개 연결을 구현했으며 입력 준비는5,760/23,124프레임 보존이 보고됐으며 중단 후 재개를 진행합니다. GPU 학습은 아직 시작 전입니다. 실제 시간 동기·motion 독립성은 미확인으로 유지합니다. [감사 근거](docs/V12_AUDIT_RESUME.md#2026-11-12-전체-파일-감사-완료) · [전체 학습 연결·실행 조건](docs/V12_TRAINING_CONNECTION.md).
 
+v1.4 단일클립 GT조건 진단은 A100에서 각5,000update를 완료했습니다. Body13.71mm·hand local2.90mm로 형태 복원을 확인했으며, 실제 RGB 추론·일반화 성능과는 구분합니다. [결과와 해석](docs/V14_ORACLE_RESULTS.md).
+
 v1.1 T4 재실행은 동일1,000페어·각10epoch를 완료했고, Drive 자동 보관본의 모델13개를 회수·검토했습니다. 전체약97분24초, frontend best214.84px이며3D 형태 축소는 남았습니다. [재실행 결과](docs/V11_CUDA_RERUN_RESULTS.md).
 
 이전 v1.1 동일1,000페어의 각10epoch 실행은 완료 로그만 확보했습니다. 2D 오차는205.27px로 줄었으나3D 형태 축소는 남았으며 모델 ZIP 다운로드 실패로 checkpoint는 미확보입니다. [결과와 복원 한계](docs/V11_EPOCH_EXPANSION_RESULTS.md).
