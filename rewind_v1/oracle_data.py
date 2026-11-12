@@ -58,6 +58,20 @@ def oracle_features(xy, valid):
     return views.transpose(1, 2).flatten(1)[None]
 
 
+def _check_clip_file_pins(plan, cache, keys):
+    selected = {tuple(row["key"]): row for row in plan["records"]}
+    for key in keys:
+        _, row = cache.index[key]
+        expected = selected[key]
+        # Packing enriches path-only selection entries with measured size/SHA.
+        # Every field actually pinned by selection must still match the pinned cache.
+        if (row["split"] != "train" or expected["split"] != "train"
+                or set(row["files"]) != set(expected["files"])
+                or any(any(row["files"][role].get(field) != value for field, value in pin.items())
+                       for role, pin in expected["files"].items())):
+            raise ValueError("v14_clip_file_pins")
+
+
 def prepare(args):
     started = time.monotonic()
     output = Path(args.output).absolute()
@@ -82,11 +96,7 @@ def prepare(args):
             or cache.manifest["preprocessing"] != "none_raw_source_bytes_v1"):
         raise ValueError("v14_raw_cache_binding")
     keys = [(SEQUENCE, frame) for frame in range(START, START+FRAMES)]
-    selected = {tuple(row["key"]): row for row in plan["records"]}
-    for key in keys:
-        _, row = cache.index[key]
-        if row["split"] != "train" or selected[key]["split"] != "train" or row["files"] != selected[key]["files"]:
-            raise ValueError("v14_clip_file_pins")
+    _check_clip_file_pins(plan, cache, keys)
     names = {cache.index[key][0] for key in keys}
     if len(names) != 1:
         raise ValueError("v14_single_pinned_part_required")

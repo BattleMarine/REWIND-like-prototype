@@ -102,3 +102,19 @@ Root는 신규11개 로컬 검사를 독립 재실행해 정상 종료로 통과
 미커밋 소스 검증용 ZIP으로 notebook bootstrap의 source/input/evidence ZIP 및 config/source pin, 기본 셀의 실행 비활성화를 확인했다. 검증용 ZIP은 정식 배포본이 아니다. `outputs/v14_oracle_development/final_builder_qa/validation.json`에 근거를 보존했다. 준비 논리 읽기 예약은228,690,928bytes로256MiB 이하이며, 파트 복사106,518,460bytes, 로컬 member payload 상한106,518,460bytes, ZIP metadata 상한1,445,770bytes와 입력 metadata14,208,238bytes를 포함한다. 이는 실제 Drive 전송량 실측이 아니다.
 
 로컬 축소 모델·합성 텐서와 pose fixture로 입력 channel/mask, GT 상체 제한, 평가 RNG, 중단/재개, 회수·복원·복사 실패를 검증한다. 이는 실제50프레임 원본의 준비 완료나 CUDA 수렴 결과를 뜻하지 않는다. 실제 준비·CUDA 학습·Drive 보관은 고정본 테스트에서 확인한다.
+
+## 2026-11-12 실제 준비 실패와 파일 pin 비교 수정
+
+고정 `231e651`의 실제 시험은 `one_clip_prepare`에서 `v14_clip_file_pins`로 중단됐으며 GPU 학습은 시작하지 않았다. 회수 근거는 `outputs/v14_oracle_release_20261112/user_test/failed_prepare_001/status.zip`과 receipt다. Root가 회수 ZIP의 CRC/SHA를 독립 확인했다. 이 실패를 모델 수렴 실패로 해석하지 않는다.
+
+원인은 selection과 cache의 파일 metadata 사전 전체가 같아야 한다는 잘못된 가정이다. 고정50frame의150file 중 selection135개는 `path`만,15개는 `path/sha256/size_bytes`를 갖는다. Cache producer는 실제 바이트를 검사한 뒤 모든 파일에 크기·SHA를 기록한다. 따라서 원래 비교는45frame을 거부하지만 selection이 지정한 실제 값의 불일치는0개였다. Frame0은 세 pin이 완전해 통과하고 frame1의 path-only pin에서 처음 실패한다.
+
+수정은 v1.4의 `_check_clip_file_pins`로 제한했다. 양쪽 train split과 동일한 파일 role 집합을 요구하고, **selection에 존재하는 모든 필드**를 cache와 대조한다. 모든150path와 기존15SHA·15size 검사를 유지하며 cache의 정당한 추가 측정 필드를 허용한다. `_checked_plan`, 고정 cache content SHA, 진단 bundle pin, part 복사 SHA, 실제 `RawCache.read_pair`의 member 크기·바이트 SHA 검사는 변경하지 않았다. 실험 설정·학습 예산·v1.2 코드·고정 release도 변경하지 않았다.
+
+실제 원본 metadata를 전체 pin으로 검증한 뒤 새 비교를50frame/150file에 적용했다. 근거는 `outputs/v14_oracle_development/file_pin_fix/metadata_review.json`과 `metadata_cache/cache_manifest.json`이다. 원본 RGB/pose payload 읽기는0이며 실제 part 준비·Drive·CUDA를 실행한 것은 아니다.
+
+회귀 fixture `tests/fixtures/v14_clip_file_pins.json`은 해당 고정 metadata의50행을 추출한 것으로135/15 혼합을 보존한다. 테스트는 Git의 CRLF/LF 변환과 무관한 canonical JSON SHA `4b2cfd6b54bfa2ef349ea43344380b194414ac7285f3c8d00eb5ed6f8690f584`를 사용한다. 신규3검사는 실제 혼합 metadata 통과,150path·15SHA·15size 각각의 변경 거부, split·파일 role 불일치 거부를 확인한다.
+
+신규3개와 기존 oracle11개를 합친14검사는 재확인에서21.258초·정상 종료로 통과했다. 최초 실행에서는 기존 pause/resume 검사의 `run.json` 원자 교체에서 `WinError 5`가1회 발생했다(20.169초). 원인은 미확정이며 비교 수정으로 해결됐다고 주장하지 않는다. Root는 신규3개와 해당 기존 pause/resume1개를 독립 재실행해8.405초에 통과했다. 실패 로그는 `outputs/v14_oracle_development/file_pin_fix/regression.log`, 재확인 로그는 `regression_recheck.log`에 보존했다.
+
+수정·검증 후 코드를 동결한다. 커밋·새 고정 source ZIP/notebook 발급과 테스트 재인계는 root가 담당하며, 실제 클립 준비와 GPU 학습 성공은 새 고정본의 시험 결과로 별도 확인한다.

@@ -11,7 +11,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │  │
 │  └─ v1.4 — 한 train 클립 + GT 2D + hand용 GT 상체
 │             정답 조건에서도 3D 형태를 학습할 수 있는지 분리 진단
-│             [구현·로컬 검증 완료 / 실제 입력·GPU 시험 대기]
+│             [준비 단계 비교 오류 수정·로컬 검토 / 실제 재시험 대기]
 │             ├─ 복원 성공 → 예측 2D·예측 상체로 하나씩 교체하는 후속 후보
 │             └─ 미수렴    → 최적화·좌표·조건·loss·sampling 원인 재검토
 │
@@ -235,3 +235,12 @@ Frontend는 전체 train을 사용하고 teacher는 완전281·짧은156·tail12
 시험 순서는 준비1청크의 원본 변환·hash 확인, 고정 예산 내 나머지 입력 준비, GPU20update pilot, 그 checkpoint에서 고정10epoch까지 유한 호출로 재개다. Pilot은 frontend 연결만 확인하며 teacher 수렴을 입증하지 않는다. 신규 입력 캐시는 약8.47GiB 이미지 tensor와 metadata로 구성하고 사용자 수행 셀로 Drive에 보존한다. 전체 준비 최소7호출과 결과 보관 비용을 별도로 기록하며 실패 시 설정/예산을 자동 확대하지 않는다.
 
 판정은 운영 성공(coverage·재개·보관·유한 loss)과 모델 개선(기존 분기 대비2D오차·3D형태·시간변화)을 분리한다. 실제 준비·CUDA·Drive 결과는 아직 없다. v1.4 oracle 진단과 v1.3 보류 상태는 유지한다. 상세 실행 조건과 로컬 검증은 [v1.2 학습 연결](V12_TRAINING_CONNECTION.md), 고정 소스·notebook·입력 pin은 배포 receipt/TEST_HANDOFF.md를 따른다.
+
+
+### 2026-11-12 v1.4 실제 준비 실패
+
+테스트 세션이 A100-SXM4-40GB·torch2.14.1+cu130 환경에서 `one_clip_prepare`의 `v14_clip_file_pins` 오류를 보고했다. 학습은 시작하지 않았으므로 수렴·형태 개선 가설을 판정할 근거가 아니다. Root가 status.zip1,421bytes의 CRC와 receipt SHA `e9d2fdfd606748285988172007eb618c03155db20024af63d116b45e30b788ce`를 확인했다.
+
+고정 selection의50frame/150file 중135개는 경로만,15개는 경로·크기·SHA가 있다. 캐시 생성기는 모든 항목에 크기·SHA를 추가하는데 v1.4는 두 files 사전 전체를 직접 비교했다. 이 비교는 정상적인 정보 추가도 거부한다. 기존 로컬 검사는 이 실제 혼합형 selection 경로를 포괄하지 못했다. 선택 목록에 존재하는 pin을 모두 대조하고 고정 캐시 identity와 실제 바이트 검증은 유지하는 최소수정을 검토한다. 실험조건·예산은 변경하지 않으며 v1.2 진행과 분리한다.
+
+후속 root 검토: 고정 selection·cache manifest의 content pin을 검증하고50frame 전체 및 실제 metadata fixture 일치를 확인했다. 신규pin검사3개와 기존재개1개를8.405초에 통과했다. 개발자의 최초14검사 중 기존 Windows run.json 원자교체 WinError5가1회 있었고 root 단독재개에서는 재현되지 않았다. 원인은 미확정으로 유지한다. 준비 실패는 비교 로직 오류로 판단하며 payload 손상으로 판단하지 않는다. 새 고정 소스로 같은 클립·설정·예산을1회 재시험하고 실제 준비·학습 성공 여부는 후속 결과로 판정한다.

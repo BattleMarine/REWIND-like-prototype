@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-12 v1.4 실제시험: A100 환경에서 클립 준비의 파일 pin 비교 오류로 중단돼 학습은 미시작이다. status ZIP의 CRC/SHA와 고정 selection의 혼합 metadata 구조를 검토했으며 비교 로직 최소수정과 실제 metadata 회귀 검토를 완료했다. 같은 조건의 새 고정본으로 실제 준비·학습을 재시험한다. [실험 계보](V1_EXPERIMENT_LINEAGE.md).
+
 2026-11-12 v1.2 학습 연결: 완료된 감사 manifest를 사용하여 train20,888 전체를 frontend와 short/tail 포함564개 teacher clip에 연결했다. 기존 validation·모델·각10epoch를 유지하고 float32 청크 캐시·특징 캐시·중단/재개·제한된 주기/종료 보관과 사용자 캐시 보존 셀을 추가했다. 실제 준비·CUDA 학습·Drive 복원은 시험 전이며 아래 short/tail 미완료 표기는 당시 기록이다. [실행 조건·검증·한계](V12_TRAINING_CONNECTION.md).
 
 2026-11-12 v1.4 구현 검토: 고정50frame GT2D·hand GT상체 oracle 학습, 각5000update·단계별형태/평균자세 비교, 재개/회수·Colab 진입점을 추가했다. Root 신규11검사와 개발자 확장29검사 정상종료 통과. 실제입력/CUDA/Drive시험은 미실행이며 수렴·일반화 완료가 아니다. [고정 계약·한계](V14_ORACLE_OVERFIT.md).
