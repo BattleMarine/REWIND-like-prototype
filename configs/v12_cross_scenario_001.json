@@ -1,0 +1,20 @@
+{
+  "run_id": "V12-CROSS-SCENARIO-001",
+  "environments": ["CityPark_Showcase", "DowntownWest_Demo_Environment"],
+  "split": "validation",
+  "clips_per_environment": 2,
+  "clip_frames": 50,
+  "model_sha256": "48661e75e0969ca140ab9cf0e543d73d2bb3b9ec108d30652cf7fb4f4b76b506",
+  "model_bytes": 873393783,
+  "model_drive_relative": "REWIND-like prototype/reports/v1_branch_experiments/v12_training/run-a3698ed7d1bfb34114b4ce144fb6dc317cdd73e89ca4c18372eb0794d5e41ba7/attempt-d31bc5bd2ba14958bd1cd908813ffcf0/training.zip",
+  "rgb_drive_relative": "REWIND-like prototype/datasets/UnrealEgo2/UnrealEgoData2_train_val_rgb",
+  "pose_drive_relative": "REWIND-like prototype/datasets/UnrealEgo2/UnrealEgoData2_train_val_pose",
+  "limits": {
+    "metadata_seconds": 1800, "metadata_entries": 100000, "metadata_bytes": 33554432,
+    "prepare_seconds": 3600, "source_read_bytes": 2147483648, "infer_seconds": 3600,
+    "model_copy_seconds": 600, "model_zip_bytes": 1073741824,
+    "result_bytes": 268435456, "package_seconds": 600, "copy_readback_seconds": 600,
+    "initial_free_disk_bytes": 8589934592, "initial_available_ram_bytes": 4294967296,
+    "observed_rss_bytes": 4294967296
+  }
+}

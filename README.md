@@ -67,6 +67,8 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 
 ## 다음 작업
 
+2026-11-15 승인에 따라 고정 v1.2 모델을 CityPark·Downtown 공식 validation 연속클립에 재학습 없이 적용하는 `V12-CROSS-SCENARIO-001`을 준비합니다. 시나리오별 최대2클립·각50프레임을 사전 선정해 2D/3D 오차와 전체 클립 GIF를 확인합니다. 실제 시나리오 추론 결과는 아직 없으며 v1.3 혼합학습은 계속 보류합니다. [평가·시각화 실행 계약](docs/V12_CROSS_SCENARIO.md).
+
 v1·v1.1·v1.2·v1.4의 조건과 결과를 [종합 비교](docs/V1_COMPARISON_AND_V15_PLAN.md)했습니다. v1.5는 같은 클립에서 GT와 예측 입력의 효과를 분리하는 설계 제안이며 아직 구현·학습하지 않았습니다.
 
 실험의 분기 트리·설계 목적·원인 가설·결과별 다음 판단은 [v1 실험 의사결정 기록](docs/V1_EXPERIMENT_LINEAGE.md)에 누적합니다. v1.1의 형태 축소를 분리하는 **v1.4: 한 train 클립의 GT 2D·GT 상체 조건 학습**을 구현·로컬 검증했습니다. [실행 계약](docs/V14_ORACLE_OVERFIT.md). 실제 단일클립 GT조건 학습은 완료됐으며 [결과](docs/V14_ORACLE_RESULTS.md)를 참고합니다.

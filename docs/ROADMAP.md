@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-15 교차 시나리오 평가 승인: 고정 v1.2 best 모델로 CityPark·Downtown 공식 validation의 시나리오별 최대2개 연속50프레임 클립을 재학습 없이 추론·평가·시각화하도록 준비한다. 실제 GPU/Drive 실행과 성능 판단은 테스트 세션의 결과 회수 후 진행하며 v1.3 혼합학습·v1.5 학습은 승인 범위가 아니다. [고정 평가 계약](V12_CROSS_SCENARIO.md).
+
 2026-11-15 v1.5 방향 제안: v1/v1.1/v1.2/v1.4를 비교하고 연속클립 평가와 동일초기화·동일학습량의 GT/예측 조건 분리를 제안했다. 구현·새 학습은 미시작이며 입력·예산·판정은 후속 확정 사항이다. [종합 비교·설계](V1_COMPARISON_AND_V15_PLAN.md).
 
 2026-11-15 v1.2 전체학습 완료: 각10epoch·115,720update, 참고 validation2D89.97px/body169.56mm/hand global318.56mm. Root ZIP19파일 무결성과 checkpoint18개 CPU 로드·유한값 검토 완료. Body 축소 완화, 손 축소 잔존이며 후속 train2프레임 T=1 시각화에서 잔여 자세 오류를 확인했으며 연속 validation·독립 일반화 검증은 남았다. [결과와 후속 제안](V12_TRAINING_RESULTS.md).
