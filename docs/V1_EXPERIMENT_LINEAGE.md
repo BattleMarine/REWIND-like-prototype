@@ -18,7 +18,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
-│          [전체 감사 완료 / VM 소실 후8,192프레임 복원 보고 / 학습 전]
+│          [전체 감사 완료 / 입력 준비20,608프레임 정상 paused 보고 / 학습 전]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -292,3 +292,10 @@ v1.1 train loss감소와유효gradient는학습이작동했음을보여준다. �
 관측한 원격 ledger는4예약/55,593bytes·lease 없음이며 최신 status나 catalog가 추가로 확인되지 않았다. 따라서 VM 소실 전 추가 진행·읽기 비용은 미확정이고0으로 간주하지 않는다. 영구 보존이 확인된8,192만 재개 기준으로 사용한다. 정상 finally 종료가 없는 VM 소실에는 종료 보고서 보관을 보장하지 않는다.
 
 이전 VM과 다른 writer가 종료됐음, 실행 직전 기존 ledger/seal/lease, 같은 source/config/입력/라이브러리, 로컬64청크·binding·원본root·여유16GiB를 확인한 후 같은 예산으로 준비1회 재개하도록 인계했다. 새 VM 생성만으로 이전 writer 종료를 추정하지 않으며 lease나ledger를 자동 삭제/초기화하지 않는다. 복원은 preparation.json을 생성하지 않을 수 있으므로 해당 파일 부재만으로 실패라고 판단하지 않는다. 결과/복원 출력을 restored_001 등에 보존하며 실제 재개 성공은 후속 검토다.
+
+
+### 2026-11-14 v1.2 정상 시간 상한 중단 보고
+
+사용자 출력에서 prepare child returncode0, preparation paused/reason v12_prepare_time_limit, 완료20,608/23,124프레임(약89.1%,161청크), 이번 원본읽기7,741,881,783bytes·경과7,080.420초를 확인했다. 7,200초 중 종료 여유120초를 남기는 정상 중단이며 이전 KeyboardInterrupt와 구분한다. 보고서 content SHA는 `5ff2fe2f167e4046ffb35cea2fd1ec6aa8447582530f484ede5288a98ee748dc`다. 이번 호출 시작 frame은 출력에 없어 전체 증가량으로 호출 처리속도를 계산하지 않는다.
+
+사용자 보고상 원격status 보관8건은verified이고 ledger8예약/145,502bytes다. 이는 출력 검토이며 이번 ZIP·catalog·ledger 본문을 root가 독립 검증한 상태는 아니다. Status ZIP 보관과 입력 캐시 prefix 보관을 구별한다. 테스트 세션에 해당 report/receipt 연결 검증과 사용자의161청크 cache 보존·catalog 확인을 요청했다. 잔여2,516프레임은 같은 source7e10201·환경·경로·예산, writer 종료/lease/여유 공간 확인 후 정상paused 재개 계약으로 준비1회 이어간다. 16attempt와12GiB에서145,502bytes를 뺀 결과 보관 예산은 준비·학습이 공유한다. 전체23,124 준비·검증 전에 GPU학습을 시작하지 않으며 한 호출 안의 완료를 보장하지 않는다.
