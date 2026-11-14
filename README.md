@@ -10,7 +10,7 @@
 
 장시간 실행 결과는 Drive 자동 보관을 기본으로 준비합니다. v1.1은 종료 후 모델 ZIP을, 새 v1.2 notebook은 각 단계 종료 후 보고서를 보관합니다. [적용 범위·한계](docs/RESULT_RETENTION.md).
 
-v1.2 ArchVis 전체 train20,888페어로 frontend/body/hand 각10epoch·115,720update를 완료했습니다. 참고 validation best는2D89.97px, body169.56mm, hand global318.56mm입니다. Body 형태 축소는 완화됐고 손 축소는 남았습니다. 회수 checkpoint18개 CPU 로드·유한값 검토를 완료했으며 실제 추론 시각화와 독립 일반화 검증은 남았습니다. [결과·검증·한계](docs/V12_TRAINING_RESULTS.md).
+v1.2 ArchVis 전체 train20,888페어로 frontend/body/hand 각10epoch·115,720update를 완료했습니다. 참고 validation best는2D89.97px, body169.56mm, hand global318.56mm입니다. Body 형태 축소는 완화됐고 손 축소는 남았습니다. 회수 checkpoint18개 CPU 로드·유한값 검토를 완료했으며 로컬 train2프레임의 실제 예측 시각화에서 형태 복원과 잔여 자세 오류를 확인했습니다. 연속 validation 시각화와 독립 일반화 검증은 남았습니다. [결과·검증·한계](docs/V12_TRAINING_RESULTS.md).
 
 v1.4 단일클립 GT조건 진단은 A100에서 각5,000update를 완료했습니다. Body13.71mm·hand local2.90mm로 형태 복원을 확인했으며, 실제 RGB 추론·일반화 성능과는 구분합니다. [결과와 해석](docs/V14_ORACLE_RESULTS.md) · [v1.1 비교·원인 가설·후속 테스트](docs/V11_V14_COMPARATIVE_REVIEW.md).
 

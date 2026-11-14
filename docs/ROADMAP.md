@@ -1,6 +1,6 @@
 # REWIND-like prototype 프로젝트 로드맵
 
-2026-11-15 v1.2 전체학습 완료: 각10epoch·115,720update, 참고 validation2D89.97px/body169.56mm/hand global318.56mm. Root ZIP19파일 무결성과 checkpoint18개 CPU 로드·유한값 검토 완료. Body 축소 완화, 손 축소 잔존이며 실제 추론 시각화·독립 일반화 검증은 남았다. [결과와 후속 제안](V12_TRAINING_RESULTS.md).
+2026-11-15 v1.2 전체학습 완료: 각10epoch·115,720update, 참고 validation2D89.97px/body169.56mm/hand global318.56mm. Root ZIP19파일 무결성과 checkpoint18개 CPU 로드·유한값 검토 완료. Body 축소 완화, 손 축소 잔존이며 후속 train2프레임 T=1 시각화에서 잔여 자세 오류를 확인했으며 연속 validation·독립 일반화 검증은 남았다. [결과와 후속 제안](V12_TRAINING_RESULTS.md).
 
 2026-11-14 v1.2 진행 보고: 사용자 출력상20,608/23,124프레임 준비 후7,080초 정상 시간 상한으로 paused됐다. 잔여2,516프레임이며 캐시 보존·현재 상태 확인 후 같은 예산으로 이어간다. 새 보고서 본문 독립검토·전체준비·GPU학습은 아직이다. [관찰과 후속 조건](V1_EXPERIMENT_LINEAGE.md).
 

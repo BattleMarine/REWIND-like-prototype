@@ -29,6 +29,8 @@ from rewind_v1.diagnostic import HISTORICAL, validate_pilot
 from rewind_v1.expansion import RUN_ID, validate_expansion
 from rewind_v1.frontend import PaperHeatmapFrontend, predicted_features
 from rewind_v1.teacher import V1Body, V1Hand
+from rewind_v1.full_contract import MANIFEST_SHA, RUN_ID as FULL_RUN_ID, diagnostic_decision
+from rewind_v1.full_training import FORMAT as FULL_FORMAT, validate_full_config
 
 
 TRAINING_SHA = "8bd6b99d1119f5f0255ba63143d931c69fde40bd7be93f9b5171fd3eb2d7257d"
@@ -88,24 +90,39 @@ def _selected_pins(report, files, with_teachers, checkpoint_epoch):
 
 def _models(path, spec, with_teachers, *, training_sha256=None, run_id="V1-DIAGNOSTIC-001", checkpoint_epoch=None):
     expansion = run_id == RUN_ID
-    if (run_id not in ("V1-DIAGNOSTIC-001", RUN_ID) or (expansion and not _hash(training_sha256))
-            or (not expansion and training_sha256 not in (None, TRAINING_SHA))):
+    full = run_id == FULL_RUN_ID
+    if (run_id not in ("V1-DIAGNOSTIC-001", RUN_ID, FULL_RUN_ID)
+            or ((expansion or full) and not _hash(training_sha256))
+            or (not (expansion or full) and training_sha256 not in (None, TRAINING_SHA))
+            or (full and checkpoint_epoch is not None)):
         raise ValueError("v1_view_explicit_training_identity")
     training_sha256 = training_sha256 or TRAINING_SHA
-    with _archive(path, training_sha256, (1024 if expansion else 512)*MIB) as stream, zipfile.ZipFile(stream) as archive:
+    with _archive(path, training_sha256, (2048 if full else 1024 if expansion else 512)*MIB) as stream, zipfile.ZipFile(stream) as archive:
         receipt = read_json(_member(archive, "recovery_receipt.json", MIB))
-        if receipt["schema"] != "rewind_v1_recovery_v1":
+        if receipt["schema"] != ("archvis_v12_training_recovery_v1" if full else "rewind_v1_recovery_v1"):
             raise ValueError("v1_view_training_receipt")
+        if full:
+            check_pin(receipt, "archvis_v12_training_recovery_v1", receipt.get("content_sha256"))
         files = receipt["files"]
         report = read_json(_member(archive, "run.json", MIB, files["run.json"]))
-        expected_epochs = dict.fromkeys(("frontend", "body", "hand"), 10 if expansion else 1)
-        if (report["status"] != "completed" or report["cursor"]["updates"] != (5400 if expansion else 540)
+        expected_epochs = dict.fromkeys(("frontend", "body", "hand"), 10 if expansion or full else 1)
+        if (report["status"] != "completed" or report["cursor"]["updates"] != (115720 if full else 5400 if expansion else 540)
                 or report["input"]["run_id"] != run_id or report["config"]["epochs"] != expected_epochs
                 or report["input"]["spec_sha256"] != SPEC_SHA
-                or report["input"]["selection_sha256"] != HISTORICAL["selection_sha256"]
-                or report["input"]["cache_sha256"] != HISTORICAL["cache_sha256"]):
+                or (not full and (report["input"]["selection_sha256"] != HISTORICAL["selection_sha256"]
+                                  or report["input"]["cache_sha256"] != HISTORICAL["cache_sha256"]))):
             raise ValueError("v1_view_training_binding")
-        (validate_expansion if expansion else validate_pilot)(report["config"])
+        if full:
+            if (report["format"] != FULL_FORMAT or report["input"]["manifest_sha256"] != MANIFEST_SHA
+                    or report["coverage"]["train_unique_frames"] != 20888
+                    or report["coverage"]["frontend_validation_frames"] != 2236
+                    or report["coverage"]["teacher_validation_frames"] != 1450):
+                raise ValueError("v12_view_training_binding")
+            decision = report["input"]["diagnostic_decision"]
+            check_pin(decision, "archvis_v12_training_diagnostic_decision_v1", report["input"]["decision_sha256"])
+            if canonical(decision) != canonical(diagnostic_decision(report["config_sha256"], report["input"]["plan_sha256"])):
+                raise ValueError("v12_view_diagnostic_contract")
+        (validate_full_config if full else validate_expansion if expansion else validate_pilot)(report["config"])
         selected = _selected_pins(report, files, with_teachers, checkpoint_epoch)
         implementations = ["rewind_v1/frontend.py", "rewind_v1/data.py", "rewind_m1/frontend.py",
                            "rewind_m1/rgb_frontend_artifacts.py", "rewind_m1/local_rgb.py"]
@@ -264,7 +281,7 @@ def panel(raw, pred, gt, predicted3d, target3d, spec, sequence, frame, scope, mo
     return canvas
 
 
-def comparison_panel(raw, first2d, second2d, gt2d, first3d, second3d, gt3d, spec, frame, epochs, scope):
+def comparison_panel(raw, first2d, second2d, gt2d, first3d, second3d, gt3d, spec, frame, epochs, scope, *, model_labels=None):
     size = 360
     rows = 3 if second3d is not None else 2
     canvas = Image.new("RGB", (3*size+48, 108+rows*(size+30)), DARK)
@@ -275,7 +292,7 @@ def comparison_panel(raw, first2d, second2d, gt2d, first3d, second3d, gt3d, spec
     draw.text((12, 39), f"{scope} / {conditioning}", font=font, fill="#b9c8d4")
     draw.text((12, 62), "Body: amber  /  fingers: cyan  /  3D shares axes and scale across all columns", font=font, fill="#b9c8d4")
     selected = " ".join(f"{role[0].upper()}{epoch}" for role, epoch in epochs.items())
-    labels = ("v1 1 epoch", f"v1.1 best  {selected}", "GT annotation")
+    labels = (*model_labels, "GT annotation") if model_labels is not None else ("v1 1 epoch", f"v1.1 best  {selected}", "GT annotation")
     groups = (first2d, second2d, gt2d)
     for row, side in enumerate(("left", "right")):
         for col, (label, points) in enumerate(zip(labels, groups)):
