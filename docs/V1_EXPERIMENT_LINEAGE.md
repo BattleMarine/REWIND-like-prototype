@@ -18,7 +18,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
-│          [전체 감사 완료 / 입력 준비20,608프레임 정상 paused 보고 / 학습 전]
+│          [각10epoch 완료 / 2D·body 개선, 손 축소 잔존 / 회수 모델 검토 완료]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -299,3 +299,10 @@ v1.1 train loss감소와유효gradient는학습이작동했음을보여준다. �
 사용자 출력에서 prepare child returncode0, preparation paused/reason v12_prepare_time_limit, 완료20,608/23,124프레임(약89.1%,161청크), 이번 원본읽기7,741,881,783bytes·경과7,080.420초를 확인했다. 7,200초 중 종료 여유120초를 남기는 정상 중단이며 이전 KeyboardInterrupt와 구분한다. 보고서 content SHA는 `5ff2fe2f167e4046ffb35cea2fd1ec6aa8447582530f484ede5288a98ee748dc`다. 이번 호출 시작 frame은 출력에 없어 전체 증가량으로 호출 처리속도를 계산하지 않는다.
 
 사용자 보고상 원격status 보관8건은verified이고 ledger8예약/145,502bytes다. 이는 출력 검토이며 이번 ZIP·catalog·ledger 본문을 root가 독립 검증한 상태는 아니다. Status ZIP 보관과 입력 캐시 prefix 보관을 구별한다. 테스트 세션에 해당 report/receipt 연결 검증과 사용자의161청크 cache 보존·catalog 확인을 요청했다. 잔여2,516프레임은 같은 source7e10201·환경·경로·예산, writer 종료/lease/여유 공간 확인 후 정상paused 재개 계약으로 준비1회 이어간다. 16attempt와12GiB에서145,502bytes를 뺀 결과 보관 예산은 준비·학습이 공유한다. 전체23,124 준비·검증 전에 GPU학습을 시작하지 않으며 한 호출 안의 완료를 보장하지 않는다.
+
+
+## 2026-11-15 v1.2 전체 학습 결과와 다음 분기
+
+각10epoch·115,720update 완료 후 ZIP19파일과 모델18개를 root가 검토했다. 참고 validation best2D89.97px/body169.56mm/hand global318.56mm이며 body 뼈 길이 비율88.7%, 손56.4%로 body 축소는 완화되고 손은 남았다. [결과·근거·시간 범위](V12_TRAINING_RESULTS.md).
+
+분기 가설인 데이터·학습 신호 부족과 양립하는 개선이지만 데이터 수와 업데이트가 동시에 증가했으므로 원인을 분리하지 못한다. v1.4 oracle 성공을 예측 입력 일반화 성공으로 확장하지 않는다. 다음은 같은 모델의 실제 추론 시각화→hand 상체 조건 민감도→동일 평가의 업데이트별 비교를 제안한다. 새 학습·v1.3 확대 승인은 아니며 기존 v1.1/v1.4 통제 실험 제안도 보존한다.

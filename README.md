@@ -6,11 +6,11 @@
 
 ## 현재 상태
 
-2026-11-14 기준입니다. 학습은 A100에 제한하지 않고 지원되는 CUDA GPU를 사용합니다. 실제 GPU·VRAM·시간을 기록하며 A100 조건은 추론 레이턴시 비교 시험에서 별도로 적용합니다.
+2026-11-15 기준입니다. 학습은 A100에 제한하지 않고 지원되는 CUDA GPU를 사용합니다. 실제 GPU·VRAM·시간을 기록하며 A100 조건은 추론 레이턴시 비교 시험에서 별도로 적용합니다.
 
 장시간 실행 결과는 Drive 자동 보관을 기본으로 준비합니다. v1.1은 종료 후 모델 ZIP을, 새 v1.2 notebook은 각 단계 종료 후 보고서를 보관합니다. [적용 범위·한계](docs/RESULT_RETENTION.md).
 
-v1.2 ArchVis 전체 파일 감사가 완료됐습니다(train20,888·validation2,236). 감사 manifest를 사용하는 short/tail 포함 학습·청크 캐시·저장/재개 연결을 구현했으며 사용자 출력상 입력 준비는20,608/23,124프레임(약89.1%)에서 정상 시간 상한으로 중단됐습니다. 캐시 보존과 현재 상태를 확인한 뒤 남은2,516프레임을 같은 설정으로 준비합니다. GPU 학습은 아직 시작 전입니다. 실제 시간 동기·motion 독립성은 미확인으로 유지합니다. [감사 근거](docs/V12_AUDIT_RESUME.md#2026-11-12-전체-파일-감사-완료) · [전체 학습 연결·실행 조건](docs/V12_TRAINING_CONNECTION.md).
+v1.2 ArchVis 전체 train20,888페어로 frontend/body/hand 각10epoch·115,720update를 완료했습니다. 참고 validation best는2D89.97px, body169.56mm, hand global318.56mm입니다. Body 형태 축소는 완화됐고 손 축소는 남았습니다. 회수 checkpoint18개 CPU 로드·유한값 검토를 완료했으며 실제 추론 시각화와 독립 일반화 검증은 남았습니다. [결과·검증·한계](docs/V12_TRAINING_RESULTS.md).
 
 v1.4 단일클립 GT조건 진단은 A100에서 각5,000update를 완료했습니다. Body13.71mm·hand local2.90mm로 형태 복원을 확인했으며, 실제 RGB 추론·일반화 성능과는 구분합니다. [결과와 해석](docs/V14_ORACLE_RESULTS.md) · [v1.1 비교·원인 가설·후속 테스트](docs/V11_V14_COMPARATIVE_REVIEW.md).
 
@@ -67,7 +67,7 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 
 ## 다음 작업
 
-실험의 분기 트리·설계 목적·원인 가설·결과별 다음 판단은 [v1 실험 의사결정 기록](docs/V1_EXPERIMENT_LINEAGE.md)에 누적합니다. v1.1의 형태 축소를 분리하는 **v1.4: 한 train 클립의 GT 2D·GT 상체 조건 학습**을 구현·로컬 검증했습니다. [실행 계약](docs/V14_ORACLE_OVERFIT.md). 실제 입력 준비·GPU 학습·Drive 보관은 사용자 시험에서 확인하며 아직 성능 결과는 없습니다.
+실험의 분기 트리·설계 목적·원인 가설·결과별 다음 판단은 [v1 실험 의사결정 기록](docs/V1_EXPERIMENT_LINEAGE.md)에 누적합니다. v1.1의 형태 축소를 분리하는 **v1.4: 한 train 클립의 GT 2D·GT 상체 조건 학습**을 구현·로컬 검증했습니다. [실행 계약](docs/V14_ORACLE_OVERFIT.md). 실제 단일클립 GT조건 학습은 완료됐으며 [결과](docs/V14_ORACLE_RESULTS.md)를 참고합니다.
 
 v1.1은 같은1,000페어의epoch확대, v1.2는ArchVis 전체train확대를 병행 준비합니다. v1.3다른시나리오추가는보류합니다. [분기실험·비용](docs/V1_BRANCH_EXPERIMENTS.md). 아래기존순서보다이결정을우선합니다.
 
