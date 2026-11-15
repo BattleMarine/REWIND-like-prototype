@@ -255,6 +255,8 @@ def prepare(inputs,selection,pin,output,*,budget=None,context=None):
                         path = _payload_path(roots["pose" if role=="pose" else "rgb"],item["path"])
                         if _no_link(path).st_mtime_ns!=item["mtime_ns"]:raise ValueError("cross_source_changed_after_selection")
                         raw[role] = budget.read(path,item["size_bytes"])
+                        if "sha256" in item and sha(raw[role])!=item["sha256"]:
+                            raise ValueError("cross_fixed_source_hash_mismatch")
                         relative = f"raw/{role}/{record['frame']:09d}."+("json" if role=="pose" else "png")
                         destination = staged/relative;destination.parent.mkdir(exist_ok=True,parents=True)
                         destination.write_bytes(raw[role])

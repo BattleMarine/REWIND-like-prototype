@@ -1,0 +1,62 @@
+{
+  "run_id": "V12-CAMERA-GAUGE-001",
+  "environments": [
+    "ArchVisInterior_ArchVis_RT",
+    "CityPark_Showcase",
+    "DowntownWest_Demo_Environment"
+  ],
+  "split": "validation",
+  "clips_per_environment": 2,
+  "clip_frames": 50,
+  "model_sha256": "48661e75e0969ca140ab9cf0e543d73d2bb3b9ec108d30652cf7fb4f4b76b506",
+  "model_bytes": 873393783,
+  "model_drive_relative": "REWIND-like prototype/reports/v1_branch_experiments/v12_training/run-a3698ed7d1bfb34114b4ce144fb6dc317cdd73e89ca4c18372eb0794d5e41ba7/attempt-d31bc5bd2ba14958bd1cd908813ffcf0/training.zip",
+  "rgb_drive_relative": "REWIND-like prototype/datasets/UnrealEgo2/UnrealEgoData2_train_val_rgb",
+  "pose_drive_relative": "REWIND-like prototype/datasets/UnrealEgo2/UnrealEgoData2_train_val_pose",
+  "limits": {
+    "metadata_seconds": 1800,
+    "metadata_entries": 100000,
+    "metadata_bytes": 33554432,
+    "prepare_seconds": 3600,
+    "source_read_bytes": 2147483648,
+    "infer_seconds": 3600,
+    "model_copy_seconds": 600,
+    "model_zip_bytes": 1073741824,
+    "result_bytes": 268435456,
+    "package_seconds": 600,
+    "copy_readback_seconds": 600,
+    "initial_free_disk_bytes": 8589934592,
+    "initial_available_ram_bytes": 4294967296,
+    "observed_rss_bytes": 4294967296,
+    "reference_zip_bytes": 67108864,
+    "reference_unpacked_bytes": 134217728,
+    "reference_members": 100
+  },
+  "references": {
+    "city": {
+      "bytes": 47144765,
+      "sha256": "c302fede5d8f3f5d72548dedb627f57892e9d8420670381e4c49ebd049bc6910",
+      "source_sha256": "849b615f3129620aff585505d5ae435a5bf9650631ccb8511bdcd9a147c630f5",
+      "revision": "2de4262"
+    },
+    "control": {
+      "bytes": 23996807,
+      "sha256": "48ca2d5cab15596b637bbb3db47a7736e32446cc516d6994fa6bdbf79ed7c63b",
+      "source_sha256": "f0742d9b8c137c50add64059c7404440add35c6ecce71f56a74d51646f9bc116",
+      "revision": "fdab0f1f499869a0d292a3d58944020b6a187f84"
+    }
+  },
+  "variants": [
+    "baseline",
+    "zero_repeat",
+    "first_midpoint",
+    "world_x_plus_100m"
+  ],
+  "comparison_tolerance": {
+    "atol_mm": 0.01,
+    "rtol": 1e-05,
+    "atol_native_px": 0.001,
+    "invariance_mm": 1e-06,
+    "encoding_roundtrip_mm": 0.1
+  }
+}

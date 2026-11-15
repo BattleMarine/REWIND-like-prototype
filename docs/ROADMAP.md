@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-15 원점 민감도 진단 승인: `V12-CAMERA-GAUGE-001`로 기존 ArchVis·CityPark·Downtown 6클립300frame에서 같은 모델·RGB·예측2D·noise를 유지하고 camera world 원점만 바꾸는 무재학습 시험을 준비한다. 원본·원본 반복·첫frame stereo 중점 원점·고정100m 이동을 비교하며, Δ는 GT오차로 선택하지 않는다. 좌표 재표현 불변성과 예측 민감도를 분리한다. 실제 실행·개선은 아직 미확인이다. [실험 분기와 판단](V1_EXPERIMENT_LINEAGE.md).
+
 2026-11-15 ArchVis 대조 완료: `fdab0f1`의 ArchVis100frame·camera300행을 회수·독립 검토했다. Body197.34mm·뼈 길이184.87/GT185.28mm로 도시와 달리 몸 크기를 유지했다. Camera translation norm의 큰 환경 차이를 확인했으나 인과는 미확정이다. 후속 후보는 동일입력의 camera 원점 민감도 시험이며 새 실행·학습은 미시작이다. [결과와 판단](V12_CAMERA_CONTROL_RESULTS.md).
 
 2026-11-15 ArchVis 대조 승인: `V12-CAMERA-CONTROL-001`로 ArchVis validation100frame의 동일경로 추론과 기존 도시200frame의 카메라 조건 비교를 준비한다. 동일모델·추론설정을 유지하고 도시예측은고정결과에서재사용하며 대응pose의크기/SHA를대조한다. 조건분포차이는인과증명이아니며새학습·camera정규화변경은포함하지않는다. [실행 설계](V12_CAMERA_CONTROL.md).
