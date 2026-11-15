@@ -1,5 +1,7 @@
 # V12-CROSS-SCENARIO-001 연속클립 평가
 
+2026-11-15 상태: 메모리 검사 수정본 `2de4262`의 실제200frame 평가·회수를 완료했다. 실행 성공과 정확도 실패를 구분한 [결과 보고서](V12_CROSS_SCENARIO_RESULTS.md)를 참조한다. 아래는 고정 실행 계약과 당시 로컬 검증 기록이며, 새 반복 실행 승인이 아니다.
+
 2026-11-15 사용자 승인 범위는 저장된 v1.2 모델로 `CityPark_Showcase`, `DowntownWest_Demo_Environment`를 재학습 없이 평가·시각화하는 것이다. v1.3 혼합학습이나 v1.5 학습을 시작하지 않는다. 개발·합성 fixture 검증과 실제 시나리오 결과는 구분하며 정식 revision/source ZIP/notebook 고정·테스트 세션 인계는 root가 담당한다.
 
 ## 고정 모델과 입력

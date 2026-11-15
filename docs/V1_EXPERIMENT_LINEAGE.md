@@ -22,7 +22,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │          20,888 train + 고정 validation 2,236
 │          [각10epoch 완료 / 2D·body 개선, 손 축소 잔존 / train2프레임 시각화 확인]
 │          └─ V12-CROSS-SCENARIO-001 — CityPark·Downtown 연속클립 전이 평가
-│             [2026-11-15 사용자 승인 / 무재학습 평가 준비 중]
+│             [200frame 평가·회수 완료 / 큰 위치 오차·3D 축소 / 원인 미확정]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -339,3 +339,11 @@ Root의 Drive metadata 확인은 RGB/pose 추출본의 시나리오/Day/인물 �
 고정 revision `68fd9b8`의 run `600e2ba18f8a4e688765572502992c6d`는 bootstrap 이후 selection 전 preflight에서 `cross_initial_available_ram_4GiB`로 중단됐다. 테스트 세션이 전달한 직후 환경 관찰은 total83.47GiB / available80.55GiB / free2.5GiB, disk209.87GiB, A100이다. 코드가 `SC_AVPHYS_PAGES`의 약2.5GiB를 available로 취급해 충분한 회수 가능 메모리를 제외한 것이 원인이다. 데이터 선정·payload 준비·추론 및 phase 보관 준비는 미시작이며 모델 성능 실패가 아니다. 이 값은 순간 OS 관찰이고 cgroup/RSS 한도를 보장하지 않는다. 4GiB 기준은 유지하고 Linux `MemAvailable` 지표로 판정하는 수정과 집중 검증 후 새 고정 소스를 인계한다. 이전 실행의 가드를 직접 바꾸거나 반복하지 않는다.
 
 수정본은 Linux `MemAvailable`을 사용하고 정보 누락·형식 오류를 명시적으로 거부한다. Root가 같은 free값을 대입해 이전 오류를 재현했으며, high available/low free 허용·실제 부족 거부·4GiB 경계·누락/형식/읽기 오류의 집중4검사를 독립 실행해 통과했다(0.022초). 메모리 여유의 OS 추정과 cgroup 제한을 구별하며 실제 Colab 재실행 성공은 아직 미확인이다. 새 배포는 `release_memory_fix/`에 분리하고 원래 실패 근거를 보존한다.
+
+### 재실행 결과: 운영 성공, 교차 시나리오 정확도 실패
+
+`2de4262`에서 두 시나리오 각2개·50frame, 총200frame의 selection/prepare/inference가 complete로 회수됐다. 메모리 지표 수정 뒤 실제 Colab 준비가 진행됐고, 테스트 세션은 Drive 보관 verified를 보고했다. Root는 회수29파일의 크기·SHA와 입력/모델/source 연결을 확인하고 body MPJPE를 재계산했다. A100 FP32 추론 단계86.62초이며 전체 wall-clock·순수 모델 지연은 아니다.
+
+2D valid321.09px, body4,499.75mm, hand global5,218.41mm/local2,166.99mm다. Body 뼈 길이는GT의약9.0%, 중심 위치 오차4,477.52mm로 축소와 큰 위치 이탈이 함께 있다. 중심을 제거해도373.74mm 오차가 남는다. 형상·시각화 축척만의 문제로 설명되지 않는다. 네 클립이 모두 같은 인물명이며 한 동작명도train과겹쳐 독립 일반화 근거는 제한된다. [표본·지표·보조 진단·한계](V12_CROSS_SCENARIO_RESULTS.md).
+
+후속 방향은 같은 경로의 ArchVis 연속클립 대조와 camera/2D 조건 분포 확인, 필요시GT/예측 조건 분리다. 현재카메라수치·raw/tensor 미회수로 조건분포 원인은 미확정이다. 시나리오 혼합학습으로 즉시 전환하지 않으며 v1.3 보류·v1.5 제안을 유지한다. 이 결과 기록은 새 실행·학습 승인이 아니다.
