@@ -67,7 +67,7 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 
 ## 다음 작업
 
-사용자 승인에 따라 같은6클립300frame의 **카메라 원점 민감도 진단**을 준비합니다. RGB·모델·예측2D는 고정하고 원점만 바꿔, 물리적으로 같은 장면에서 예측이 달라지는지 확인합니다. 재학습이나 성능 개선 완료를 뜻하지 않습니다. [실행 계약](docs/V12_CAMERA_GAUGE.md) · [실험 설계 기록](docs/V1_EXPERIMENT_LINEAGE.md).
+같은6클립300frame의 **카메라 원점 민감도 진단을 완료**했습니다. 원점만 정렬해 CityPark body6,721.67→276.27mm, Downtown2,277.83→306.05mm로 개선됐고 ArchVis의+100m 조건은 다시 축소됐습니다. 절대원점 의존성이 주요 기여 요인이라는 근거이며, ArchVis 손 악화도 있어 최종 해결책·일반화 완료는 아닙니다. 다음은 학습·추론에 일관된 camera 표현의 실험 설계 제안입니다. [결과·한계](docs/V12_CAMERA_GAUGE_RESULTS.md) · [실행 계약](docs/V12_CAMERA_GAUGE.md).
 
 고정 v1.2 모델의 CityPark·Downtown 공식 validation200frame 무재학습 평가를 완료했습니다. 실행·회수는 성공했지만 body4,499.75mm와 심한3D 축소·위치 이탈을 확인했습니다. 원인은 미확정이며 같은 추론 경로의 ArchVis 대조와 입력 조건 검토를 제안합니다. v1.3 혼합학습은 계속 보류합니다. [결과·한계](docs/V12_CROSS_SCENARIO_RESULTS.md) · [실행 계약](docs/V12_CROSS_SCENARIO.md).
 
