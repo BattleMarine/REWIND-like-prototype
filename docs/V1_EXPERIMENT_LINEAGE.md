@@ -333,3 +333,9 @@ v1.5는두분기의근거를합쳐 연속클립평가기준정렬→같은초기
 Root의 Drive metadata 확인은 RGB/pose 추출본의 시나리오/Day/인물 폴더 존재까지이며 전체업로드·파일무결성 검증은 아니다. 명목25FPS·stereo frame-key 가정과원본motion 독립성미확인을유지한다. 인물/동작명 중복은proxy로보고하며낯선배경평가를미관측동작검증으로부르지않는다. 구현·로컬검증·고정배포 완료와실제Colab추론결과는별도로기록한다.
 
 로컬 구현 검토에서는 validation만 사전 선택, 선정 후 오류 시 대체 금지, 미래 입력 불변성과 클립 상태 초기화, 손목 누락 mask, 두 합성50프레임의 준비→추론→GIF→결과 ZIP→로컬 보관 읽기 검증 등8개 검사를 root가 독립 실행해 통과했다(33.711초). 실제 v1.2 best 가중치와 합성50프레임 입력에서 새/기존 추론 출력 최대 차이는0.0mm였다. 이는 실행 경로 검증이며 실제 CityPark·Downtown 정확도나 원격 Drive 보관 성공의 증거는 아니다. [실행 계약·결과 해석](V12_CROSS_SCENARIO.md)에 따라 고정 소스와 notebook을 테스트 세션에 인계하며, 회수 후 시나리오별 오차·형태·시간적 안정성을 판단한다.
+
+### 첫 사용자 실행: 준비 전 메모리 지표 오류
+
+고정 revision `68fd9b8`의 run `600e2ba18f8a4e688765572502992c6d`는 bootstrap 이후 selection 전 preflight에서 `cross_initial_available_ram_4GiB`로 중단됐다. 테스트 세션이 전달한 직후 환경 관찰은 total83.47GiB / available80.55GiB / free2.5GiB, disk209.87GiB, A100이다. 코드가 `SC_AVPHYS_PAGES`의 약2.5GiB를 available로 취급해 충분한 회수 가능 메모리를 제외한 것이 원인이다. 데이터 선정·payload 준비·추론 및 phase 보관 준비는 미시작이며 모델 성능 실패가 아니다. 이 값은 순간 OS 관찰이고 cgroup/RSS 한도를 보장하지 않는다. 4GiB 기준은 유지하고 Linux `MemAvailable` 지표로 판정하는 수정과 집중 검증 후 새 고정 소스를 인계한다. 이전 실행의 가드를 직접 바꾸거나 반복하지 않는다.
+
+수정본은 Linux `MemAvailable`을 사용하고 정보 누락·형식 오류를 명시적으로 거부한다. Root가 같은 free값을 대입해 이전 오류를 재현했으며, high available/low free 허용·실제 부족 거부·4GiB 경계·누락/형식/읽기 오류의 집중4검사를 독립 실행해 통과했다(0.022초). 메모리 여유의 OS 추정과 cgroup 제한을 구별하며 실제 Colab 재실행 성공은 아직 미확인이다. 새 배포는 `release_memory_fix/`에 분리하고 원래 실패 근거를 보존한다.

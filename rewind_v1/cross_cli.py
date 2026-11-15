@@ -18,15 +18,31 @@ from .cross_inference import infer
 from . import cross_recovery as recovery
 
 
+def _linux_available_ram():
+    # SC_AVPHYS_PAGES reports free pages, not Linux's reclaimable-aware MemAvailable.
+    try:
+        with Path("/proc/meminfo").open("r",encoding="ascii") as stream:
+            text=stream.read(64*1024+1)
+    except (OSError,UnicodeError) as error:
+        raise RuntimeError("cross_available_ram_unavailable") from error
+    if len(text)>64*1024:raise RuntimeError("cross_available_ram_invalid")
+    rows=[line.split() for line in text.splitlines() if line.split()[:1]==["MemAvailable:"]]
+    if not rows:raise RuntimeError("cross_available_ram_unavailable")
+    if (len(rows)!=1 or len(rows[0])!=3 or rows[0][2]!="kB"
+            or not rows[0][1].isascii() or not rows[0][1].isdecimal() or len(rows[0][1])>20):
+        raise RuntimeError("cross_available_ram_invalid")
+    return int(rows[0][1])*1024
+
+
 def preflight(path):
     path=_local(path,directory=True)
     free=shutil.disk_usage(path).free
     if free<LIMITS["initial_free_disk_bytes"]:raise ValueError("cross_initial_free_disk_8GiB")
-    available=None
-    if hasattr(os,"sysconf"):
-        available=os.sysconf("SC_AVPHYS_PAGES")*os.sysconf("SC_PAGE_SIZE")
-        if available<LIMITS["initial_available_ram_bytes"]:raise MemoryError("cross_initial_available_ram_4GiB")
-    return {"free_disk_bytes":free,"available_ram_bytes":available,"ram_measurement":"OS available pages if supported"}
+    available=_linux_available_ram()
+    if available<LIMITS["initial_available_ram_bytes"]:raise MemoryError("cross_initial_available_ram_4GiB")
+    return {"free_disk_bytes":free,"available_ram_bytes":available,
+            "ram_measurement":"Linux /proc/meminfo MemAvailable",
+            "ram_scope":"OS-visible availability; effective container/cgroup headroom not measured"}
 
 
 def model_copy(source,output,status):

@@ -42,11 +42,13 @@ CPU 또는 지원 CUDA GPU를 명시한다. A100 이름 제한이나 OOM 자동 
 | 추론·모델 로드·metric·그림 | 3,600초 |
 | 모델 copy/hash | 별도600초,최대1GiB; 고정873MB ZIP |
 | 결과 일반 파일 합/회수 ZIP | 각각256MiB |
-| 시작 여유 | 로컬 disk8GiB,OS 관측 available RAM4GiB |
+| 시작 여유 | 로컬 disk8GiB,Linux `/proc/meminfo`의 `MemAvailable`4GiB |
 | CPU RSS | 4GiB 관측guard; OS 강제 보장 아님 |
 | 보관 | 단계마다 package600초 + copy/readback 합계600초 |
 
 Source ZIP64MiB/unpack192MiB·input ZIP16MiB/unpack32MiB는 별도의 bootstrap 범위다. 고정 metadata/소스 pin 재확인 비용과 모델 ZIP 읽기는 payload2GiB와 구분한다. Directory-entry 계량이나 논리 파일 읽기를 실제 Drive/FUSE 네트워크 전송량으로 부르지 않는다.
+
+`MemAvailable`은 회수 가능한 캐시 등을 고려한 OS의 추정치다. `MemFree` 또는 `SC_AVPHYS_PAGES`를 같은 지표로 대신 쓰지 않는다. 메모리 지표 누락·형식 오류는 검증 실패로 처리하며4GiB 조건을 생략하지 않는다. 이 검사는 컨테이너 cgroup 제한·미래 여유·VRAM을 보장하지 않으며 실행 중 RSS 관측guard는 별도로 유지한다.
 
 모델1GiB + raw2GiB + 준비 tensor 약0.08GiB + source/input unpack0.25GiB + 결과0.25GiB + 회수0.25GiB + 렌더 임시 약0.25GiB가 주된 예약이다. 이미 업로드한 모델을 복사하면 로컬 원본0.9GiB가 추가될 수 있어8GiB 여유를 요구한다. Clip별 이미지/특징만 메모리에 두고 GIF는320px tile·클립별로 생성한다. 실제 GPU명/VRAM·threads·단계별 elapsed와 읽기 카운터를 보고한다.
 
@@ -54,7 +56,7 @@ Source ZIP64MiB/unpack192MiB·input ZIP16MiB/unpack32MiB는 별도의 bootstrap 
 
 ## Notebook·CLI와 테스트 세션 순서
 
-배포 위치는 `outputs/v12_cross_scenario_20261115/release/`다. `handoff/v12_cross_scenario_001.ipynb`와 `handoff/handoff_receipt.json`을 사용하며 source ZIP의 정확한 이름·SHA·revision은 receipt에 고정한다. 실제 실행은 이 프로젝트 테스트 세션 `01a14391-c1b9-7a40-b537-af6b0b43709c`에서 안내한다.
+메모리 지표 수정본의 배포 위치는 `outputs/v12_cross_scenario_20261115/release_memory_fix/`다. `handoff/v12_cross_scenario_001.ipynb`와 `handoff/handoff_receipt.json`을 사용하며 source ZIP의 정확한 이름·SHA·revision은 receipt에 고정한다. 이전 `release/`는 첫 실행 근거로 보존한다. 실제 실행은 이 프로젝트 테스트 세션 `01a14391-c1b9-7a40-b537-af6b0b43709c`에서 안내한다.
 
 생성기:
 
@@ -79,6 +81,8 @@ Root가 검토·커밋한 source ZIP과 기존 input ZIP을 `/content`에 둔다
 회수 whitelist는 selection/준비 manifest·보고서·예측 JSON·PNG/GIF·notebook/model 상태다. **원본 RGB/pose·준비 tensor·모델 ZIP은 업로드하지 않는다.** 이 자동 결과 보관은 사용자 입력 캐시 업로드 정책 변경이 아니다. VM 강제 종료·커널 사망에서는 finally를 보장하지 못하며, 브라우저 연결 단절과 VM 종료를 구분한다. Model/result publication은 새 경로만 쓰고 기존 파일을 덮어쓰지 않는다.
 
 ## 로컬 검증 상태와 한계
+
+첫 사용자 실행 `68fd9b8`은 bootstrap 후 preflight가 `SC_AVPHYS_PAGES`의 free2.5GiB를 available로 오인해 중단됐다. 직후 테스트 세션 보고상 available은80.55GiB였다. Selection·payload·추론 전이며 모델 성능 결과는 없다. 후속 버전은 위 `MemAvailable` 지표로 수정하되4GiB 기준과 나머지 실행 계약을 유지한다. 구버전 노트북의 가드를 직접 수정하지 않고 새 receipt에 고정된 배포본을 사용한다.
 
 기본6검사는 개발20.270초·root15.876초에 통과했다. Validation-only 선정/partial·0개 실패, self-sealed official test/role/model/environment 변이 거부, payload 실패 후 후보 교체 금지, 미래 feature 변조/prefix·sequence reset, optimizer 미생성, missing wrist local/global mask·합/분모와 raw/model 제외 회수를 확인했다.
 
