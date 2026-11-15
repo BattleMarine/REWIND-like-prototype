@@ -1,4 +1,6 @@
-# V12-CAMERA-CONTROL-001 실행 계약
+# v1.2.2 — V12-CAMERA-CONTROL-001 실행 계약
+
+표시 버전: **v1.2.2** (2026-11-15 사용자 확정). 기존 실행 ID `V12-CAMERA-CONTROL-001` 및 파일·config·결과 해시는 보존한다. [번호 관리](EXPERIMENT_VERSIONS.md).
 
 2026-11-15 후속 상태: 고정 `fdab0f1` 실제 실행·회수와 root 독립 검토를 완료했다. 아래는 실행 전 고정 계약·개발 검증 기록이다. 최신 판정은 [결과 보고서](V12_CAMERA_CONTROL_RESULTS.md)를 따른다.
 

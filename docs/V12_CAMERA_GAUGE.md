@@ -1,4 +1,6 @@
-# V12-CAMERA-GAUGE-001 원점 민감도 진단
+# v1.2.3 — V12-CAMERA-GAUGE-001 원점 민감도 진단
+
+표시 버전: **v1.2.3** (2026-11-15 사용자 확정). 기존 실행 ID `V12-CAMERA-GAUGE-001` 및 파일·config·결과 해시는 보존한다. [번호 관리](EXPERIMENT_VERSIONS.md).
 
 후속 상태: 2026-11-15 실제300frame 실행과 결과 독립검토를 완료했다. 원점 민감도와 도시의 큰 개선, ArchVis 손 악화를 함께 확인했다. 아래는 실행 전 고정 계약이며 최신 판정은 [결과 문서](V12_CAMERA_GAUGE_RESULTS.md)를 따른다.
 

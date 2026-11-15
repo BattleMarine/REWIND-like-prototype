@@ -1,4 +1,6 @@
-# v1.2 CityPark·Downtown 무재학습 평가 결과
+# v1.2.1 — v1.2 CityPark·Downtown 무재학습 평가 결과
+
+표시 버전: **v1.2.1** (2026-11-15 사용자 확정). 기존 실행 ID `V12-CROSS-SCENARIO-001` 및 파일·config·결과 해시는 보존한다. [번호 관리](EXPERIMENT_VERSIONS.md).
 
 2026-11-15 검토. `V12-CROSS-SCENARIO-001`의 실행·회수는 완료됐지만 이번 4클립에서 정확도와 형태 복원은 실패했다. 새 시나리오 혼합학습의 효과나 실패 원인을 확정하는 시험은 아니다.
 

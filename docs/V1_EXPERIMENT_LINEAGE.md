@@ -2,6 +2,8 @@
 
 ## 실험 분기 트리
 
+2026-11-15 사용자 확정: v1.2 파생 시험의 표시명은 v1.2.1~v1.2.3이다. 긴 실행 ID와 원본 산출물은 보존한다. 다음 camera 표현 학습은 기존 v1.5와 별도 범위이며 v1.6 번호를 제안 중이다(미확정·미실행). [번호 대응·후속 범위](EXPERIMENT_VERSIONS.md).
+
 ```text
 v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │    각 1epoch: 연결은 동작, 2D 중앙 집중·3D 형태 축소 관찰
@@ -21,11 +23,11 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 ├─ v1.2 — ArchVis 전체 train으로 데이터 규모 확대
 │          20,888 train + 고정 validation 2,236
 │          [각10epoch 완료 / 2D·body 개선, 손 축소 잔존 / train2프레임 시각화 확인]
-│          └─ V12-CROSS-SCENARIO-001 — CityPark·Downtown 연속클립 전이 평가
+│          └─ v1.2.1 (V12-CROSS-SCENARIO-001) — CityPark·Downtown 연속클립 전이 평가
 │             [200frame 평가·회수 완료 / 큰 위치 오차·3D 축소 / 원인 미확정]
-│             └─ V12-CAMERA-CONTROL-001 — ArchVis 동일경로 대조·카메라 조건 비교
+│             └─ v1.2.2 (V12-CAMERA-CONTROL-001) — ArchVis 동일경로 대조·카메라 조건 비교
 │                [ArchVis100frame·camera300행 검토 완료 / 조건 차이 확인·인과 미확정]
-│                └─ V12-CAMERA-GAUGE-001 — 같은 입력의 world 원점 민감도
+│                └─ v1.2.3 (V12-CAMERA-GAUGE-001) — 같은 입력의 world 원점 민감도
 │                   [300frame 검토 완료 / 큰 원점 의존성 확인·도시 개선 / 최종수정 미완료]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
