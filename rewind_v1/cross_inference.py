@@ -19,7 +19,7 @@ from rewind_prepare.extracted import _local, _Budget, ExtractedLimits
 from rewind_prepare.temporal_cache import _check_part
 from rewind_prepare.temporal_selection import seal
 from .cross_data import (Budget, MODEL_SHA, MIB, RESULT_BYTES, RUN_ID, LIMITS, assets, checked_selection,
-                         read_sealed, source_identity, write_report)
+                         read_sealed, source_identity, write_report, evaluation_context)
 from .data import attach_predicted_hands, _hand_indices
 from .frontend import predicted_features
 from .run_stages import CascadeStages
@@ -159,10 +159,11 @@ def render(output,clip_root,entry,prediction,xy,data,spec,budget,available):
 
 
 @torch.inference_mode()
-def infer(inputs,selection,selection_sha,prepared,prepared_sha,model,output,device,*,budget=None):
+def infer(inputs,selection,selection_sha,prepared,prepared_sha,model,output,device,*,budget=None,context=None):
+    context=evaluation_context(context)
     budget=budget or Budget(LIMITS["infer_seconds"])
-    plan=checked_selection(selection,selection_sha)
-    prepared=Path(prepared);doc=read_sealed(prepared/"prepared.json","v12_cross_prepared_v1",prepared_sha)
+    plan=checked_selection(selection,selection_sha,context=context)
+    prepared=Path(prepared);doc=read_sealed(prepared/"prepared.json","v12_cross_prepared_v1",prepared_sha,context=context)
     snapshot,spec,_,binding=assets(inputs)
     owners,_=official_splits(Path(inputs)/"split",spec,_Budget(ExtractedLimits(8*MIB,60)))
     if (plan["binding"]!=binding or any(owners.get(c["sequence"])!="validation" for c in plan["clips"])
@@ -194,7 +195,7 @@ def infer(inputs,selection,selection_sha,prepared,prepared_sha,model,output,devi
             directory=output/f"clip-{number:02d}";directory.mkdir()
             used=sum(p.stat().st_size for p in output.rglob("*") if p.is_file())
             artifacts=render(directory,root,entry,prediction,xy,data,spec,budget,RESULT_BYTES-2*MIB-used)
-            result=seal({"schema":"v12_cross_clip_predictions_v1","run_id":RUN_ID,"sequence":entry["sequence"],
+            result=seal({"schema":"v12_cross_clip_predictions_v1","run_id":context.run_id,"sequence":entry["sequence"],
                 "environment":entry["environment"],"split":"validation","overlap_proxy":plan["clips"][number]["overlap_proxy"],
                 "keys":keys,"nominal_seconds":[k[1]/25 for k in keys],"predicted_2d_native":xy.tolist(),"confidence":confidence.tolist(),
                 "prediction":{k:v.tolist() for k,v in prediction.items()},"gt_target_device_mm":data["target"].tolist(),
@@ -207,7 +208,7 @@ def infer(inputs,selection,selection_sha,prepared,prepared_sha,model,output,devi
                 raise ValueError("cross_total_result_files_limit")
             completed.append(result)
         all_rows=[r for clip in completed for r in clip["frame_metrics"]]
-        result=seal({"schema":"v12_cross_report_v1","run_id":RUN_ID,"source_sha256":digest(source_identity()),
+        result=seal({"schema":"v12_cross_report_v1","run_id":context.run_id,"source_sha256":digest(context.source()),
             "selection_sha256":selection_sha,"prepared_sha256":prepared_sha,"model_zip_sha256":MODEL_SHA,
             "model_weights":pins,"inference_implementation_sha256":implementation,"status":plan["status"],
             "clips":[{"sequence":c["sequence"],"content_sha256":c["content_sha256"],"aggregate":c["aggregate"]} for c in completed],

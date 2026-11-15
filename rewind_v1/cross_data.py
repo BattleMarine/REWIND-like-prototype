@@ -43,6 +43,16 @@ def source_identity():
             "configs/v12_cross_scenario_001.json":sha(CONFIG_PATH.read_bytes())}
 
 
+class EvaluationContext:
+    """Explicit evaluation scope; omitted context preserves the original city contract."""
+    def __init__(self, run_id=RUN_ID, environments=ENVIRONMENTS, source=source_identity):
+        self.run_id,self.environments,self.source=run_id,tuple(environments),source
+
+
+def evaluation_context(context=None):
+    return context if context is not None else EvaluationContext()
+
+
 def write_report(path, value):
     raw = canonical(value)+b"\n"
     if len(raw) > 32*MIB:
@@ -50,10 +60,11 @@ def write_report(path, value):
     _atomic(path, raw)
 
 
-def read_sealed(path, schema, expected):
+def read_sealed(path, schema, expected, *, context=None):
+    context=evaluation_context(context)
     doc = json.loads(_regular_read(_local(path),32*MIB))
     check_pin(doc,schema,expected)
-    if doc.get("source_sha256") != digest(source_identity()) or doc.get("run_id") != RUN_ID:
+    if doc.get("source_sha256") != digest(context.source()) or doc.get("run_id") != context.run_id:
         raise ValueError("cross_source_or_run_binding")
     return doc
 
@@ -129,7 +140,8 @@ def _proxy(sequence,train_sequences):
             "interpretation":"Name overlap suggests possible shared identity/motion; absence does not establish independence."}
 
 
-def select(inputs,rgb_root,pose_root,output,*,budget=None):
+def select(inputs,rgb_root,pose_root,output,*,budget=None,context=None):
+    context=evaluation_context(context)
     budget = budget or Budget(LIMITS["metadata_seconds"],LIMITS["metadata_bytes"])
     snapshot,spec,_,binding = assets(inputs)
     output = Path(output).absolute()
@@ -139,10 +151,10 @@ def select(inputs,rgb_root,pose_root,output,*,budget=None):
     owners,_ = official_splits(Path(inputs)/"split",spec,_Budget(ExtractedLimits(8*MIB,60)))
     train_sequences = {seq for seq,_ in snapshot["keys"]["train"]}
     candidates = {env:sorted(seq for seq,split in owners.items() if split=="validation" and seq.split("/")[0]==env)
-                  for env in ENVIRONMENTS}
-    selected,observations,counts = [],[],dict.fromkeys(ENVIRONMENTS,0)
+                  for env in context.environments}
+    selected,observations,counts = [],[],dict.fromkeys(context.environments,0)
     try:
-        for env in ENVIRONMENTS:
+        for env in context.environments:
             for sequence in candidates[env]:
                 budget.check()
                 if counts[env]>=2:
@@ -177,7 +189,7 @@ def select(inputs,rgb_root,pose_root,output,*,budget=None):
                                  "overlap_proxy":_proxy(sequence,train_sequences)})
                 counts[env]+=1;observations.append({**record,"status":"selected","first_frame":first})
         if any(count==0 for count in counts.values()):raise ValueError("cross_scenario_zero_available_clips")
-        doc = seal({"schema":"v12_cross_selection_v1","run_id":RUN_ID,"source_sha256":digest(source_identity()),
+        doc = seal({"schema":"v12_cross_selection_v1","run_id":context.run_id,"source_sha256":digest(context.source()),
             "status":"complete" if all(count==2 for count in counts.values()) else "partial_availability",
             "model_zip_sha256":MODEL_SHA,"binding":binding,"roots":{k:str(v) for k,v in roots.items()},
             "policy":"Official validation only; lexical sequence order; earliest common contiguous50; no prediction-based selection or train fallback",
@@ -195,17 +207,18 @@ def select(inputs,rgb_root,pose_root,output,*,budget=None):
         raise
 
 
-def checked_selection(path,pin):
-    doc = read_sealed(path,"v12_cross_selection_v1",pin)
+def checked_selection(path,pin,*,context=None):
+    context=evaluation_context(context)
+    doc = read_sealed(path,"v12_cross_selection_v1",pin,context=context)
     if doc["model_zip_sha256"]!=MODEL_SHA:raise ValueError("cross_model_pin")
     clips = doc["clips"]
-    if not 2<=len(clips)<=4 or len({c["sequence"] for c in clips})!=len(clips):
+    if not len(context.environments)<=len(clips)<=2*len(context.environments) or len({c["sequence"] for c in clips})!=len(clips):
         raise ValueError("cross_selection_scope")
-    for env in ENVIRONMENTS:
+    for env in context.environments:
         if not 1<=sum(c["environment"]==env for c in clips)<=2:raise ValueError("cross_environment_quota")
     for clip in clips:
         frames = [r["frame"] for r in clip["frames"]]
-        if (clip["environment"] not in ENVIRONMENTS or clip["split"]!="validation"
+        if (clip["environment"] not in context.environments or clip["split"]!="validation"
                 or clip["sequence"].split("/")[0]!=clip["environment"]
                 or len(frames)!=50 or frames!=list(range(frames[0],frames[0]+50))):
             raise ValueError("cross_clip_contiguity_or_split")
@@ -218,9 +231,10 @@ def checked_selection(path,pin):
     return doc
 
 
-def prepare(inputs,selection,pin,output,*,budget=None):
+def prepare(inputs,selection,pin,output,*,budget=None,context=None):
+    context=evaluation_context(context)
     budget = budget or Budget(LIMITS["prepare_seconds"])
-    doc = checked_selection(selection,pin)
+    doc = checked_selection(selection,pin,context=context)
     _,spec,calibration,binding = assets(inputs)
     if doc["binding"]!=binding:raise ValueError("cross_input_binding")
     owners,_ = official_splits(Path(inputs)/"split",spec,_Budget(ExtractedLimits(8*MIB,60)))
@@ -264,7 +278,7 @@ def prepare(inputs,selection,pin,output,*,budget=None):
                 write_report(staged/"manifest.json",entry)
                 staged.rename(output/f"clip-{number:02d}")
                 completed.append(entry)
-        result = seal({"schema":"v12_cross_prepared_v1","run_id":RUN_ID,"source_sha256":digest(source_identity()),
+        result = seal({"schema":"v12_cross_prepared_v1","run_id":context.run_id,"source_sha256":digest(context.source()),
             "selection_sha256":pin,"binding":binding,"clips":completed,"status":doc["status"],
             "source_bytes_read":budget.read_bytes,"model_zip_sha256":MODEL_SHA,
             "elapsed_seconds":time.monotonic()-budget.start,

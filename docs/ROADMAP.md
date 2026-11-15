@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-15 ArchVis 대조 승인: `V12-CAMERA-CONTROL-001`로 ArchVis validation100frame의 동일경로 추론과 기존 도시200frame의 카메라 조건 비교를 준비한다. 동일모델·추론설정을 유지하고 도시예측은고정결과에서재사용하며 대응pose의크기/SHA를대조한다. 조건분포차이는인과증명이아니며새학습·camera정규화변경은포함하지않는다. [실행 설계](V12_CAMERA_CONTROL.md).
+
 2026-11-15 교차 시나리오 평가 회수: 메모리 지표 수정 `2de4262`에서 CityPark·Downtown validation200frame 평가·결과 회수 완료. Root ZIP29파일 검토 및 body 지표 재계산 일치. Body4,499.75mm·뼈 길이GT대비9.0%로 정확도 실패이며 원인은 미확정이다. 다음은 동일경로 ArchVis 연속클립 대조와 조건 분포 확인을 제안하며 새 혼합학습은 시작하지 않는다. [결과·판정](V12_CROSS_SCENARIO_RESULTS.md).
 
 2026-11-15 교차 시나리오 평가 승인: 고정 v1.2 best 모델로 CityPark·Downtown 공식 validation의 시나리오별 최대2개 연속50프레임 클립을 재학습 없이 추론·평가·시각화하도록 준비한다. 실제 GPU/Drive 실행과 성능 판단은 테스트 세션의 결과 회수 후 진행하며 v1.3 혼합학습·v1.5 학습은 승인 범위가 아니다. [고정 평가 계약](V12_CROSS_SCENARIO.md).
