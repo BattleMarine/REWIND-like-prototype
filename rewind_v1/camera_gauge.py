@@ -389,7 +389,7 @@ def write_table(output,report):
     (Path(output)/'comparison.md').write_text('\n'.join(rows)+'\n',encoding='utf-8')
 
 
-def render_comparison(output,clip_root,entry,predictions,xy,data,spec,budget,available):
+def render_comparison(output,clip_root,entry,predictions,xy,data,spec,budget,available,*,labels=None,title='camera gauge'):
     from PIL import Image,ImageDraw,ImageFont
     view=inference.view;names=('baseline','first_midpoint','world_x_plus_100m')
     target=data['target'].tolist()
@@ -404,9 +404,9 @@ def render_comparison(output,clip_root,entry,predictions,xy,data,spec,budget,ava
     for t,row in enumerate(entry['frames']):
         budget.check();image=Image.new('RGB',(952,810),view.DARK);draw=ImageDraw.Draw(image)
         font=ImageFont.load_default(size=13)
-        draw.text((12,8),f"camera gauge | clip {entry['number']} / frame {row['frame']} | nominal25FPS",fill='white',font=font)
+        draw.text((12,8),f"{title} | clip {entry['number']} / frame {row['frame']} | nominal25FPS",fill='white',font=font)
         draw.text((12,29),f"shared device xyz bounds mm: {np.round(bounds['min'],1)} .. {np.round(bounds['max'],1)}",fill='white',font=font)
-        for col,label in enumerate(('GT',)+names):draw.text((12+col*235,54),label,fill='white',font=font)
+        for col,label in enumerate(labels or ('GT',)+names):draw.text((12+col*235,54),label,fill='white',font=font)
         for v,side in enumerate(('left','right')):
             pin=row['files'][side];raw=_regular_read(clip_root/pin['path'],8*cross.MIB,pin['size_bytes'])
             if sha(raw)!=pin['sha256']:raise ValueError('gauge_render_raw_hash')

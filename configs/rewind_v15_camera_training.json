@@ -1,0 +1,54 @@
+{
+  "teacher": {
+    "hidden": 512,
+    "heads": 4,
+    "graph_layers": 3,
+    "temporal_layers": 3,
+    "attention_past_frames": 20,
+    "diffusion_steps": 1000,
+    "dropout": 0.0,
+    "beta_start": 0.0001,
+    "beta_end": 0.02,
+    "sampling_steps": 10,
+    "learning_rate": 5e-05,
+    "scheduler_step": 1,
+    "scheduler_gamma": 1.0,
+    "target_scale_mm": 100.0,
+    "frame_loss_weight": 1.0,
+    "velocity_loss_weight": 0.0
+  },
+  "run_id": "V15-CAMERA-TRAINING-001",
+  "seed": 71,
+  "arms": [
+    "absolute",
+    "first_midpoint"
+  ],
+  "updates_per_teacher": 1000,
+  "milestones": [
+    0,
+    200,
+    1000
+  ],
+  "checkpoint_every": 100,
+  "pilot_pairs": 2,
+  "decision_sha256": "f6b79bac09d168e48134cab58560eb26f07c7d6f8f4aae139b7aecfc662e789f",
+  "evidence_zip_sha256": "654af71d3864a6ccf9dcbed1610c6cae90651edcd47b30b9f4b2f386762d9c20",
+  "raw_drive_relative": "REWIND-like prototype/reports/v1_actual_001/raw_cache/",
+  "limits": {
+    "raw_restore_bytes": 4294967296,
+    "raw_restore_seconds": 3600,
+    "feature_source_bytes": 4294967296,
+    "feature_seconds": 3600,
+    "feature_bytes": 67108864,
+    "train_seconds": 7200,
+    "train_cumulative_seconds": 14400,
+    "eval_seconds": 3600,
+    "checkpoint_bytes": 1073741824,
+    "output_bytes": 2147483648,
+    "initial_free_disk_bytes": 17179869184,
+    "initial_available_ram_bytes": 4294967296,
+    "observed_rss_bytes": 4294967296,
+    "package_seconds": 600,
+    "copy_readback_seconds": 600
+  }
+}
