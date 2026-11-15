@@ -69,7 +69,7 @@ v0 2D 모델의 1,000페어 학습을 완료했습니다. Validation 화면 안 
 
 고정 v1.2 모델의 CityPark·Downtown 공식 validation200frame 무재학습 평가를 완료했습니다. 실행·회수는 성공했지만 body4,499.75mm와 심한3D 축소·위치 이탈을 확인했습니다. 원인은 미확정이며 같은 추론 경로의 ArchVis 대조와 입력 조건 검토를 제안합니다. v1.3 혼합학습은 계속 보류합니다. [결과·한계](docs/V12_CROSS_SCENARIO_RESULTS.md) · [실행 계약](docs/V12_CROSS_SCENARIO.md).
 
-후속 사용자 승인에 따라 ArchVis validation100frame을 동일 경로로 대조하고 세 환경의 카메라 조건을 비교하는 `V12-CAMERA-CONTROL-001`을 준비합니다. 도시 예측은 고정 결과를 재사용하며 모델 변경이나 재학습은 없습니다. [대조 평가 계약](docs/V12_CAMERA_CONTROL.md).
+ArchVis validation100frame의 동일경로 대조와 camera300행 비교를 완료했습니다. Body197.34mm이며 도시와 달리 몸 크기를 유지했습니다. 카메라 조건의 큰 환경 차이도 확인했지만 실패 원인으로 입증한 것은 아닙니다. 모델 변경·재학습 없이 검토했습니다. [대조 결과·후속 가설](docs/V12_CAMERA_CONTROL_RESULTS.md) · [실행 계약](docs/V12_CAMERA_CONTROL.md).
 
 v1·v1.1·v1.2·v1.4의 조건과 결과를 [종합 비교](docs/V1_COMPARISON_AND_V15_PLAN.md)했습니다. v1.5는 같은 클립에서 GT와 예측 입력의 효과를 분리하는 설계 제안이며 아직 구현·학습하지 않았습니다.
 

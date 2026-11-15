@@ -24,7 +24,7 @@ v1 — 1,000 train 페어에서 REWIND 기반 구조·실행 연결
 │          └─ V12-CROSS-SCENARIO-001 — CityPark·Downtown 연속클립 전이 평가
 │             [200frame 평가·회수 완료 / 큰 위치 오차·3D 축소 / 원인 미확정]
 │             └─ V12-CAMERA-CONTROL-001 — ArchVis 동일경로 대조·카메라 조건 비교
-│                [2026-11-15 사용자 승인 / 무재학습 평가 준비 중]
+│                [ArchVis100frame·camera300행 검토 완료 / 조건 차이 확인·인과 미확정]
 │
 └─ v1.3 — 다른 시나리오를 추가해 다양성·일반화 확인
            [보류 / 새 수집·혼합·학습 미승인]
@@ -363,3 +363,11 @@ ArchVis 공식 validation에서 결과와 무관하게 서로 다른2sequence의
 구현 검토와 root 독립 로컬22검사(87.364초)를 통과했다. 기존 추론·집계·렌더 함수의 AST 동일성, 실제 고정 도시 reference 연결, 합성 카메라 통계·그림과 작은 전체 흐름을 확인했다. 단계별 child timeout과 selection/prepared/최종 보고서 보관, partial 표본 표시·pose 변조 및 단계 pin 혼입 거부를 포함한다. 고정 소스·노트북 인계 뒤 실제 Colab 결과를 회수할 예정이며, 이 로컬 통과를 ArchVis 정확도나 카메라 분포 가설 검증 완료로 표시하지 않는다.
 
 마지막 reference receipt의 단계 간 기대 SHA 보완은 별도1개 집중 검사(0.668초)로 root가 확인했다. 전체 실행을 추가 반복하지 않고 변경된 연결만 검증했다.
+
+### ArchVis 대조 회수: 공통 경로의 보편적 붕괴 가설 약화
+
+`fdab0f1` 고정 실행에서 ArchVis2clip100frame 평가와 도시200pose 회수가 complete로 끝났다. Root는 ZIP22구성파일 크기/SHA, 소스·모델·입력 연결, body/hand MPJPE, camera300행의 인코딩·center·환경별통계를 독립 검토했다. [상세 결과](V12_CAMERA_CONTROL_RESULTS.md).
+
+ArchVis body197.34mm·hand global293.29mm/local82.15mm이며 body 평균 뼈 길이184.87/GT185.28mm로 몸 크기를 유지했다. 자세·손 오류와 body spread 과대는 남았다. 도시의 심한 축소·위치 편향과 달라 동일 full50 경로가 모든 환경에서 붕괴한다는 설명은 약화됐다. 모든 구현 오류를 배제한 것은 아니다.
+
+카메라 translation norm의 클립 평균은 ArchVis약1.7~3.2m, 도시약60~270m였다. 이는 사람까지의 거리나 depth가 아니라 world 원점에 의존하는 값이다. 모델에 들어가는 조건 분포의 큰 차이가 실제로 확인되어 camera 원점 의존성 가설의 우선순위가 높아졌다. 다만 RGB·motion·rotation·2D 오류가 함께 달라 인과 미확정이며 ArchVis100표본을 전체train분포로 부르지 않는다. 다음은 같은RGB/모델/클립에서 공통world좌표 재표현만 바꾸는 민감도 시험을 제안한다. 아직 Δ·예산·판정·실행은 확정하지 않았고 재학습·혼합학습은 시작하지 않았다.
