@@ -1,0 +1,44 @@
+{
+  "run_id": "V151-UPPER-CONDITION-001",
+  "parent_run_id": "V15-CAMERA-TRAINING-001",
+  "parent_revision": "4f24f3aa2265c2ac54c21600b57bdece4e540411",
+  "parent_source_sha256": "10e25cd2cb6f5b8d5dd4242481bf1aca349869f7000985dba28e82214c9a4540",
+  "parent_zip_bytes": 1553751536,
+  "parent_zip_sha256": "a46e6a65f3777469d9f70d9aa99bf0aadf5bb5972ad06bb488c5b96f0944a170",
+  "parent_report_sha256": "e6f50fe90b7a234aabea6c44065f07ab4538fc8b53c040059f132309e5c73c27",
+  "model_sha256": {
+    "body": "05a7ec1f6d7832ce25623ee065fe3848fc6361f64166df6427d0f14561f700f4",
+    "hand": "baf7bf29055960b51c99b598e0d865d52fd0a7a507d93242b804b687be7f7489"
+  },
+  "clips": 6,
+  "frames_per_clip": 50,
+  "seed": 71,
+  "noise_offsets": {
+    "body": 100,
+    "hand": 200
+  },
+  "ddim_steps": 10,
+  "target_scale_mm": 100.0,
+  "precision": "fp32",
+  "tolerance": {
+    "atol_mm": 0.01,
+    "rtol": 1e-05,
+    "attachment_identity_atol_mm": 0.001
+  },
+  "limits": {
+    "parent_seconds": 600,
+    "parent_zip_bytes": 2147483648,
+    "parent_read_bytes": 4294967296,
+    "parent_members": 128,
+    "bundle_bytes": 201326592,
+    "bundle_members": 64,
+    "input_seconds": 600,
+    "infer_seconds": 3600,
+    "initial_free_disk_bytes": 2147483648,
+    "initial_available_ram_bytes": 4294967296,
+    "observed_rss_bytes": 4294967296,
+    "result_bytes": 134217728,
+    "package_seconds": 600,
+    "copy_readback_seconds": 600
+  }
+}
