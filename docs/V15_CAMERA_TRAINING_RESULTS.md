@@ -67,7 +67,9 @@ GPU peak allocated는1,874,572,288B(약1.75GiB)이며 CUDA 예약량·프로세�
 
 [ArchVis 대표 그림](../outputs/v15_camera_training_20261115/user_test/completed_001/extracted/evaluation/clip-00/frame-000000025.png) · [CityPark 대표 그림](../outputs/v15_camera_training_20261115/user_test/completed_001/extracted/evaluation/clip-02/frame-000000025.png).
 
-## 후속 방향 — 제안, 미실행
+## 후속 방향 — 당시 제안과 후속 결과
+
+2026-11-17 후속: 아래 GT/예측 상체 교체 진단은 v1.5.1로 실행·검토했다. Local 평균10.8% 개선에도 손 축소가 남았다. [실제 결과](V151_UPPER_CONDITION_RESULTS.md). 아래 문단은 당시 제안 기록이다.
 
 중점 표현을 후속 통제 진단의 기준 후보로 유지하되, 데이터 확대보다 **같은 checkpoint에서 hand에 GT 상체를 넣는 평가와 예측 상체 평가를 비교**하는 작은 진단이 우선 후보다. 예측2D·camera·noise는 유지하고 local 손 오차와 예측 wrist의 global 위치 오류를 분리한다. GT 조건 결과는 진단이며 배포 성능이 아니다. 그 뒤 필요할 때 고정 train 표본의 학습량 또는 GT/예측2D를 한 변수씩 바꾼다.
 
