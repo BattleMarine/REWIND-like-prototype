@@ -40,6 +40,8 @@ v1.5.2 [저장 모델 복원·생성 진단](docs/V152_SAMPLING_DIAGNOSTIC.md)�
 
 ## 데이터 사용 방식
 
+2026-11-18 사용자 결정으로 데이터셋 범위를 **ArchVis·CityPark·Downtown의 RGB·pose**로 고정했습니다. Factory와 depth는 현재 범위에서 제외합니다. 사용자가 중복 제거 완료를 확인했으며, 전체 파일 해시 검증 완료를 뜻하지 않습니다. [범위·검증 상태](docs/DATA_ACQUISITION_STRATEGY.md).
+
 2026-11-04 결정에 따라 자동 인덱싱 운영을 중단하고, 사용자가 압축 해제해 Drive에 업로드하는 **RGB·pose 추출본**을 사용합니다. Depth는 초기 필수 입력이 아닙니다. 기존 압축 원본·인덱스·실험 근거는 보존합니다.
 
 - 좌우 RGB와 pose를 sequence/frame 키로 대조하고 파일 무결성·관절·단위·좌표·시간 정합을 검증합니다.

@@ -24,6 +24,8 @@
 
 ## 데이터와 좌표계
 
+- 2026-11-18 사용자 결정: 데이터셋 범위를 `ArchVisInterior_ArchVis_RT`, `CityPark_Showcase`, `DowntownWest_Demo_Environment`의 RGB·pose로 고정한다. Factory 업로드를 기다리지 않으며 depth는 현재 범위에서 제외한다. 사용자가 중복 제거 완료를 확인했지만 에이전트의 정리 후 재조회·전체 파일 해시 검증 완료로 표시하지 않는다. 공식 split과 기존 실험의 고정 manifest를 유지하며 이 결정은 v1.3 혼합학습이나 새 학습 실행 승인이 아니다. 상세 기준은 [데이터 확보 전략](docs/DATA_ACQUISITION_STRATEGY.md)을 따른다.
+
 - 데이터 규모를 확대하기 전에 관절 정의, 단위, 좌표계, 카메라 변환 방향, 어안 projection과 timestamp를 검증합니다.
 - 정답 누락 mask와 visibility를 구분합니다. 화면 밖 관절을 무조건 학습·평가 대상에서 제거하지 않습니다.
 - Split은 sequence 및 원본 motion 중복을 고려해 관리합니다. Test set으로 모델이나 임계값을 튜닝하지 않습니다.
