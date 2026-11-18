@@ -1,0 +1,29 @@
+{
+  "run_id": "V2-THREE-SCENARIO-001",
+  "seconds_per_invocation": 28800,
+  "terminal_reserve_seconds": 1320,
+  "package_seconds": 600,
+  "copy_seconds": 600,
+  "checkpoint_grace_seconds": 120,
+  "external_timeout_seconds": 28920,
+  "resources": {
+    "read_bytes": 8589934592,
+    "write_bytes": 8589934592,
+    "cache_bytes": 12884901888,
+    "feature_bytes": 268435456,
+    "run_bytes": 4294967296,
+    "archive_bytes": 2147483648,
+    "checkpoint_bytes": 268435456,
+    "rss_bytes": 4294967296
+  },
+  "training": {
+    "initialization": null,
+    "epochs": null,
+    "upper_policy": null,
+    "seed": null,
+    "evaluation_policy": null
+  },
+  "cumulative_limits": null,
+  "camera": "first_valid_clip_stereo_midpoint_float64_v1",
+  "user_cache_copy_default": false
+}
