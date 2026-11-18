@@ -1,5 +1,7 @@
 # v1.5.2 복원·생성 과정 진단
 
+2026-11-18 실제 T4 결과와 저장 수치 검토를 완료했다. 환경 간 fingerprint 재현은 미확인이다. [결과·한계](V152_SAMPLING_RESULTS.md). 아래 준비 상태는 실행 전 기록이다.
+
 2026-11-17 사용자 승인에 따른 `V152-SAMPLING-DIAGNOSTIC-001` 개발 계약이다. 구현·로컬 검증 단계이며 실제 CUDA 실행 결과는 없다. [v1.5 결과](V15_CAMERA_TRAINING_RESULTS.md), [v1.5.1 결과](V151_UPPER_CONDITION_RESULTS.md)를 부모 근거로 사용한다. 새 학습, 원점 이동·도시 전이·기존 6클립 회귀 반복은 포함하지 않는다.
 
 ## 고정 입력

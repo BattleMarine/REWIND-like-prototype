@@ -36,7 +36,7 @@ v1.5는 T4에서 두 카메라 표현의 통제 학습 총4,000update를 완료�
 
 v1.5.1은 같은 중점 모델에 GT/예측 상체 조건을 넣어 손 오류를 분리하는 **재학습 없는 파생 진단**입니다. T4 실제 결과를 검토했습니다. GT 상체로 손 local 오차는80.85→72.14mm로 줄었지만 손 축소는 남았습니다. [결과·한계](docs/V151_UPPER_CONDITION_RESULTS.md) · [실행 계약](docs/V151_UPPER_CONDITION.md) · [버전·범위](docs/EXPERIMENT_VERSIONS.md).
 
-v1.5.2 [저장 모델 복원·생성 진단](docs/V152_SAMPLING_DIAGNOSTIC.md)과 v1.5.3 [예측2D 단일클립 학습](docs/V153_PREDICTED_CLIP.md)을 병행 준비했습니다. 같은 보존 입력을 재사용하며 관련 로컬30검사를 통과했습니다. 실제 GPU 결과는 아직 없습니다.
+v1.5.2 [저장 모델 복원·생성 진단](docs/V152_SAMPLING_DIAGNOSTIC.md)과 v1.5.3 [예측2D 단일클립 학습](docs/V153_PREDICTED_CLIP.md)을 병행 준비했습니다. 같은 보존 입력을 재사용하며 관련 로컬30검사를 통과했습니다. v1.5.2 T4 결과를 회수해 저장 지표를 검토했습니다. DDIM10→50 확대의 이득은 작고 손 축소가 남았습니다. 환경 간 fingerprint 재현은 미확인이고 v1.5.3 결과는 대기 중입니다. [v1.5.2 결과](docs/V152_SAMPLING_RESULTS.md).
 
 ## 데이터 사용 방식
 

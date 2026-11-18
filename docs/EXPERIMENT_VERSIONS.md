@@ -17,7 +17,7 @@
 | v1.4 | 한 클립에 GT 2D·GT 상체를 넣는 oracle overfit | [각 5,000update 완료](V14_ORACLE_RESULTS.md) |
 | v1.5 | 카메라 표현 통제 학습·원점 안정성 평가, 잔여 오류의 조건부 진단 | [T4 총4,000update·6클립 결과 검토 완료](V15_CAMERA_TRAINING_RESULTS.md), 원점 민감도 완화·손 축소 잔존 |
 | v1.5.1 | 고정 v1.5 중점 모델의 GT/예측 상체 조건 교체 진단 | [T4 실제 결과 검토 완료](V151_UPPER_CONDITION_RESULTS.md), local 오차 일부 개선·손 축소 잔존 |
-| v1.5.2 | 저장 중점 모델의 복원·생성 과정 진단 | [구현·로컬 검토 완료](V152_SAMPLING_DIAGNOSTIC.md), 실제 GPU 대기·재학습 없음 |
+| v1.5.2 | 저장 중점 모델의 복원·생성 과정 진단 | [T4 결과 검토 완료](V152_SAMPLING_RESULTS.md), 환경 간 재현 미확인·재학습 없음 |
 | v1.5.3 | 예측2D 단일클립 학습 | [구현·로컬 검토 완료](V153_PREDICTED_CLIP.md), 실제 GPU 대기·GT2D 대조군 자동 실행 없음 |
 | v1.6 | 별도 카메라 표현 시험 제안 | **폐기**: 유효한 내용을 v1.5에 흡수, 독립 실행 없음 |
 
