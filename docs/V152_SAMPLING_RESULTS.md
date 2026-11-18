@@ -41,3 +41,5 @@ DDIM10→50에서 body는0.24mm 악화, hand는0.69mm 개선에 그쳐 이번 �
 프로젝트 상대 경로 `outputs/train_clip_diagnostics/user_test/v152/run-0ef7db1cdffd48e495d84f1954b8c39a/`에 `results.zip`, `receipt.json`, root 독립 검토 `root_review.json`을 보존했다. ZIP6,489,604bytes, SHA-256 `43f3099886cf25debcfe442fd479d4f6d6be7523d6dab2f88f56164728e46eb1`. ZIP 내부 `experiment/run.json` 및 `experiment/predictions-*.json`이 원본 수치 근거다. 대용량 결과는 Git 제외다.
 
 다음 판단 근거는 이미 준비된 v1.5.3 예측2D 단일클립 충분학습 결과다. 아직 결과가 없으므로 성공·실패를 예단하지 않는다. 환경 간 fingerprint 불일치를 별도 확인 대상으로 남기며, 이번 검토로 재실행·예산 변경·새 대규모 학습을 시작하지 않는다. [종합 보고서](EXPERIMENT_RESULTS_REPORT.md) · [판단 이력](V1_EXPERIMENT_LINEAGE.md).
+
+2026-11-18 후속: 위 대기 기록 이후 v1.5.3을 회수해 단일클립 형태 복원을 확인했다. [v1.5.3 결과](V153_PREDICTED_CLIP_RESULTS.md)를 함께 보며 환경 간 fingerprint 미확인 과제는 유지한다.

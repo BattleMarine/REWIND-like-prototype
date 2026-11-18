@@ -1,5 +1,7 @@
 # v1.5.3 예측2D 단일클립 학습
 
+2026-11-18 실제 T4 학습 및 checkpoint·저장 지표 검토 완료. Body10.78mm·hand local5.65mm, 단일클립 형태 기준 통과. [결과·범위·한계](V153_PREDICTED_CLIP_RESULTS.md). 아래 준비/미실행 표시는 실행 전 기록이다.
+
 2026-11-17 사용자 승인에 따른 `V153-PREDICTED-CLIP-001` 개발 계약이다. 구현·로컬 검증 단계이며 실제 GPU 학습 결과는 없다. [v1.5.2 공통 입력·부모 pin](V152_SAMPLING_DIAGNOSTIC.md)과 같은 첫 train50 클립을 사용하지만 source/config/실행ID/notebook/result 경로는 분리한다. [v1.4 GT조건 결과](V14_ORACLE_RESULTS.md)는 기존 근거로 재사용하며 새 GT2D 대조군이나 다른 클립을 자동 실행하지 않는다.
 
 ## 학습 조건과 초기화

@@ -1,5 +1,7 @@
 # REWIND-like prototype 프로젝트 로드맵
 
+2026-11-18 v1.5.3 T4 완료: 예측 F9·GT 상체의 train50을 body/hand 각5,000update 학습해10.78/5.65mm와 형태 기준 통과를 확인했다. 16파일·checkpoint5개 CPU 로드·저장 지표 재계산 완료. 단일클립 암기 근거이며 다중클립 일반화·예측 상체·실제 재개는 미검증이다. 아래 v1.5.3 대기는 회수 전 상태다. [결과·후속 가설](V153_PREDICTED_CLIP_RESULTS.md).
+
 2026-11-18 v1.5.2 T4 무재학습 9조건 결과 회수: 21파일·18artifact pin, 원본 모델6개 fingerprint와 저장 좌표 MPJPE 재계산을 확인했다. DDIM10→50의 개선이 작고 손 축소가 남는다. 로컬 재생성 noise·입력 fingerprint의 Colab 대비 불일치 원인은 미확정이다. v1.5.3은 실제 결과 대기다. [결과·검토 한계](V152_SAMPLING_RESULTS.md).
 
 2026-11-18 사용자 결정: 데이터셋을 ArchVis·CityPark·Downtown의 RGB·pose로 고정하고 Factory·depth는 현재 범위에서 제외한다. 중복 제거는 사용자 확인 완료로 기록한다. 정리 후 파일 수 재집계와 전체 내용 무결성 검증은 별도이며, 기존 실험 입력이나 v1.3 혼합학습 보류 상태를 변경하지 않는다. [정확한 시나리오명·검증 범위](DATA_ACQUISITION_STRATEGY.md).
