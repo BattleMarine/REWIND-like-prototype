@@ -27,7 +27,18 @@ class ScenarioMap(Mapping):
         return self.base[key]
 
 
-class Data:
+class CacheFrames:
+    def frame(self,key,split,size):
+        if list(size)!=[128,128]:raise ValueError('v2_frame_size')
+        image,target=self.cache.frame(key,split);return (image,target['xy'],target['xy_valid']),{}
+
+
+class ReadOnlyCacheFrames(CacheFrames):
+    def __init__(self,root,doc,spec,cfg,ledger,*,policy,local_catalog_sha256):
+        self.cache=Cache.open_read_only(root,doc,spec,cfg,ledger,policy=policy,local_catalog_sha256=local_catalog_sha256)
+
+
+class Data(CacheFrames):
     width=50
     def __init__(self,doc,spec,cfg,plan,cache,ledger):
         self.spec,self.doc,self.cfg,self.plan,self.ledger=spec,doc,cfg,plan,ledger;self.cache=Cache(cache,doc,spec,cfg,ledger);self.budget=ledger
@@ -40,10 +51,6 @@ class Data:
 
     def coverage(self):return {'counts':self.plan['counts'],'summary':self.plan['summary'],'validation_reference_only':True}
     def real_frames(self,key,split):return self.clip_rows[key]['real_frames']
-    def frame(self,key,split,size):
-        if list(size)!=[128,128]:raise ValueError('v2_frame_size')
-        image,target=self.cache.frame(key,split);return (image,target['xy'],target['xy_valid']),{}
-
     def clip(self,key,split,frontend,size,input_sha):
         if frontend.training or any(p.requires_grad for p in frontend.parameters()):raise ValueError('v2_frozen_frontend_required')
         sequence,start=key;features=[];metadata=[];batch=[];count=self.real_frames(key,split)

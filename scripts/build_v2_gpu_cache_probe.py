@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+from string import Template
 import tempfile
 
 from rewind_archive.contracts import canonical, digest
@@ -25,7 +26,16 @@ DRIVE_PROJECT = "/content/drive/MyDrive/REWIND-like prototype"
 '''
 
 
-RUN = '''
+PROBE_DRIVER_BLOCK = '''        driver = DRIVER_TEXT.encode("utf-8")
+        if hashlib.sha256(driver).hexdigest() != PINS["probe_source_sha256"]:
+            raise ValueError("GPU probe source pin")
+        driver_path = source / "scripts" / "run_v2_gpu_cache_probe.py"
+        with driver_path.open("xb") as stream:
+            stream.write(driver)
+'''
+
+
+RUN_TEMPLATE = Template('''
 import json
 import shutil
 import signal
@@ -99,9 +109,9 @@ def save_report(invocation, retained, started, error):
         signal.alarm(prev_alarm)
     print("Drive diagnostic:", target, "SHA-256:", hashlib.sha256(raw).hexdigest(), flush=True)
 
-def run_gpu_cache_probe():
+def $entrypoint():
     started = time.monotonic()
-    work = Path("/content/rewind_v2_gpu_cache_probe")
+    work = Path("/content/$work_folder")
     work.mkdir(exist_ok=True)
     invocation = Path(tempfile.mkdtemp(prefix="invocation-", dir=work))
     print("Local invocation folder:", invocation, flush=True)
@@ -123,7 +133,7 @@ def run_gpu_cache_probe():
         parent = (project / "reports" / "cache").resolve(strict=True)
         if not parent.is_relative_to(project):
             raise ValueError("Drive cache folder resolved outside the project")
-        candidate = parent / "v2_gpu_cache_041837Z"
+        candidate = parent / "$report_folder"
         if candidate.is_symlink():
             raise ValueError("Drive report destination is a link")
         retained = candidate
@@ -133,18 +143,12 @@ def run_gpu_cache_probe():
         extract_pinned_zip(upload, PINS["source_sha256"], source,
                            max_zip_bytes=64*1024**2, max_output_bytes=192*1024**2, max_members=3000,
                            revision=PINS["revision"])
-        driver = DRIVER_TEXT.encode("utf-8")
-        if hashlib.sha256(driver).hexdigest() != PINS["probe_source_sha256"]:
-            raise ValueError("GPU probe source pin")
-        driver_path = source / "scripts" / "run_v2_gpu_cache_probe.py"
-        with driver_path.open("xb") as stream:
-            stream.write(driver)
-        pin_file = invocation / "pins.json"
+$driver_block        pin_file = invocation / "pins.json"
         pin_file.write_text(json.dumps(PINS), encoding="utf-8")
         remaining = int(LIMIT-(time.monotonic()-started)) - 90
         if remaining <= 0:
             raise TimeoutError("No time left for the probe worker")
-        command = [sys.executable, "-m", "scripts.run_v2_gpu_cache_probe",
+        command = [sys.executable, "-m", "$worker_module",
                    "--pins", str(pin_file), "--work", str(invocation),
                    "--input-dir", str(parent / "v2_cpu_cache_041837Z"), "--seconds", str(remaining)]
         with (invocation / "worker.log").open("xb") as log, subprocess.Popen(
@@ -175,11 +179,16 @@ def run_gpu_cache_probe():
         finally:
             print("Notebook wall seconds:", round(time.monotonic()-started, 3), flush=True)
 
-if RUN_GPU_CACHE_PROBE:
-    run_gpu_cache_probe()
+if $run_switch:
+    $entrypoint()
 else:
     print("실행 스위치가 꺼져 있습니다.")
-'''
+''')
+
+RUN = RUN_TEMPLATE.substitute(
+    entrypoint="run_gpu_cache_probe", work_folder="rewind_v2_gpu_cache_probe", report_folder="v2_gpu_cache_041837Z",
+    driver_block=PROBE_DRIVER_BLOCK, worker_module="scripts.run_v2_gpu_cache_probe", run_switch="RUN_GPU_CACHE_PROBE",
+)
 
 
 def notebook(pins, driver):
@@ -205,9 +214,7 @@ def notebook(pins, driver):
     }
 
 
-def build(source, catalog, cpu_report, output):
-    if output.exists() or not output.parent.is_dir():
-        raise ValueError("v2_gpu_new_output")
+def input_pins(source, catalog, cpu_report):
     catalog_raw = _regular_read(catalog, 64 * 1024, 13700)
     cpu_raw = _regular_read(cpu_report, 64 * 1024)
     if sha(catalog_raw) != CATALOG_SHA or sha(cpu_raw) != CPU_REPORT_SHA:
@@ -226,6 +233,13 @@ def build(source, catalog, cpu_report, output):
                 shard_files=shard["files"], producer_environment=worker["runtime"],
                 producer_binding_sha256=digest(shard["binding"]), probe_source_sha256=sha(driver.encode("utf-8")))
     load_catalog(catalog_raw, pins)
+    return pins, driver
+
+
+def build(source, catalog, cpu_report, output):
+    if output.exists() or not output.parent.is_dir():
+        raise ValueError("v2_gpu_new_output")
+    pins, driver = input_pins(source, catalog, cpu_report)
     with tempfile.TemporaryDirectory(dir=output.parent) as tmp:
         root = Path(tmp) / "source"
         extract_pinned_zip(source, SOURCE_SHA, root, max_zip_bytes=64*1024**2, max_output_bytes=192*1024**2,

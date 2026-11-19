@@ -14,7 +14,10 @@ import torch
 from rewind_archive.contracts import canonical, digest
 from rewind_prepare.temporal_selection import seal
 from rewind_v1 import v2_cache as cache, v2_contract as contract
+from rewind_v1 import v2_retention as retention
+from rewind_v1.v2_budget import Ledger
 from scripts import build_v2_gpu_cache_probe as builder, run_v2_gpu_cache_probe as probe
+from scripts import build_v2_gpu_cache_restore as restore_builder, run_v2_gpu_cache_restore as restore
 
 
 class ProbeTest(unittest.TestCase):
@@ -32,7 +35,7 @@ class ProbeTest(unittest.TestCase):
             mock.start()
             self.addCleanup(mock.stop)
 
-    def prepare(self):
+    def prepare(self, *, prior_build=False):
         owners = {f"{scene}/Day/Avatar/Actor/001/{split}": split
                   for scene in contract.SCENARIOS for split in ("train", "validation", "test")}
         sources = self.root / "reference"
@@ -73,7 +76,15 @@ class ProbeTest(unittest.TestCase):
             archive.writestr(probe.MANIFEST_NAME, raw)
         cfg_raw = (self.root / "configs/rewind_v2.json").read_bytes()
         binding = cache.binding(doc, spec, json.loads(cfg_raw))
-        binding["torch"] = "2.14.1+cpu-fixture"
+        binding["torch"] = "2.14.1+cpu" if prior_build else "2.14.1+cpu-fixture"
+        if prior_build:
+            binding["source"]["rewind_v1/v2_cache.py"] = "f"*64
+        cfg = json.loads(cfg_raw)
+        origin = {"manifest": doc["content_sha256"], "source": digest(binding["source"]), "config": digest(cfg)}
+        ledger = Ledger(self.root / "producer-usage", origin, cfg)
+        with ledger.invocation("fixture_cache"):
+            pass
+        self.fixture = (doc, spec, cfg, ledger)
         self.pins = {
             "source_identity": digest(contract.source()), "revision": "0"*40,
             "spec_sha256": contract.sha(spec_raw), "config_sha256": contract.sha(cfg_raw),
@@ -112,7 +123,8 @@ class ProbeTest(unittest.TestCase):
         package = {"number": 0, "name": name, "bytes": self.shard.stat().st_size,
                    "sha256": archive_sha, "receipt_sha256": receipt["content_sha256"]}
         catalog = seal({"schema": "rewind_v2_retained_catalog_v1", "binding": binding,
-                        "packages": [package], "completed_frames": n, "status": "remote_verified"})
+                        "packages": [package], "completed_frames": n, "status": "remote_verified",
+                        "usage": ledger.snapshot()})
         catalog_raw = canonical(catalog)
         (self.root / "drive" / "catalog.json").write_bytes(catalog_raw)
         self.pins.update(package=package, catalog_file_sha256=contract.sha(catalog_raw),
@@ -120,6 +132,69 @@ class ProbeTest(unittest.TestCase):
                          records_sha256=receipt["records_sha256"], shard_files=parts)
         self.pin_file = self.root / "pins.json"
         self.pin_file.write_bytes(canonical(self.pins))
+
+    def restore_args(self, label):
+        work = self.root / label
+        work.mkdir()
+        args = ["--pins", str(self.pin_file), "--work", str(work),
+                "--input-dir", str(self.root / "drive"), "--seconds", "120"]
+        return work, args
+
+    def test_explicit_restore_uses_standard_batch_and_strict_loader_still_requires_full_cache(self):
+        self.prepare(prior_build=True)
+        self.pins["consumer_source_identity"] = digest(contract.source())
+        self.pin_file.write_bytes(canonical(self.pins))
+        work, args = self.restore_args("consumer")
+        doc, spec, cfg, ledger = self.fixture
+
+        def compare(batch):
+            self.assertEqual(set(batch), {"image", "xy", "xy_valid"})
+            self.assertEqual(tuple(batch["image"].shape), (2, 2, 3, 128, 128))
+            self.assertTrue(torch.all(batch["image"] == 0.5))
+            self.assertTrue(torch.all(batch["xy_valid"]))
+            return {"all_exact": True}
+
+        with (patch.object(torch, "__version__", "2.14.1+cu130"),
+              patch.object(torch.version, "cuda", "13.0"),
+              patch.object(torch.cuda, "is_available", return_value=True),
+              patch.object(restore, "available_ram", return_value=8*1024**3),
+              patch.object(restore, "cuda_round_trip", side_effect=compare),
+              patch.object(restore, "frame_batch", wraps=restore.frame_batch) as batch):
+            with self.assertRaisesRegex(ValueError, "v2_restore_binding_prefix"):
+                retention.restore_cache(self.root / "drive", self.pins["catalog_file_sha256"],
+                                        self.root / "strict", doc, spec, cfg, ledger)
+            restore.main(args)
+            batch.assert_called_once()
+        report = json.loads((work / "result.json").read_bytes())
+        self.assertEqual(report["status"], "passed")
+        restored = json.loads((work / "restored/catalog.json").read_bytes())
+        self.assertEqual(restored["binding"]["torch"], "2.14.1+cpu")
+        with patch.object(cache, "binding", return_value=restored["binding"]):
+            with self.assertRaisesRegex(ValueError, "v2_complete_cache_required"):
+                cache.Cache(work / "restored", doc, spec, cfg, ledger)
+        producer = restored["binding"]
+        current = {**producer, "torch": "2.14.1+cu130", "source": contract.source()}
+        policy = cache.ReadOnlyFirstShard(digest(producer), digest(current["source"]), self.pins["package"]["receipt_sha256"])
+        for changes in ({"numpy": "other"}, {"torch": "2.14.1+cu129"}, {"manifest_sha256": "a"*64}):
+            with self.assertRaisesRegex(ValueError, "v2_read_only_binding_pin"):
+                policy.verify(producer, {**current, **changes})
+        with self.assertRaisesRegex(ValueError, "v2_read_only_output_overlap"):
+            retention.restore_cache(self.root / "drive", self.pins["catalog_file_sha256"],
+                                    self.root / "drive/overlap", doc, spec, cfg, ledger, read_only=policy)
+
+    def test_restore_notebook_sources_and_entry(self):
+        overlay = dict.fromkeys(restore_builder.MODULES, "# fixture")
+        doc = restore_builder.make_notebook({"source_name": "fixed.zip"}, overlay)
+        scope = {}
+        with patch("builtins.print"):
+            for cell in doc["cells"]:
+                if cell["cell_type"] == "code":
+                    exec(compile("".join(cell["source"]), "<notebook>", "exec"), scope)
+        source = "".join(doc["cells"][-1]["source"])
+        self.assertIn('"scripts.run_v2_gpu_cache_restore"', source)
+        self.assertIn('"v2_gpu_restore_041837Z"', source)
+        self.assertFalse(scope["RUN_GPU_CACHE_RESTORE"])
+        self.assertEqual(scope["OVERLAY"], overlay)
 
     def run_cli(self, work):
         work.mkdir()

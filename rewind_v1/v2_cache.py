@@ -1,5 +1,6 @@
 """V2 atomic shards preserve original float64 camera transforms."""
 from collections import OrderedDict
+from dataclasses import dataclass
 import io
 import json
 from pathlib import Path
@@ -19,6 +20,28 @@ from .full_cache import _frame
 from . import v2_contract as contract
 
 CHUNK=128
+
+
+@dataclass(frozen=True)
+class ReadOnlyFirstShard:
+    """Exact producer and consumer pins for the observed CPU-to-CUDA build pair."""
+
+    producer_binding_sha256: str
+    consumer_source_sha256: str
+    receipt_sha256: str
+
+    def verify(self, producer, consumer):
+        source_changes = {"rewind_v1/v2_cache.py", "rewind_v1/v2_retention.py", "rewind_v1/v2_training.py"}
+        old_source, new_source = producer["source"], consumer["source"]
+        changes = {name for name in old_source.keys() | new_source.keys()
+                   if old_source.get(name) != new_source.get(name)}
+        if (digest(producer) != self.producer_binding_sha256
+                or digest(new_source) != self.consumer_source_sha256
+                or old_source.keys() != new_source.keys() or not changes <= source_changes
+                or (producer["torch"], consumer["torch"]) != ("2.14.1+cpu", "2.14.1+cu130")
+                or {k: v for k, v in producer.items() if k not in {"source", "torch"}}
+                != {k: v for k, v in consumer.items() if k not in {"source", "torch"}}):
+            raise ValueError("v2_read_only_binding_pin")
 
 
 def binding(doc,spec,cfg):
@@ -122,12 +145,31 @@ def quarantine(root,name,expected_receipt_file_sha):
 
 class Cache:
     def __init__(self,root,doc,spec,cfg,ledger):
+        self._open(root,doc,spec,cfg,ledger)
+
+    @classmethod
+    def open_read_only(cls,root,doc,spec,cfg,ledger,*,policy,local_catalog_sha256):
+        instance=cls.__new__(cls)
+        instance._open(root,doc,spec,cfg,ledger,policy=policy,local_catalog_sha256=local_catalog_sha256)
+        return instance
+
+    def _open(self,root,doc,spec,cfg,ledger,*,policy=None,local_catalog_sha256=None):
         self.root,self.doc,self.spec,self.ledger=Path(root),doc,spec,ledger;self.bind=binding(doc,spec,cfg);self.loaded=OrderedDict()
-        cat=json.loads(_regular_read(self.root/'catalog.json',32*1024**2));check_pin(cat,'rewind_v2_local_catalog_v1',cat.get('content_sha256'))
-        if cat['binding']!=self.bind or cat['status']!='local_complete' or cat['completed_frames']!=len(doc['records']) or len(cat['shards'])!=(len(doc['records'])+CHUNK-1)//CHUNK:raise ValueError('v2_complete_cache_required')
+        cat=json.loads(_regular_read(self.root/'catalog.json',32*1024**2))
+        if policy is None:
+            check_pin(cat,'rewind_v2_local_catalog_v1',cat.get('content_sha256'))
+            if cat['binding']!=self.bind or cat['status']!='local_complete' or cat['completed_frames']!=len(doc['records']) or len(cat['shards'])!=(len(doc['records'])+CHUNK-1)//CHUNK:raise ValueError('v2_complete_cache_required')
+        else:
+            check_pin(cat,'rewind_v2_local_catalog_v1',local_catalog_sha256)
+            policy.verify(cat['binding'],self.bind)
+            if (cat['status']!='local_partial' or cat['completed_frames']!=CHUNK or len(cat['shards'])!=1
+                    or cat['shards'][0]['content_sha256']!=policy.receipt_sha256
+                    or cat['total_frames']!=len(doc['records']) or len(doc['records'])<=CHUNK):
+                raise ValueError('v2_read_only_first_shard')
+            self.bind=cat['binding']
         for i,pin in enumerate(cat['shards']):
             if receipt(root,i,self.bind,doc['records'][i*CHUNK:(i+1)*CHUNK],ledger)!=pin:raise ValueError('v2_cache_pin')
-        self.identity=cat['content_sha256'];self.index={(r['sequence_id'],r['frame_index']):i for i,r in enumerate(doc['records'])}
+        self.identity=cat['content_sha256'];self.index={(r['sequence_id'],r['frame_index']):i for i,r in enumerate(doc['records'][:cat['completed_frames']])}
 
     def frame(self,key,split):
         i=self.index[tuple(key)];r=self.doc['records'][i]

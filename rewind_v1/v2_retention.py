@@ -95,13 +95,25 @@ def user_copy_cache(cache,retained,doc,spec,cfg,ledger):
         return {'copied_shards':copied,'verified_shards':len(packages),'catalog_sha256':remote['content_sha256'],'catalog_file_sha256':_hash_file(retained/'catalog.json')}
 
 
-def restore_cache(retained,expected_catalog_sha,output,doc,spec,cfg,ledger):
+def restore_cache(retained,expected_catalog_sha,output,doc,spec,cfg,ledger,*,read_only=None):
     from .v2_cache import binding
-    root=Path(output);root.mkdir(parents=True,exist_ok=True);retained=Path(retained)
+    root=Path(output);retained=Path(retained)
+    if read_only is not None:
+        source_path,output_path=retained.resolve(),root.resolve()
+        if (root.is_symlink() or retained.is_symlink() or output_path.is_relative_to(source_path)
+                or source_path.is_relative_to(output_path)):
+            raise ValueError('v2_read_only_output_overlap')
+    root.mkdir(parents=True,exist_ok=True)
     raw=_regular_read(retained/'catalog.json',32*1024**2)
     if contract_sha(raw)!=expected_catalog_sha:raise ValueError('v2_retained_catalog_file_pin')
     remote=json.loads(raw);check_pin(remote,'rewind_v2_retained_catalog_v1',remote.get('content_sha256'))
     bind=binding(doc,spec,cfg)
+    if read_only is not None:
+        read_only.verify(remote['binding'],bind)
+        if (len(remote['packages'])!=1 or remote['completed_frames']!=CHUNK or len(doc['records'])<=CHUNK
+                or remote['packages'][0]['receipt_sha256']!=read_only.receipt_sha256):
+            raise ValueError('v2_read_only_first_shard')
+        bind=remote['binding']
     if remote['binding']!=bind or [p['number'] for p in remote['packages']]!=list(range(len(remote['packages']))):raise ValueError('v2_restore_binding_prefix')
     ledger.import_usage(remote['usage'])
     pins=[];prior=None
@@ -113,9 +125,12 @@ def restore_cache(retained,expected_catalog_sha,output,doc,spec,cfg,ledger):
         for p in remote['packages']:
             ledger.check();number=p['number'];folder=root/f'shard-{number:05d}'
             if p['name']!=f'shard-{number:05d}-{p["sha256"]}.zip' or not 0<p['bytes']<=64*1024**2:raise ValueError('v2_restore_package')
+            source=retained/p['name']
+            if read_only is not None and (source.is_symlink() or not source.is_file() or source.stat().st_size!=p['bytes']):
+                raise ValueError('v2_read_only_package_size')
             if not folder.exists():
                 with tempfile.TemporaryDirectory(dir=root,prefix='.restore-') as tmp:
-                    local=Path(tmp)/'shard.zip';copy_verified(retained/p['name'],local,p,ledger,ledger.clock()+min(cfg['copy_seconds'],ledger.remaining()))
+                    local=Path(tmp)/'shard.zip';copy_verified(source,local,p,ledger,ledger.clock()+min(cfg['copy_seconds'],ledger.remaining()))
                     staged=Path(tmp)/f'shard-{number:05d}'
                     extract_pinned_zip(local,p['sha256'],staged,max_zip_bytes=64*1024**2,max_output_bytes=64*1024**2,max_members=3)
                     r=receipt(Path(tmp),number,bind,doc['records'][number*CHUNK:(number+1)*CHUNK],ledger)
@@ -127,7 +142,9 @@ def restore_cache(retained,expected_catalog_sha,output,doc,spec,cfg,ledger):
             if prior is not None and number<len(prior['shards']) and prior['shards'][number]!=r:raise ValueError('v2_restore_existing_pin_mismatch')
             if prior is None or len(pins)>len(prior['shards']):prior=catalog(root,bind,pins,len(doc['records']))
         if not remote['packages'] and prior is None:catalog(root,bind,[],len(doc['records']))
-    return {'restored_frames':sum(r['frames'] for r in pins),'status':'local_complete' if sum(r['frames'] for r in pins)==len(doc['records']) else 'local_partial'}
+    result={'restored_frames':sum(r['frames'] for r in pins),'status':'local_complete' if sum(r['frames'] for r in pins)==len(doc['records']) else 'local_partial'}
+    if read_only is not None:result['local_catalog_sha256']=prior['content_sha256']
+    return result
 
 
 def contract_sha(raw):return hashlib.sha256(raw).hexdigest()
