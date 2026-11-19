@@ -1,7 +1,7 @@
 """Append verified v2 shards on CPU, or read a pinned boundary batch on CUDA."""
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 from pathlib import Path
 import platform
@@ -67,7 +67,8 @@ class Journal:
     def path(self, index):
         return self.root / f"boundary-{index:05d}.json"
 
-    def read(self, path):
+    @staticmethod
+    def read(path):
         raw = _regular_read(path, 16 * 1024)
         doc = json.loads(raw)
         check_pin(doc, JOURNAL_SCHEMA, doc.get("content_sha256"))
@@ -194,10 +195,12 @@ def admit(rows, ledger, cfg, *, orphan=False):
 
 
 def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, report, *,
-               frame_builder=None, recover_writer=""):
+               frame_builder=None, recover_writer="", owner_check=None, minimum_shards=0, drive_quota=None):
     journal.root.mkdir(parents=True, exist_ok=True)
-    with writer(journal.root, recover_writer) as owner:
+    with (writer(journal.root, recover_writer) if owner_check is None else nullcontext(owner_check)) as owner:
         entries = journal.scan(expected, ledger.check, allow_absent=True)
+        if len(entries) < minimum_shards:
+            raise ValueError("v2_bulk_baseline_required")
         if not entries:
             package_path(journal.legacy, 0, journal.genesis["package"])
             journal.publish(journal.genesis, owner)
@@ -215,6 +218,9 @@ def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, re
             orphans = list(journal.root.glob(f"shard-{index:05d}-*.zip"))
             if len(orphans) > 1:
                 raise ValueError("v2_bulk_conflicting_unpublished_packages")
+            if drive_quota is not None and not drive_quota.admit(0 if orphans else PACKAGE_CAP):
+                report["stop_reason"] = "drive_cumulative_budget"
+                return
             reason = admit(rows, ledger, ledger.cfg, orphan=bool(orphans))
             if reason:
                 report["stop_reason"] = reason + "_budget"
@@ -245,6 +251,9 @@ def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, re
                     pin = retention.pack_shard(stage / f"shard-{index:05d}", local_zip, ledger)
                     pin.update(number=index, name=f"shard-{index:05d}-{pin['sha256']}.zip")
                     final = journal.root / pin["name"]
+                    if drive_quota is not None and not drive_quota.admit(pin["bytes"]):
+                        report["stop_reason"] = "drive_cumulative_budget"
+                        return
                     with tempfile.TemporaryDirectory(dir=journal.root, prefix=".incoming-") as incoming:
                         draft = Path(incoming) / pin["name"]
                         retention.copy_verified(local_zip, draft, pin, ledger,
@@ -262,6 +271,8 @@ def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, re
                 pin["receipt_sha256"] = item["content_sha256"]
                 current = journal.entry(index, entries[-1]["content_sha256"], pin, digest(journal.binding))
                 journal.publish(current, owner)
+                if drive_quota is not None:
+                    drive_quota.committed(current, orphan=bool(orphans))
             entries.append(current)
             report["added_shards"] += 1
             report["completed_shards"] = len(entries)

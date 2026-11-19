@@ -22,6 +22,7 @@ from rewind_v1.run_data import FixtureData
 from rewind_v1.runner import _read_checkpoint
 from scripts.build_v2 import notebook
 from scripts import build_v2_bulk_cache as bulk_builder, run_v2_bulk_cache as bulk
+from scripts.v2_bulk_quota import DriveQuota, METADATA_CAP
 
 
 class V2Tests(TestCase):
@@ -255,6 +256,22 @@ class V2Tests(TestCase):
                 result = json.loads((invocation/"diagnostic.json").read_bytes())
                 self.assertEqual(result["status"], "paused")
                 self.assertEqual(result["worker"]["boundary_sha256"], "b"*64)
+
+    def test_bulk_cumulative_drive_gate_stops_before_read_or_upload(self):
+        journal = self.bulk_fixture()
+        baseline = self.bulk_add(journal, "baseline", 4)
+        entries = journal.scan(baseline["boundary_sha256"], lambda: None)
+        work = self.root/"quota-window"
+        work.mkdir()
+        quota = DriveQuota(journal.root, entries, cap=METADATA_CAP)
+        report = {}
+        with self.ledger.invocation("quota-window"), patch.object(cache, "publish_shard") as emit:
+            bulk.add_shards(journal, baseline["boundary_sha256"], 5, work, self.spec, self.cfg,
+                            self.root/"raw", self.root/"raw", self.ledger, report, drive_quota=quota, minimum_shards=4)
+            emit.assert_not_called()
+        self.assertEqual(report["stop_reason"], "drive_cumulative_budget")
+        self.assertEqual(report["boundary_sha256"], baseline["boundary_sha256"])
+        self.assertFalse(journal.path(4).exists())
 
     def test_retained_catalog_monotone_binding_and_large_prefix_progress(self):
         self.prepare(1);short=(self.root/'cache/catalog.json').read_bytes();self.prepare(2)

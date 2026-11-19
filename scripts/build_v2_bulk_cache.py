@@ -11,7 +11,7 @@ from rewind_archive.contracts import canonical
 from rewind_prepare.converter import sha
 from scripts.archvis_pilot_bootstrap import extract_pinned_zip
 from scripts.build_archvis_pilot_handoff import _cell
-from scripts.build_v2_gpu_cache_probe import REVISION, RUN_TEMPLATE, SOURCE_SHA, input_pins
+from scripts.build_v2_gpu_cache_probe import DEFAULT_REPORT_REMAINING, DEFAULT_WAIT_BLOCK, REVISION, RUN_TEMPLATE, SOURCE_SHA, input_pins
 from scripts.build_v2_gpu_cache_restore import OVERLAY_BLOCK
 from scripts.run_v2_bulk_cache import CPU_SECONDS, GPU_SECONDS
 
@@ -56,6 +56,8 @@ def notebook(pins, overlay, mode):
         entrypoint="run_v2_bulk", work_folder=f"rewind_v2_bulk_{mode}",
         report_folder=f"v2_bulk_{mode}_reports_041837Z", driver_block=OVERLAY_BLOCK,
         command_block=COMMAND, run_switch="RUN_V2_BULK",
+        wait_block=DEFAULT_WAIT_BLOCK,
+        report_remaining=DEFAULT_REPORT_REMAINING,
         success_rule='worker["status"] if error is None and worker and worker["status"] in ("passed", "paused")',
     )
     guide = (f"# v2 캐시 {mode.upper()}\n\n`{pins['source_name']}`을 /content에 업로드하고 "

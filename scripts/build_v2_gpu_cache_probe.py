@@ -39,6 +39,19 @@ DEFAULT_COMMAND_BLOCK = '''        if remaining <= 0:
                    "--pins", str(pin_file), "--work", str(invocation),
                    "--input-dir", str(parent / "v2_cpu_cache_041837Z"), "--seconds", str(remaining)]
 '''
+DEFAULT_WAIT_BLOCK = '''            try:
+                code = child.wait(timeout=remaining)
+            except BaseException:
+                if child.poll() is None:
+                    child.send_signal(signal.SIGINT)
+                try:
+                    child.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait(timeout=10)
+                raise
+'''
+DEFAULT_REPORT_REMAINING = "min(60, int(LIMIT-(time.monotonic()-started)))"
 
 
 RUN_TEMPLATE = Template('''
@@ -85,7 +98,7 @@ def save_report(invocation, retained, started, error):
         print(log, flush=True)
     if retained is None:
         return
-    remaining = min(60, int(LIMIT-(time.monotonic()-started)))
+    remaining = $report_remaining
     if remaining <= 0:
         raise TimeoutError("No time left for Drive report")
     prev_handler = signal.signal(signal.SIGALRM, report_timeout)
@@ -154,18 +167,7 @@ $driver_block        pin_file = invocation / "pins.json"
         remaining = int(LIMIT-(time.monotonic()-started)) - 90
 $command_block        with (invocation / "worker.log").open("xb") as log, subprocess.Popen(
                 command, cwd=source, stdout=log, stderr=subprocess.STDOUT) as child:
-            try:
-                code = child.wait(timeout=remaining)
-            except BaseException:
-                if child.poll() is None:
-                    child.send_signal(signal.SIGINT)
-                try:
-                    child.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait(timeout=10)
-                raise
-        if code:
+$wait_block        if code:
             raise RuntimeError(f"GPU cache worker exited with code {code}")
     except BaseException as failure:
         error = failure
@@ -190,6 +192,8 @@ RUN = RUN_TEMPLATE.substitute(
     entrypoint="run_gpu_cache_probe", work_folder="rewind_v2_gpu_cache_probe", report_folder="v2_gpu_cache_041837Z",
     driver_block=PROBE_DRIVER_BLOCK,
     command_block=Template(DEFAULT_COMMAND_BLOCK).substitute(worker_module="scripts.run_v2_gpu_cache_probe"),
+    wait_block=DEFAULT_WAIT_BLOCK,
+    report_remaining=DEFAULT_REPORT_REMAINING,
     run_switch="RUN_GPU_CACHE_PROBE",
     success_rule='"passed" if error is None and worker and worker["status"] == "passed"',
 )
