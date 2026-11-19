@@ -1,6 +1,6 @@
 # REWIND-like prototype 실험 결과 종합 보고서
 
-최종 갱신 2026-11-20 · 모델 결과 v0~v1.5.3 · v2 CPU 캐시 첫 샤드 보관 확인, A100 첫 샤드 복원 통과 · 다중 샤드 재개 및 경계 배치 시험 대기
+최종 갱신 2026-11-20 · 모델 결과 v0~v1.5.3 · v2 CPU 캐시 첫 샤드 보관 확인, A100 첫 샤드 복원 통과 · 새 CPU VM 재개 및 A100 경계 배치 통과
 
 이 문서는 프로젝트의 실험 결과를 읽는 기본 진입점이다. 개별 보고서의 결과·검토 범위를 종합하며, 새 테스트 설계와 결과 검토 때 계속 갱신한다. 이번 작성은 기존 근거의 통합이며 새로운 학습·GPU 실행이나 원본 결과 전체의 재검증을 뜻하지 않는다.
 
@@ -39,7 +39,7 @@ v0 — 1,000페어 2D 학습 [완료, 정확도 개선 필요]
    └─ v1.3 — 다른 시나리오 혼합 학습 [v2로 확대·이관]
       └─ v2 — 세 시나리오 전체 train 통합 학습 [준비 승인·학습 미시작]
          └─ CPU 캐시 128페어 [보관 확인] → 동일 샤드 A100 한 배치 읽기 [통과] → 정식 복원 및 한 배치 읽기 [Colab 통과]
-            └─ 다중 샤드 CPU 캐싱 → 재개 → GPU 경계 배치 [Colab 결과 대기]
+            └─ 다중 샤드 CPU 캐싱 → 재개 → GPU 경계 배치 [4샤드·512프레임, Colab 통과]
 
 v1.6 — 별도 버전 폐기; 유효한 제안은 재정의된 v1.5에 흡수
 ```
@@ -53,11 +53,21 @@ v1.6 — 별도 버전 폐기; 유효한 제안은 재정의된 v1.5에 흡수
 | 첫 CPU 캐시 | 공식 train 128페어, 384파일 | 원본 307,418,238 B를 188.757초에 준비했다. 전체 호출은 230.633초, 보관된 샤드는 50,627,408 B다. 회수한 진단·카탈로그의 해시와 샤드 참조를 대조했다. |
 | GPU 읽기 시험 | ArchVis Joyful Jump, train 프레임 0·1 | A100-SXM4-40GB에서 790,804 B를 왕복 전송해 텐서 8종의 값과 dtype이 일치했다. 두 프레임 모두 좌우 2D 및 3D에서 62관절이 유효했다. PyTorch `2.14.1+cpu`와 `2.14.1+cu130`의 빌드 차이로 정식 복원 조건이 불일치했다. 이 실행에서는 직접 읽기 경로를 사용했다. |
 | 정식 복원 시험 | 같은 카탈로그·샤드·train 두 프레임 | `restore_cache`가 128/136,011프레임을 `local_partial`로 복원했다. A100에서 `frame_batch`의 이미지·2D 좌표·유효 마스크 3종이 왕복 후 모두 일치했다. 양쪽 뷰 모두 프레임당 62관절이 유효했다. |
-| 다중 샤드 재개 시험 | 동일 manifest, 기존 첫 샤드와 추가 샤드 | 한 호출에서 여러 샤드를 만든 뒤 다른 호출에서 마지막 보관 지점 다음으로 이어지는지 확인한다. 인접 샤드의 마지막·첫 프레임을 GPU에서 한 배치로 읽어 순서와 값 보존을 검사한다. 실제 결과 대기 중이다. |
+| 다중 샤드 재개 시험 | 동일 manifest, 기존 첫 샤드와 추가 샤드 | CPU 1→3샤드(384프레임), 새 CPU VM 3→4샤드(512프레임). A100에서 샤드 2·3의 경계인 Guitar Playing 21·22번을 한 배치로 읽었다. 이미지·2D 좌표·마스크 모두 CUDA 왕복 값이 일치했다. |
 
 근거 파일은 `outputs/v2_plan_inputs/user_test/cpu_cache_invocation-hlok774l/`의 진단 JSON과 카탈로그다. 샤드는 사용자 Drive에 보관돼 있다. [CPU 캐시 실행 계약](V2_CPU_CACHE_PILOT.md)
 
-GPU 시험 revision은 `39d7cd0`이며 회수한 [진단 JSON](../outputs/v2_plan_inputs/user_test/gpu_cache_invocation-1xyc6uuv/invocation-1xyc6uuv.json)의 SHA-256은 `8d2b5fefe7e88f6d1f5f5e943b9cf215ae48f247ceff7ae768aaed7a15038538`이다. Drive 입력은 50,641,108 B, worker 실행은 21.699초였다. 후속 시험 `ad353cb`의 [복원 진단 JSON](../outputs/v2_plan_inputs/user_test/gpu_cache_restore_invocation-piktkag5/invocation-piktkag5.json) SHA-256은 `5a0f0d1d99e8e6e5ca2688f04e76468c1620c3a8bd8e6446ca1f2c2f983af2f8`이다. 배포 receipt와 입력 식별자가 일치했다. Drive 논리 입력은 50,654,808 B, 복원은 1.136초, worker 실행은 21.310초였다. 생산·소비 빌드가 다른 고정 샤드의 읽기 전용 시험으로, 전체 캐시를 사용하는 일반 학습의 호환성은 별도로 검증해야 한다. 다음 단계는 여러 샤드의 생성·보관·재개 및 학습 로더 연결이다.
+GPU 시험 revision은 `39d7cd0`이며 회수한 [진단 JSON](../outputs/v2_plan_inputs/user_test/gpu_cache_invocation-1xyc6uuv/invocation-1xyc6uuv.json)의 SHA-256은 `8d2b5fefe7e88f6d1f5f5e943b9cf215ae48f247ceff7ae768aaed7a15038538`이다. Drive 입력은 50,641,108 B, worker 실행은 21.699초였다. 후속 시험 `ad353cb`의 [복원 진단 JSON](../outputs/v2_plan_inputs/user_test/gpu_cache_restore_invocation-piktkag5/invocation-piktkag5.json) SHA-256은 `5a0f0d1d99e8e6e5ca2688f04e76468c1620c3a8bd8e6446ca1f2c2f983af2f8`이다. 배포 receipt와 입력 식별자가 일치했다. Drive 논리 입력은 50,654,808 B, 복원은 1.136초, worker 실행은 21.310초였다. 생산·소비 빌드가 다른 고정 샤드의 읽기 전용 시험으로, 전체 캐시를 사용하는 일반 학습의 호환성은 별도로 검증해야 한다. 후속 다중 샤드 결과는 위 표와 아래 진단에 기록했다.
+
+다중 샤드 시험 revision은 `5e10bdb`다. 회수본 SHA-256을 테스트 세션 기록과 대조하고, 세 보고서의 입력 식별자가 배포 receipt와 일치하는지 확인했다. 표의 시간은 각 노트북이 진단 작성을 시작할 때까지의 경과 시간이다.
+
+| 회수 진단 | 경과 시간 | SHA-256 |
+| --- | ---: | --- |
+| [CPU 연속 생성](../outputs/v2_plan_inputs/user_test/bulk_cache_3_then_4/invocation-k3nbzode.json) | 428.934초 | `c8be6bde595024de1108165803a62cb0427d21071fc9574542b72ca2a552d971` |
+| [새 CPU VM 재개](../outputs/v2_plan_inputs/user_test/bulk_cache_3_then_4/invocation-hk_nsqcd.json) | 224.956초 | `6e9e32258d11938392912fbe2d48dd635a28a4f300c370a58e3306c86aa60cb6` |
+| [GPU 경계 배치](../outputs/v2_plan_inputs/user_test/bulk_cache_3_then_4/invocation-yhtbc6zx.json) | 30.169초 | `604c7e6da75aa4d5b6c46027985fca436c89f62f556f1b7536c9f114581223b7` |
+
+다음 캐싱의 기준은 4샤드 완료 SHA `9121e075033b9b922cb8fe93e4389f04914b70eb77cd0c496d138973a4098e55`다. 두 CPU 호출 모두 목표에 도달해 종료했다. 강제 종료 도중의 복구는 로컬 회귀 검사 범위다. 후속 작업은 누적 실행 예산과 저장 공간을 정한 뒤 캐시 범위를 확대하는 것이다.
 
 아래는 각 실행의 참고 validation 결과다. 2D는 화면 안 관절의 원본 이미지 좌표 오차(px), body/hand는 3D MPJPE(mm)다. Hand global에는 wrist 위치 오류가 포함되고 local은 wrist-relative 오차다. **행 간 차이는 모델·학습량·데이터·GPU 등이 함께 달라진 비교이며 성능 순위나 단일 변수의 인과 효과가 아니다.**
 
@@ -238,4 +248,4 @@ v1.5 대표 그림: [ArchVis](../outputs/v15_camera_training_20261115/user_test/
 | 2026-11-18 | v2 명명·준비 승인, v1.3 이관 및 후속 각1회8시간 확정. 전용 인프라 구현·신규14검사와 root 검토 완료, 실제 학습 미시작 |
 | 2026-11-19 | v2 첫 CPU 캐시 실측 및 보관 근거를 추가하고 A100 읽기 결과, 복원 조건의 빌드 차이와 후속 검증 범위를 기록했다. |
 | 2026-11-20 | 같은 샤드의 정식 복원과 학습 로더 한 배치 읽기를 후속 시험으로 등록하고 A100에서 첫 샤드 복원과 표준 배치 3종의 값 보존을 확인했다. |
-| 2026-11-20 | CPU 다중 샤드 생성·재개 및 GPU 경계 배치 시험 설계를 추가했다. |
+| 2026-11-20 | 다중 샤드 CPU 연속 생성·새 VM 재개 및 GPU 경계 배치 통과를 반영했다. |
