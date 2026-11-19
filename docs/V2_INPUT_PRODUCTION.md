@@ -33,3 +33,7 @@ Producer는 공식 sequence 소속, 관측된 sequence/frame 각각의 좌·우 
 API가 SHA를 제공하지 않으면 producer가 미확보 파일과 총 바이트를 보고하고 발급을 차단한다. 별도 승인된 bounded payload 감사 결과나 과거 감사와 현재 Drive 객체 버전의 동일성까지 입증한 경우에만 `--evidence/--evidence-sha`로 검토된 JSONL을 전달할 수 있다. 보충 행은 `file_id, version, size_bytes, path, sha256, source, evidence_sha256`을 요구한다. `source` 값은 `bounded_payload_sha256` 또는 `prior_audit_same_object_version`이다. 날짜·이름·크기가 같다는 이유로 과거 SHA를 현재 행에 복사하지 않는다. 입력 evidence 파일의 SHA는 producer가 검증하며, 각 행의 원본 증거를 검토하고 고정하는 책임은 인계 단계에 있다.
 
 공식 sequence 수는 ArchVis train 286·validation 30, CityPark 756·108, Downtown 371·48이다. 보존된 공식 경로로 가상 140,000페어를 canonical JSON으로 직렬화한 크기는 약 142.2MiB였다. 가장 긴 공식 sequence와 12자리 frame 번호를 적용한 보수적 크기는 약 167.6MiB였다. 기존 소비기 상한은 134,217,728B다. 실제 목록이 오면 producer가 정확한 후보 직렬화 크기와 SHA를 보고한다. 상한을 넘으면 검증된 목록·SQLite·보고서는 유지하고 고정 실행용 manifest와 그 pin 발급을 차단한다. v2 로더에만 192MiB 제한을 적용하는 안은 실제 입력의 로드·validator 최대 RSS와 직렬화 버퍼를 계측한 뒤 검토한다.
+
+## 11월 19일 부분 목록에서 재개
+
+`80f00d5` 실행에서 보존한 pose 파일 기록 79,345개를 사용하려면 [11월 19일 메타데이터 재개 가이드](V2_METADATA_RESUME_20261119.md)를 따른다. 가이드는 당시의 부분 DB, 삭제된 CityPark 빈 폴더, 남은 조회 예산에 맞춰 작성했다.

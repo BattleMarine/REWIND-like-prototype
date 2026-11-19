@@ -82,13 +82,26 @@ class Drive:
 
     def changes(self, corpus, token, check, byte_limit):
         params = {"pageToken": token, "pageSize": "1000", "supportsAllDrives": "true",
-                  "includeItemsFromAllDrives": "true", "fields": "nextPageToken,newStartPageToken,changes(changeType)"}
+                  "includeItemsFromAllDrives": "true",
+                  "fields": "nextPageToken,newStartPageToken,changes(changeType,fileId,removed,file(id,parents,mimeType,trashed))"}
         if corpus:
             params["driveId"] = id_value(corpus)
         return self.get("/changes", params, check, byte_limit)
 
 
-def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_bytes):
+def allowed_removal(change, object_id, parent_id):
+    if change.get("changeType") != "file" or change.get("fileId") != object_id:
+        return False
+    if change.get("removed") is True:
+        return set(change) == {"changeType", "fileId", "removed"}
+    item = change.get("file")
+    return (change.get("removed") is False and isinstance(item, dict)
+            and item.get("id") == object_id and item.get("mimeType") == FOLDER
+            and item.get("trashed") is True and ("parents" not in item or item["parents"] == [parent_id]))
+
+
+def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_bytes,
+            resume_removal=None, resume_parent=None):
     if not 1 <= max_requests <= 50000 or not 1 <= max_seconds <= 28800 or not 1 <= max_bytes <= 512 * MIB:
         raise ValueError("v2_metadata_invocation_limits")
     if set(roots) != {"pose", "rgb"}:
@@ -116,6 +129,16 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
     saved = db.execute("SELECT value FROM binding").fetchone()
     if saved is not None and saved[0] != binding:
         raise ValueError("v2_drive_resume_binding")
+    if resume_removal is not None:
+        id_value(resume_removal)
+        id_value(resume_parent)
+        if saved is None or db.execute("SELECT 1 FROM completion").fetchone():
+            raise ValueError("v2_metadata_partial_cursor_required")
+        for table in ("queue", "entries"):
+            if db.execute(f"SELECT 1 FROM {table} WHERE id=? LIMIT 1", (resume_removal,)).fetchone():
+                raise ValueError("v2_metadata_removed_object_already_observed")
+        db.execute("""CREATE TABLE IF NOT EXISTS resume_removals
+            (object_id TEXT PRIMARY KEY, corpus TEXT, phase TEXT, observation BLOB)""")
     start = time.monotonic()
     requests = received = 0
 
@@ -132,6 +155,47 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
         check()
         return data
 
+    def fences(*, preflight=False):
+        active = "pending" if preflight or resume_removal is None else "prechecked"
+        target = "prechecked" if preflight else "verified"
+        if db.execute("SELECT 1 FROM fences WHERE status='changed'").fetchone():
+            return False
+        while requests < max_requests and received < max_bytes:
+            fence = db.execute("SELECT corpus,token FROM fences WHERE status=? ORDER BY corpus LIMIT 1", (active,)).fetchone()
+            if fence is None:
+                return True
+            corpus, token = fence
+            page = call(client.changes, corpus, token)
+            following, end = page.get("nextPageToken"), page.get("newStartPageToken")
+            changes = page["changes"]
+            if not isinstance(changes, list):
+                raise ValueError("v2_metadata_invalid_changes")
+            allowed = False
+            if preflight and resume_removal is not None and len(changes) == 1:
+                change = changes[0]
+                allowed = (isinstance(change, dict) and allowed_removal(change, resume_removal, resume_parent)
+                           and not db.execute("SELECT 1 FROM resume_removals").fetchone())
+            if changes and not allowed:
+                status, next_token = "changed", token
+            elif following and not end and following != token:
+                status, next_token = active, following
+            elif not following and end:
+                status, next_token = target, end
+            else:
+                raise ValueError("v2_metadata_incomplete_change_fence")
+            if not isinstance(next_token, str) or len(next_token) > 16384:
+                raise ValueError("v2_metadata_invalid_change_cursor")
+            with db:
+                cur = db.execute("UPDATE fences SET token=?,status=? WHERE corpus=? AND token=? AND status=?",
+                                 (next_token, status, corpus, token, active))
+                if cur.rowcount != 1:
+                    raise ValueError("v2_metadata_concurrent_fence")
+                if allowed:
+                    db.execute("INSERT INTO resume_removals VALUES (?,?,'preflight',?)", (resume_removal, corpus, canonical(change)))
+            if status == "changed":
+                return False
+        return not db.execute("SELECT 1 FROM fences WHERE status=?", (active,)).fetchone()
+
     try:
         if saved is None:
             # Root IDs and their folder type are verified before storing any cursor.
@@ -143,17 +207,21 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
                 if info.get("id") != root or info.get("mimeType") != FOLDER or info.get("trashed") is not False:
                     raise ValueError("v2_metadata_root_not_folder")
                 corpora.add(id_value(info["driveId"]) if info.get("driveId") else "")
-            fences = []
+            initial_fences = []
             for corpus in sorted(corpora):
                 token = call(client.start, corpus)["startPageToken"]
                 if not isinstance(token, str) or not token or len(token) > 16384:
                     raise ValueError("v2_metadata_invalid_change_cursor")
-                fences.append((corpus, token))
+                initial_fences.append((corpus, token))
             with db:
                 db.execute("INSERT INTO binding VALUES (1,?)", (binding,))
                 db.executemany("INSERT INTO queue(kind,path,id) VALUES (?,'',?)", sorted(roots.items()))
-                db.executemany("INSERT INTO fences VALUES (?,?,'pending')", fences)
-        while requests < max_requests and received < max_bytes:
+                db.executemany("INSERT INTO fences VALUES (?,?,'pending')", initial_fences)
+        preflight_ready = resume_removal is None or fences(preflight=True)
+        if resume_removal is not None and preflight_ready:
+            if not db.execute("SELECT 1 FROM resume_removals WHERE object_id=?", (resume_removal,)).fetchone():
+                raise ValueError("v2_metadata_expected_removal_missing")
+        while preflight_ready and requests < max_requests and received < max_bytes:
             pending = db.execute("SELECT kind,path,id,token FROM queue WHERE done=0 ORDER BY kind,path LIMIT 1").fetchone()
             if pending is None:
                 break
@@ -208,29 +276,8 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
                 if following:
                     db.execute("INSERT INTO seen_tokens VALUES (?,?,?)", (kind, prefix, following))
                 db.execute("UPDATE queue SET token=?,done=? WHERE kind=? AND path=?", (following, int(following is None), kind, prefix))
-        pending = db.execute("SELECT count(*) FROM queue WHERE done=0").fetchone()[0]
-        while not pending and requests < max_requests and received < max_bytes:
-            if db.execute("SELECT 1 FROM fences WHERE status='changed'").fetchone():
-                break
-            fence = db.execute("SELECT corpus,token FROM fences WHERE status='pending' ORDER BY corpus LIMIT 1").fetchone()
-            if fence is None:
-                break
-            corpus, token = fence
-            page = call(client.changes, corpus, token)
-            following = page.get("nextPageToken")
-            if page["changes"]:
-                status = "changed"
-            elif following and following != token:
-                status = "pending"
-            elif not following and page.get("newStartPageToken"):
-                status = "verified"
-            else:
-                raise ValueError("v2_metadata_incomplete_change_fence")
-            with db:
-                cur = db.execute("UPDATE fences SET token=?,status=? WHERE corpus=? AND token=? AND status='pending'",
-                                 (following or token, status, corpus, token))
-                if cur.rowcount != 1:
-                    raise ValueError("v2_metadata_concurrent_fence")
+        if preflight_ready and not db.execute("SELECT 1 FROM queue WHERE done=0 LIMIT 1").fetchone():
+            fences()
     except TimeoutError:
         pass
     finally:
@@ -239,10 +286,10 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
     pending = db.execute("SELECT count(*) FROM queue WHERE done=0").fetchone()[0]
     missing = {k: sorted(expected[k] - {r[0] for r in db.execute("SELECT path FROM queue WHERE kind=?", (k,))}) for k in roots}
     initialized = db.execute("SELECT 1 FROM binding").fetchone() is not None
-    fences = [row[0] for row in db.execute("SELECT status FROM fences")]
-    if "changed" in fences:
+    fence_states = [row[0] for row in db.execute("SELECT status FROM fences")]
+    if "changed" in fence_states:
         status = "source_changed"
-    elif pending or not initialized or not fences or "pending" in fences:
+    elif pending or not initialized or not fence_states or any(status != "verified" for status in fence_states):
         status = "partial"
     elif any(missing.values()):
         status = "missing_folders"
@@ -254,7 +301,7 @@ def collect(db, client, roots, owners, pins, *, max_requests, max_seconds, max_b
             "requests_this_call": requests, "metadata_response_bytes_this_call": received}
 
 
-def export(db, output, roots, pins):
+def export(db, output, roots, pins, *, resume_provenance=None):
     if output.exists() or output.is_symlink():
         raise FileExistsError(output)
     binding = db.execute("SELECT value FROM binding").fetchone()
@@ -279,6 +326,13 @@ def export(db, output, roots, pins):
         receipt = {"schema": "rewind_v2_metadata_list_receipt_v1", "roots": listings, "reference_pins": pins,
                    "payload_downloads": 0, "scope": "official train/validation folder traversal",
                    "change_check": "no visible change entries through final corpus fence"}
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='resume_removals'").fetchone():
+            receipt["allowed_changes"] = [
+                {**json.loads(observation), "corpus": corpus, "phase": phase}
+                for _, corpus, phase, observation in db.execute("SELECT * FROM resume_removals ORDER BY object_id")
+            ]
+            receipt["change_check"] = "pinned start cursor, exact preflight removal only, no later visible changes"
+            receipt["resume_provenance"] = resume_provenance
         raw = canonical(receipt)
         (stage / "receipt.json").write_bytes(raw)
         stage.rename(output)

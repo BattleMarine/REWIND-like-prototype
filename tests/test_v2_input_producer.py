@@ -175,3 +175,91 @@ class ProducerTests(unittest.TestCase):
                 self.scan(db, 300)
             with self.assertRaisesRegex(ValueError, "complete_cursor"):
                 listing.export(db, self.work / "rejected", self.roots, self.pins)
+
+    def test_pinned_resume_records_exact_trashed_folder_then_checks_again(self):
+        removed, parent = "discarded", "parent"
+        event = {"changeType": "file", "fileId": removed, "removed": False,
+                 "file": {"id": removed, "mimeType": listing.FOLDER, "parents": [parent], "trashed": True}}
+        with closing(sqlite3.connect(":memory:")) as db:
+            self.assertEqual(self.scan(db, 4)["status"], "partial")
+            with patch.object(self.client, "changes", side_effect=[
+                ({"changes": [event], "newStartPageToken": "after-removal"}, 100),
+                ({"changes": [], "newStartPageToken": "final"}, 100),
+            ]) as call:
+                report = listing.collect(db, self.client, self.roots, self.owners, self.pins,
+                                         max_requests=300, max_seconds=20, max_bytes=2**20,
+                                         resume_removal=removed, resume_parent=parent)
+                self.assertEqual(report["status"], "complete")
+                self.assertEqual([args.args[1] for args in call.call_args_list], ["start-1", "after-removal"])
+            listing.export(db, self.work / "resumed", self.roots, self.pins)
+            receipt = producer.pinned_json(self.work / "resumed/receipt.json",
+                                           sha((self.work / "resumed/receipt.json").read_bytes()), 2**20)
+            self.assertEqual(receipt["allowed_changes"], [{**event, "corpus": "", "phase": "preflight"}])
+
+    def test_resume_stops_before_folder_pages_on_other_change_or_wrong_parent(self):
+        removed, parent = "discarded", "parent"
+        allowed = {"changeType": "file", "fileId": removed, "removed": True}
+        trashed = {"changeType": "file", "fileId": removed, "removed": False,
+                   "file": {"id": removed, "mimeType": listing.FOLDER, "parents": ["wrong"], "trashed": True}}
+        for events in ([allowed, {"changeType": "file", "fileId": "other", "removed": True}], [trashed]):
+            with self.subTest(events=events), closing(sqlite3.connect(":memory:")) as db:
+                self.scan(db, 4)
+                with patch.object(self.client, "changes", return_value=({"changes": events, "newStartPageToken": "next"}, 100)):
+                    with patch.object(self.client, "page", side_effect=AssertionError("must stop before listing")):
+                        report = listing.collect(db, self.client, self.roots, self.owners, self.pins,
+                                                 max_requests=300, max_seconds=20, max_bytes=2**20,
+                                                 resume_removal=removed, resume_parent=parent)
+                self.assertEqual(report["status"], "source_changed")
+
+    def test_resume_wall_evidence_and_default_off_notebook(self):
+        from scripts import build_v2_metadata_resume as builder, resume_v2_drive_metadata as resume
+        with self.assertRaisesRegex(ValueError, "prior_wall_evidence_required"):
+            resume.remaining_seconds(None, None)
+        evidence = self.work / "elapsed.json"
+        evidence.write_bytes(canonical({"schema": "v2_metadata_prior_wall_upper_v1",
+                                        "result_zip_sha256": resume.ZIP_SHA, "prior_wall_upper_seconds": 1500,
+                                        "basis": "fixture upper bound"}))
+        self.assertEqual(resume.remaining_seconds(evidence, sha(evidence.read_bytes())), 12600)
+        with self.assertRaises(ValueError):
+            resume.remaining_seconds(evidence, "0"*64)
+        doc = builder.notebook({"elapsed_evidence_sha256": None})
+        settings = "".join(doc["cells"][1]["source"])
+        compile(settings, "settings", "exec")
+        compile("".join(doc["cells"][2]["source"]), "notebook", "exec")
+        self.assertIn("RUN_RESUME = False", settings)
+        self.assertIn("VERIFY_ONLY = False", settings)
+        self.assertIn("PRIOR_WALL_UPPER_SECONDS = None", settings)
+        self.assertIn("SAVE_RECOVERY_TO_DRIVE = False", settings)
+
+    def test_recovery_copy_readback_preserves_local_and_refuses_overwrite(self):
+        from scripts import resume_v2_drive_metadata as resume
+        local = self.work / "result.zip"
+        local.write_bytes(b"local backup bytes")
+        destination = self.work / "copy"
+        destination.mkdir()
+        receipt = resume.save_recovery(local, destination, 3)
+        saved = destination / local.name
+        self.assertEqual(receipt["sha256"], sha(local.read_bytes()))
+        self.assertEqual(saved.read_bytes(), local.read_bytes())
+        with self.assertRaises(FileExistsError):
+            resume.save_recovery(local, destination, 3)
+        self.assertEqual(saved.read_bytes(), b"local backup bytes")
+        self.assertEqual(local.read_bytes(), b"local backup bytes")
+
+    def test_removed_event_is_not_allowed_again_in_final_fence(self):
+        removed, parent = "discarded", "parent"
+        event = {"changeType": "file", "fileId": removed, "removed": True}
+        with closing(sqlite3.connect(":memory:")) as db:
+            self.scan(db, 4)
+            with patch.object(self.client, "changes", side_effect=[
+                ({"changes": [event], "nextPageToken": "next-page"}, 100),
+                ({"changes": [], "newStartPageToken": "after-removal"}, 100),
+                ({"changes": [event], "newStartPageToken": "final"}, 100),
+            ]):
+                report = listing.collect(db, self.client, self.roots, self.owners, self.pins,
+                                         max_requests=300, max_seconds=20, max_bytes=2**20,
+                                         resume_removal=removed, resume_parent=parent)
+            self.assertEqual(report["status"], "source_changed")
+            self.assertEqual(db.execute("SELECT count(*) FROM resume_removals").fetchone(), (1,))
+            with self.assertRaisesRegex(ValueError, "complete_cursor"):
+                listing.export(db, self.work / "rejected", self.roots, self.pins)
