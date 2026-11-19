@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import time
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ from rewind_v1 import v2_space as space
 from rewind_v1.run_data import FixtureData
 from rewind_v1.runner import _read_checkpoint
 from scripts.build_v2 import notebook
+from scripts import build_v2_bulk_cache as bulk_builder, run_v2_bulk_cache as bulk
 
 
 class V2Tests(TestCase):
@@ -133,6 +135,126 @@ class V2Tests(TestCase):
         self.assertFalse((self.root/'retained/catalog.json').exists())
         with self.ledger.invocation('copy'):
             self.assertEqual(retention.user_copy_cache(self.root/'cache',self.root/'retained',self.doc,self.spec,self.cfg,self.ledger)['copied_shards'],1)
+
+    def bulk_fixture(self):
+        # Both frames on either side of the fixture boundary belong to the train batch.
+        self.doc["records"][2]["split"] = "train"
+        self.doc = seal({key: val for key, val in self.doc.items() if key != "content_sha256"})
+        self.prepare(1)
+        original = self.root/"retained"
+        with self.ledger.invocation("seed"):
+            retention.user_copy_cache(self.root/"cache",original,self.doc,self.spec,self.cfg,self.ledger)
+        anchor = json.loads((original/"catalog.json").read_bytes())
+        journal = bulk.Journal(self.root/"bulk", original, self.doc, anchor, anchor["binding"])
+        return journal
+
+    def bulk_add(self, journal, label, target, expected="", *, recover="", cfg=None):
+        work = self.root/label
+        work.mkdir()
+        ledger = Ledger(work/"usage", self.bind, cfg or self.cfg)
+        report = {}
+        with ledger.invocation("bulk"):
+            bulk.add_shards(journal, expected, target, work, self.spec, self.cfg, self.root/"raw",
+                            self.root/"raw", ledger, report, frame_builder=self.build_frame, recover_writer=recover)
+        return report
+
+    def test_bulk_appends_two_then_resumes_without_prior_raw_or_package_reads(self):
+        journal = self.bulk_fixture()
+        first = self.bulk_add(journal, "cpu-one", 3)
+        self.assertEqual(first["added_shards"], 2)
+        self.assertEqual(first["completed_shards"], 3)
+        for row in self.doc["records"][:6]:
+            for pin in row["files"].values():
+                (self.root/"raw"/pin["path"]).unlink()
+        unpack = bulk.unpack
+        with patch.object(bulk, "unpack", side_effect=AssertionError("resume prefix body read")):
+            second = self.bulk_add(journal, "cpu-two", 4, first["boundary_sha256"])
+        self.assertEqual(second["starting_shards"], 3)
+        self.assertEqual(second["added_shards"], 1)
+        report = {}
+        work = self.root/"gpu"
+        work.mkdir()
+        seen = []
+        def compare(batch):
+            self.assertEqual(batch["image"].shape, (2,2,3,128,128))
+            self.assertTrue(batch["xy_valid"].all())
+            seen.extend([float(i) for i in batch["image"][:,0,0,0,0]])
+            return {"all_exact": True}
+        with (self.ledger.invocation("gpu"), patch.object(bulk.cache, "CHUNK", 2),
+              patch.object(bulk, "cuda_round_trip", side_effect=compare),
+              patch.object(bulk, "unpack", wraps=unpack) as downloads):
+            bulk.read_batch(journal, second["boundary_sha256"], 1, journal.binding, work,
+                            self.spec, self.cfg, self.ledger, report)
+        self.assertEqual(report["batch"]["shards"], [0, 1])
+        self.assertEqual(downloads.call_count, 2)
+        self.assertAlmostEqual(seen[0], 0.1)
+        self.assertAlmostEqual(seen[1], 0.0)
+        with self.assertRaisesRegex(ValueError, "v2_bulk_expected_boundary_not_found"):
+            self.bulk_add(journal, "stale", 5, "a"*64)
+
+    def test_bulk_interrupted_publication_adopts_verified_zip_and_recovers_stale_lock(self):
+        journal = self.bulk_fixture()
+        original = journal.publish
+        def interrupt(item, owner):
+            if item["index"] == 1:
+                raise KeyboardInterrupt
+            original(item, owner)
+        with patch.object(journal, "publish", side_effect=interrupt), self.assertRaises(KeyboardInterrupt):
+            self.bulk_add(journal, "stopped", 2)
+        self.assertFalse((journal.root/".writer").exists())
+        self.assertEqual(len(list(journal.root.glob("shard-00001-*.zip"))), 1)
+        for row in self.doc["records"][2:4]:
+            for pin in row["files"].values():
+                (self.root/"raw"/pin["path"]).unlink()
+        lock = journal.root/".writer"
+        lock.mkdir()
+        with self.assertRaisesRegex(ValueError, "v2_bulk_writer_locked owner=empty"):
+            self.bulk_add(journal, "recovery-without-pin", 2)
+        report = self.bulk_add(journal, "recovered", 2, journal.genesis["content_sha256"], recover="empty")
+        self.assertEqual(report["completed_shards"], 2)
+        self.assertFalse(lock.exists())
+        self.assertEqual(len(list(journal.root.glob(".abandoned-writer-*"))), 1)
+        duplicate = journal.root/"shard-00001-duplicate.zip"
+        duplicate.write_bytes(b"foreign")
+        with self.assertRaisesRegex(ValueError, "v2_bulk_unexpected_package"):
+            self.bulk_add(journal, "duplicates", 3)
+
+    def test_bulk_writer_active_and_budget_bounds(self):
+        journal = self.bulk_fixture()
+        journal.root.mkdir()
+        with bulk.writer(journal.root):
+            with self.assertRaisesRegex(ValueError, "v2_bulk_writer_locked"):
+                self.bulk_add(journal, "competing", 3)
+            with self.assertRaisesRegex(ValueError, "v2_bulk_writer_recovery_pin"):
+                self.bulk_add(journal, "bad-recovery", 3, recover="empty")
+        tiny = deepcopy(self.cfg)
+        tiny["resources"]["read_bytes"] = 1
+        paused = self.bulk_add(journal, "low-budget", 3, cfg=tiny)
+        self.assertEqual(paused["stop_reason"], "read_budget")
+        self.assertEqual(paused["boundary_sha256"], journal.genesis["content_sha256"])
+        self.assertEqual(paused["completed_shards"], 1)
+
+    def test_bulk_default_off_notebooks_have_exact_worker_paths(self):
+        for mode, parameter in (("cpu","TARGET_TOTAL_SHARDS"), ("gpu","RIGHT_SHARD_INDEX")):
+            doc = bulk_builder.notebook({"source_name":"frozen.zip"}, {"scripts/sample.py":"# sample"}, mode)
+            scope = {}
+            with patch("builtins.print"):
+                for cell in doc["cells"]:
+                    if cell["cell_type"] == "code":
+                        exec(compile("".join(cell["source"]), "<notebook>", "exec"), scope)
+            text = "".join(doc["cells"][-1]["source"])
+            self.assertIn('"scripts.run_v2_bulk_cache"',text)
+            self.assertFalse(scope["RUN_V2_BULK"])
+            self.assertIn(parameter, scope)
+            if mode == "cpu":
+                invocation = self.root/"pause-diagnostic"
+                invocation.mkdir()
+                (invocation/"result.json").write_bytes(canonical({"status":"paused","boundary_sha256":"b"*64}))
+                with patch("builtins.print"):
+                    scope["save_report"](invocation, None, time.monotonic(), None)
+                result = json.loads((invocation/"diagnostic.json").read_bytes())
+                self.assertEqual(result["status"], "paused")
+                self.assertEqual(result["worker"]["boundary_sha256"], "b"*64)
 
     def test_retained_catalog_monotone_binding_and_large_prefix_progress(self):
         self.prepare(1);short=(self.root/'cache/catalog.json').read_bytes();self.prepare(2)

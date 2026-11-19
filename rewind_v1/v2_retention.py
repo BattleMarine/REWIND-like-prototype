@@ -45,6 +45,18 @@ def check_deadline(ledger,deadline):
     if ledger.clock()>deadline:raise TimeoutError('v2_retention_deadline')
 
 
+def pack_shard(folder,path,ledger):
+    with zipfile.ZipFile(path,'x') as z:
+        for name in ('images.npy','targets.pt','receipt.json'):
+            info=zipfile.ZipInfo(name,date_time=(1980,1,1,0,0,0));info.external_attr=0o100600<<16
+            with (folder/name).open('rb') as src,z.open(info,'w',force_zip64=True) as out:
+                while block:=src.read(1024**2):ledger.check();out.write(block)
+    size=path.stat().st_size
+    ledger.local_io('read',size);ledger.local_io('write',size)
+    if size>64*1024**2:raise ValueError('v2_shard_zip_cap')
+    return {'bytes':size,'sha256':_hash_file(path,expected_size=size,check_time=ledger.check)}
+
+
 def user_copy_cache(cache,retained,doc,spec,cfg,ledger):
     """Only invoked by the user's explicit copy switch; never a preparation callback."""
     root=Path(cache);retained=Path(retained);retained.mkdir(parents=True,exist_ok=True)
@@ -70,15 +82,7 @@ def user_copy_cache(cache,retained,doc,spec,cfg,ledger):
             if receipt(root,i,local['binding'],doc['records'][i*CHUNK:(i+1)*CHUNK],ledger)!=r:raise ValueError('v2_copy_local_receipt')
             with tempfile.TemporaryDirectory(dir=root,prefix='.pack-') as tmp:
                 path=Path(tmp)/'shard.zip'
-                with zipfile.ZipFile(path,'x') as z:
-                    for n in ('images.npy','targets.pt','receipt.json'):
-                        info=zipfile.ZipInfo(n,date_time=(1980,1,1,0,0,0));info.external_attr=0o100600<<16
-                        with (root/f'shard-{i:05d}'/n).open('rb') as src,z.open(info,'w',force_zip64=True) as out:
-                            while block:=src.read(1024**2):ledger.check();out.write(block)
-                size=path.stat().st_size
-                ledger.local_io('read',size);ledger.local_io('write',size)
-                if size>64*1024**2:raise ValueError('v2_shard_zip_cap')
-                pin={'bytes':size,'sha256':_hash_file(path,check_time=ledger.check)}
+                pin=pack_shard(root/f'shard-{i:05d}',path,ledger)
                 name=f'shard-{i:05d}-{pin["sha256"]}.zip'
                 made=copy_verified(path,retained/name,pin,ledger,ledger.clock()+min(cfg['copy_seconds'],ledger.remaining()))
                 copied+=int(made);packages.append({'number':i,'name':name,**pin,'receipt_sha256':r['content_sha256']})

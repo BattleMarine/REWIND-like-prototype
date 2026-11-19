@@ -33,6 +33,12 @@ PROBE_DRIVER_BLOCK = '''        driver = DRIVER_TEXT.encode("utf-8")
         with driver_path.open("xb") as stream:
             stream.write(driver)
 '''
+DEFAULT_COMMAND_BLOCK = '''        if remaining <= 0:
+            raise TimeoutError("No time left for the probe worker")
+        command = [sys.executable, "-m", "$worker_module",
+                   "--pins", str(pin_file), "--work", str(invocation),
+                   "--input-dir", str(parent / "v2_cpu_cache_041837Z"), "--seconds", str(remaining)]
+'''
 
 
 RUN_TEMPLATE = Template('''
@@ -62,7 +68,7 @@ def save_report(invocation, retained, started, error):
         except (ValueError, OSError):
             pass
     report = {
-        "status": "passed" if error is None and worker and worker["status"] == "passed"
+        "status": $success_rule
                   else "stopped" if isinstance(error, KeyboardInterrupt) else "failed",
         "elapsed_to_report_seconds": round(time.monotonic()-started, 3),
         "outer_limit_seconds": LIMIT,
@@ -146,12 +152,7 @@ def $entrypoint():
 $driver_block        pin_file = invocation / "pins.json"
         pin_file.write_text(json.dumps(PINS), encoding="utf-8")
         remaining = int(LIMIT-(time.monotonic()-started)) - 90
-        if remaining <= 0:
-            raise TimeoutError("No time left for the probe worker")
-        command = [sys.executable, "-m", "$worker_module",
-                   "--pins", str(pin_file), "--work", str(invocation),
-                   "--input-dir", str(parent / "v2_cpu_cache_041837Z"), "--seconds", str(remaining)]
-        with (invocation / "worker.log").open("xb") as log, subprocess.Popen(
+$command_block        with (invocation / "worker.log").open("xb") as log, subprocess.Popen(
                 command, cwd=source, stdout=log, stderr=subprocess.STDOUT) as child:
             try:
                 code = child.wait(timeout=remaining)
@@ -187,7 +188,10 @@ else:
 
 RUN = RUN_TEMPLATE.substitute(
     entrypoint="run_gpu_cache_probe", work_folder="rewind_v2_gpu_cache_probe", report_folder="v2_gpu_cache_041837Z",
-    driver_block=PROBE_DRIVER_BLOCK, worker_module="scripts.run_v2_gpu_cache_probe", run_switch="RUN_GPU_CACHE_PROBE",
+    driver_block=PROBE_DRIVER_BLOCK,
+    command_block=Template(DEFAULT_COMMAND_BLOCK).substitute(worker_module="scripts.run_v2_gpu_cache_probe"),
+    run_switch="RUN_GPU_CACHE_PROBE",
+    success_rule='"passed" if error is None and worker and worker["status"] == "passed"',
 )
 
 

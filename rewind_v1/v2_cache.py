@@ -69,6 +69,46 @@ def catalog(root,bind,shards,total):
     _atomic(Path(root)/'catalog.json',canonical(doc));return doc
 
 
+def shard_write_reservation(rows):
+    return len(rows)*410000+1024**2
+
+
+def publish_shard(root,number,bind,rows,spec,rgb,pose,ledger,*,frame_builder=None):
+    """Encode and atomically publish one canonical shard into an isolated local directory."""
+    folder=Path(root)/f'shard-{number:05d}'
+    ledger.reserve('write',shard_write_reservation(rows))
+    ledger.reserve('read',sum(p['size_bytes'] for row in rows for p in row['files'].values()))
+    with tempfile.TemporaryDirectory(dir=root,prefix='.pending-') as tmp:
+        staged=Path(tmp)/folder.name;staged.mkdir()
+        images=np.lib.format.open_memmap(staged/'images.npy',mode='w+',dtype=np.float32,shape=(len(rows),2,3,128,128));metadata=[]
+        try:
+            for i,row in enumerate(rows):
+                ledger.check();raw={}
+                for role,pin in row['files'].items():
+                    raw[role]=_regular_read(_payload_path(Path(pose if role=='pose' else rgb),pin['path']),8*1024**2,pin['size_bytes'])
+                    ledger.observed('read',len(raw[role]),persist=False)
+                    if contract.sha(raw[role])!=pin['sha256']:raise ValueError('v2_source_sha')
+                if frame_builder is None:
+                    image,target=_frame(raw,row['frame_index'],spec);raw_doc=_raw_pose(raw['pose'],row['frame_index']);coord=spec['coordinates']
+                    cameras=[camera_transform(raw_doc['camera_'+s],coord['mm_per_raw_unit'],coord['raw_consistency_tolerance'])[0] for s in ('left','right')]
+                    target['rotation64']=torch.tensor([c['rotation_matrix'] for c in cameras],dtype=torch.float64)
+                    target['translation64']=torch.tensor([c['translation'] for c in cameras],dtype=torch.float64)
+                else:image,target=frame_builder(raw,row,spec)
+                if target['rotation64'].dtype!=torch.float64 or target['translation64'].dtype!=torch.float64:raise ValueError('v2_float64_camera_required')
+                images[i]=image.numpy();metadata.append(target)
+            images.flush()
+        finally:del images
+        with (staged/'images.npy').open('r+b') as f:os.fsync(f.fileno())
+        tensors={n:torch.stack([r[n] for r in metadata]) for n in metadata[0]}
+        if not all(torch.isfinite(v).all() for v in tensors.values()):raise ValueError('v2_cache_nonfinite')
+        with (staged/'targets.pt').open('xb') as f:torch.save(tensors,f);f.flush();os.fsync(f.fileno())
+        files={n:{'bytes':(staged/n).stat().st_size,'sha256':_hash_file(staged/n,check_time=ledger.check)} for n in ('images.npy','targets.pt')}
+        r=seal({'schema':'rewind_v2_shard_v1','number':number,'binding':bind,'records_sha256':digest(rows),'frames':len(rows),'files':files})
+        _atomic(staged/'receipt.json',canonical(r));ledger.check();staged.rename(folder)
+        ledger.observed('write',sum(p['bytes'] for p in files.values()))
+    return r
+
+
 def prepare(doc,spec,cfg,rgb,pose,output,ledger,*,frame_builder=None,max_shards=None):
     root=Path(output);root.mkdir(parents=True,exist_ok=True);bind=binding(doc,spec,cfg);records=doc['records'];pins=[]
     if root.is_symlink():raise ValueError('v2_cache_symlink')
@@ -92,39 +132,10 @@ def prepare(doc,spec,cfg,rgb,pose,output,ledger,*,frame_builder=None,max_shards=
                 if prior is not None and number<len(prior['shards']) and prior['shards'][number]!=r:raise ValueError('v2_catalog_receipt_mismatch')
             else:
                 if max_shards is not None and number>=max_shards:break
-                estimate=len(rows)*410000+1024**2
+                estimate=shard_write_reservation(rows)
                 used=sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
                 if used+estimate>cfg['resources']['cache_bytes']:raise ValueError('v2_cache_disk_cap')
-                ledger.reserve('write',estimate)
-                ledger.reserve('read',sum(p['size_bytes'] for row in rows for p in row['files'].values()))
-                with tempfile.TemporaryDirectory(dir=root,prefix='.pending-') as tmp:
-                    staged=Path(tmp)/folder.name;staged.mkdir()
-                    images=np.lib.format.open_memmap(staged/'images.npy',mode='w+',dtype=np.float32,shape=(len(rows),2,3,128,128));metadata=[]
-                    try:
-                        for i,row in enumerate(rows):
-                            ledger.check();raw={}
-                            for role,pin in row['files'].items():
-                                raw[role]=_regular_read(_payload_path(Path(pose if role=='pose' else rgb),pin['path']),8*1024**2,pin['size_bytes'])
-                                ledger.observed('read',len(raw[role]),persist=False)
-                                if contract.sha(raw[role])!=pin['sha256']:raise ValueError('v2_source_sha')
-                            if frame_builder is None:
-                                image,target=_frame(raw,row['frame_index'],spec);raw_doc=_raw_pose(raw['pose'],row['frame_index']);coord=spec['coordinates']
-                                cameras=[camera_transform(raw_doc['camera_'+s],coord['mm_per_raw_unit'],coord['raw_consistency_tolerance'])[0] for s in ('left','right')]
-                                target['rotation64']=torch.tensor([c['rotation_matrix'] for c in cameras],dtype=torch.float64)
-                                target['translation64']=torch.tensor([c['translation'] for c in cameras],dtype=torch.float64)
-                            else:image,target=frame_builder(raw,row,spec)
-                            if target['rotation64'].dtype!=torch.float64 or target['translation64'].dtype!=torch.float64:raise ValueError('v2_float64_camera_required')
-                            images[i]=image.numpy();metadata.append(target)
-                        images.flush()
-                    finally:del images
-                    with (staged/'images.npy').open('r+b') as f:os.fsync(f.fileno())
-                    tensors={n:torch.stack([r[n] for r in metadata]) for n in metadata[0]}
-                    if not all(torch.isfinite(v).all() for v in tensors.values()):raise ValueError('v2_cache_nonfinite')
-                    with (staged/'targets.pt').open('xb') as f:torch.save(tensors,f);f.flush();os.fsync(f.fileno())
-                    files={n:{'bytes':(staged/n).stat().st_size,'sha256':_hash_file(staged/n,check_time=ledger.check)} for n in ('images.npy','targets.pt')}
-                    r=seal({'schema':'rewind_v2_shard_v1','number':number,'binding':bind,'records_sha256':digest(rows),'frames':len(rows),'files':files})
-                    _atomic(staged/'receipt.json',canonical(r));ledger.check();staged.rename(folder)
-                    ledger.observed('write',sum(p['bytes'] for p in files.values()))
+                r=publish_shard(root,number,bind,rows,spec,rgb,pose,ledger,frame_builder=frame_builder)
             pins.append(r)
             if prior is None or len(pins)>len(prior['shards']):result=catalog(root,bind,pins,len(records));prior=result
             else:result=prior
@@ -151,6 +162,25 @@ class Cache:
     def open_read_only(cls,root,doc,spec,cfg,ledger,*,policy,local_catalog_sha256):
         instance=cls.__new__(cls)
         instance._open(root,doc,spec,cfg,ledger,policy=policy,local_catalog_sha256=local_catalog_sha256)
+        return instance
+
+    @classmethod
+    def open_read_only_window(cls,root,doc,spec,ledger,*,verified_shards):
+        """Open consecutive, individually pinned shards for diagnostic batches."""
+        numbers=sorted(verified_shards)
+        if not numbers or numbers!=list(range(numbers[0],numbers[-1]+1)):
+            raise ValueError('v2_read_only_window')
+        instance=cls.__new__(cls)
+        instance.root,instance.doc,instance.spec,instance.ledger=Path(root),doc,spec,ledger
+        instance.loaded=OrderedDict()
+        instance.index={}
+        for number in numbers:
+            bind,expected=verified_shards[number]
+            offset=number*CHUNK
+            rows=doc['records'][offset:offset+CHUNK]
+            if not rows or receipt(root,number,bind,rows,ledger)['content_sha256']!=expected:
+                raise ValueError('v2_read_only_window_receipt')
+            instance.index.update({(r['sequence_id'],r['frame_index']):offset+i for i,r in enumerate(rows)})
         return instance
 
     def _open(self,root,doc,spec,cfg,ledger,*,policy=None,local_catalog_sha256=None):

@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+from string import Template
 import subprocess
 import sys
 import tempfile
@@ -12,7 +13,7 @@ from rewind_m1.local_rgb import _regular_read
 from rewind_prepare.converter import sha
 from scripts.archvis_pilot_bootstrap import extract_pinned_zip
 from scripts.build_archvis_pilot_handoff import _cell
-from scripts.build_v2_gpu_cache_probe import REVISION, RUN_TEMPLATE, SOURCE_SHA, input_pins
+from scripts.build_v2_gpu_cache_probe import DEFAULT_COMMAND_BLOCK, REVISION, RUN_TEMPLATE, SOURCE_SHA, input_pins
 from scripts.run_v2_gpu_cache_probe import MAX_SECONDS
 
 
@@ -32,7 +33,9 @@ def make_notebook(pins, overlay):
     run = RUN_TEMPLATE.substitute(
         entrypoint="run_gpu_cache_restore", work_folder="rewind_v2_gpu_cache_restore",
         report_folder="v2_gpu_restore_041837Z", driver_block=OVERLAY_BLOCK,
-        worker_module="scripts.run_v2_gpu_cache_restore", run_switch="RUN_GPU_CACHE_RESTORE",
+        command_block=Template(DEFAULT_COMMAND_BLOCK).substitute(worker_module="scripts.run_v2_gpu_cache_restore"),
+        run_switch="RUN_GPU_CACHE_RESTORE",
+        success_rule='"passed" if error is None and worker and worker["status"] == "passed"',
     )
     guide = (
         "# v2 첫 CPU 캐시 정식 복원 및 CUDA 배치 읽기\n\n"
