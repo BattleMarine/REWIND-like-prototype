@@ -19,13 +19,17 @@ CPU는 완료 샤드의 ZIP을 모두 복원하지 않는다. 카탈로그와 �
 
 ## GPU 경계 배치
 
-GPU Colab에서 `v2_bulk_cache_gpu.ipynb`와 동일한 source ZIP을 사용한다. CPU 보고서에서 확보한 SHA를 `EXPECTED_BOUNDARY_SHA256`에 넣고 오른쪽 인덱스 `RIGHT_SHARD_INDEX`를 설정한다. 기본값 1은 인덱스 0의 마지막 프레임과 1의 첫 프레임을 읽는다. 두 프레임은 모두 train이어야 하며 그 범위가 지정한 완료 경계 안에 있어야 한다. GPU 모델은 제한하지 않는다.
+CPU 보고서가 나온 뒤 GPU Colab에서 `v2_bulk_cache_gpu.ipynb`와 동일한 source ZIP을 사용한다. CPU 보고서에서 확보한 SHA를 `EXPECTED_BOUNDARY_SHA256`에 넣고 오른쪽 인덱스 `RIGHT_SHARD_INDEX`를 설정한다. 기본값 1은 인덱스 0의 마지막 프레임과 1의 첫 프레임을 읽는다. 두 프레임은 모두 train이어야 하며 그 범위가 지정한 완료 경계 안에 있어야 한다. GPU 모델은 제한하지 않는다.
 
 선택한 인접 ZIP 두 개만 내려받아 SHA·생산 binding·receipt·파일 SHA·manifest 범위를 검증한다. 기존 `Cache.frame`과 학습의 `frame_batch`를 사용해 이미지·2D 좌표·유효 마스크를 읽고 CUDA 왕복 전송한다. `status=passed`, `worker.cuda.all_exact=true`, 읽은 샤드 번호와 프레임 키를 확인한다. 허용한 Torch 생산→소비 빌드는 `2.14.1+cpu` → `2.14.1+cu130`이며 NumPy·Pillow와 다른 데이터 계약 조건은 같아야 한다.
 
 GPU ZIP 입력은 최대 128 MiB다. 로컬 readback을 포함한 읽기 예약 상한은 256 MiB, 쓰기 예약 상한은 128 MiB다. 경계 메타데이터 읽기는 별도다. 호출 상한은 1,800초이고 진단은 `reports/cache/v2_bulk_gpu_reports_041837Z/`에 보관한다. 게시에 실패하면 표시된 로컬 `diagnostic.json`과 `worker.log`를 회수한다.
 
 학습 엔트리는 기존대로 완전한 캐시와 strict binding을 요구한다. 이 시험은 혼합 생산 binding을 샤드별로 검증해 공통 학습 로더에서 두 프레임을 읽는 범위다. 전체 학습용 캐시 구성과 학습 시작은 별도 작업이다.
+
+## 이번 Colab 검증 범위
+
+첫 CPU 호출은 누적 목표 3으로 샤드 1·2를 연속 추가한다. 완료 시 384프레임이다. 새 CPU 런타임에 첫 보고서의 경계 SHA를 넘기고 누적 목표 4로 재개한다. 시작 샤드 3, 추가 샤드 1, 완료 512프레임을 확인한다. 이후 GPU는 두 번째 보고서의 경계 SHA와 오른쪽 인덱스 3을 사용한다. 이 경계의 train 프레임은 같은 `Guitar_Playing__15_` 시퀀스의 21·22다. 이 순서로 재개 직전·직후에 보관된 데이터를 한 배치로 확인한다.
 
 ## 고정본 생성과 검증
 
