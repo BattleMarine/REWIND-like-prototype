@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REWIND · 포즈 재생</title>
+<style>
+:root{color-scheme:dark;font:15px/1.55 Inter,"Malgun Gothic",system-ui,sans-serif;background:#11171a;color:#f0f3f1;--line:#354043;--pred:#63efc5;--gt:#ffb66f}*{box-sizing:border-box}
+body{margin:0}main{width:min(1500px,100%);margin:auto;padding:clamp(16px,3vw,48px)}
+header,footer,.tools,.legend,.panel-head,.timeline{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header{justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:16px}.brand{font-size:17px;letter-spacing:.12em;font-weight:800}.brand small{font:500 13px/1.2 system-ui;letter-spacing:0;color:#c4cecc;margin-left:12px}
+h1{font-size:clamp(24px,3.4vw,46px);letter-spacing:-.045em;margin:21px 0 0;line-height:1.2}.meta{color:#a2b2b1;margin:6px 0 22px}.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px}
+section{border:1px solid var(--line);border-radius:12px;background:#182023;overflow:hidden}
+.panel-head{justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);min-height:45px}.panel-head b{font-size:15px}.panel-head span{font-size:12px;color:#a2b2b1}
+.stereo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}
+figure{margin:0;min-width:0;position:relative;background:#101517}figcaption{position:absolute;top:9px;left:10px;color:#fff;background:#182022c9;border-radius:4px;padding:1px 7px;font-size:12px}
+canvas{width:100%;height:clamp(210px,27vw,430px);display:block}#pose{touch-action:none;cursor:grab;background:radial-gradient(ellipse at 50% 65%,#243638,#172022 74%)}#pose:active{cursor:grabbing}
+.legend{gap:16px;color:#cad4d1}.dot{display:inline-block;border-radius:50%;width:9px;height:9px;margin-right:6px;background:var(--pred)}.dot.gt{background:var(--gt)}
+.timeline{margin-top:16px;gap:12px}.timeline input{flex:1;min-width:140px;accent-color:var(--pred);cursor:pointer}.mono,output{font:13px/1.5 ui-monospace,Consolas,monospace}
+button,select{background:#263133;color:#f1f6f4;border:1px solid #4c5858;padding:7px 13px;border-radius:6px;font:inherit;cursor:pointer}button:hover,select:hover{background:#354346}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--pred);outline-offset:2px}
+#play{background:var(--pred);border-color:var(--pred);color:#12251e;font-weight:700;min-width:90px}footer{justify-content:space-between;padding-top:12px}.tools{gap:7px}label{cursor:pointer}label input{accent-color:var(--gt)}
+@media(max-width:800px){.layout{grid-template-columns:1fr}#pose{height:300px}.stereo canvas{height:clamp(160px,41vw,300px)}}
+</style>
+<main>
+<header><div class="brand">REWIND-like<small id="model"></small></div><div class="legend"><span><i class="dot"></i>예측</span><label id="gtLabel"><input id="gt" type="checkbox"> <i class="dot gt"></i>정답 비교</label></div></header>
+<h1 id="motion"></h1><p class="meta" id="meta"></p>
+<div class="layout"><section><div class="panel-head"><b>스테레오 RGB</b><span>2D 관절</span></div>
+<div class="stereo"><figure><canvas id="left"></canvas><figcaption>왼쪽</figcaption></figure><figure><canvas id="right"></canvas><figcaption>오른쪽</figcaption></figure></div></section>
+<section><div class="panel-head"><b>3D 몸·손</b><span>드래그로 회전 · device mm</span></div><canvas id="pose" aria-label="3D 골격"></canvas></section></div>
+<div class="timeline"><output id="position"></output><input type="range" id="seek" min="0" value="0" step="1" aria-label="프레임 탐색"><output id="time"></output></div>
+<footer><div class="tools"><button id="play">재생</button><button id="prev" aria-label="이전 프레임">◀</button><button id="next" aria-label="다음 프레임">▶</button><select id="speed" aria-label="재생 배속"><option value=".25">0.25×</option><option value=".5">0.5×</option><option value="1" selected>1×</option></select></div><button id="reset">3D 시점 초기화</button></footer>
+</main>
+<script type="application/json" id="data">__POSE_DATA__</script>
+<script>
+"use strict";
+const demo=JSON.parse(document.getElementById("data").textContent), frames=demo.frames;
+const el=id=>document.getElementById(id), pred="#63efc5", truth="#ffb66f";
+const images=frames.map(frame=>["left","right"].map(side=>{const img=new Image();img.onload=()=>render();img.src=frame[side].src;return img}));
+const parts=demo.sequence.split("/");el("model").textContent=demo.model+" · 사전 추론";
+el("motion").textContent=parts.at(-1).replace(/_+/g," ").trim();el("motion").title=demo.sequence;
+el("meta").textContent=[parts[0],demo.split,frames.length+"프레임","명목 "+demo.fps+" FPS"].filter(Boolean).join("  /  ");
+el("seek").max=frames.length-1;el("gtLabel").hidden=!frames.some(f=>f.gt_xyz||f.gt_xy);
+let index=0,playing=false,start=0,animation=0,yaw=.38,pitch=.08,drag=null;
+const lo=[Infinity,Infinity,Infinity],hi=lo.map(()=>-Infinity);
+for(const f of frames)for(const points of [f.xyz,f.gt_xyz||[]])for(const p of points)if(p)p.forEach((v,i)=>{lo[i]=Math.min(lo[i],v);hi[i]=Math.max(hi[i],v)});
+const center=lo.map((v,i)=>(v+hi[i])/2);
+const radius=Math.max(1,...frames.map(f=>Math.max(0,...[...f.xyz,...(f.gt_xyz||[])].filter(Boolean).map(p=>Math.hypot(...p.map((v,i)=>v-center[i]))))));
+function surface(id){
+ const c=el(id),w=c.clientWidth,h=c.clientHeight,d=Math.min(devicePixelRatio||1,2);
+ if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=Math.round(w*d);c.height=Math.round(h*d)}
+ const ctx=c.getContext("2d");ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);return {ctx,w,h};
+}
+function skeleton(ctx,points,color,size){
+ if(!points)return;ctx.beginPath();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=size*.85;
+ for(const [a,b] of demo.edges){if(points[a]&&points[b]){ctx.moveTo(...points[a]);ctx.lineTo(...points[b])}}
+ ctx.stroke();ctx.beginPath();for(const p of points){if(p){ctx.moveTo(p[0]+size,p[1]);ctx.arc(p[0],p[1],size,0,Math.PI*2)}}ctx.fill();
+}
+function stereo(side,n){
+ const {ctx,w,h}=surface(side),f=frames[index],img=images[index][n],{width,height}=f[side];
+ const s=Math.min(w/width,h/height),x=(w-width*s)/2,y=(h-height*s)/2;
+ if(img.complete&&img.naturalWidth)ctx.drawImage(img,x,y,width*s,height*s);
+ ctx.save();ctx.beginPath();ctx.rect(x,y,width*s,height*s);ctx.clip();
+ const project=p=>p&&[x+p[0]*s,y+p[1]*s];
+ if(el("gt").checked&&f.gt_xy)skeleton(ctx,f.gt_xy[n].map(project),truth,2.1);
+ skeleton(ctx,f.xy[n].map(project),pred,1.7);ctx.restore();
+}
+function render(){
+ stereo("left",0);stereo("right",1);
+ const {ctx,w,h}=surface("pose"),f=frames[index],s=.45*Math.min(w,h)/radius;
+ const project=p=>{if(!p)return null;const [x,y,z]=p.map((v,i)=>v-center[i]);const u=Math.cos(yaw)*x+Math.sin(yaw)*y,depth=-Math.sin(yaw)*x+Math.cos(yaw)*y;
+ return [w/2+u*s,h/2+(Math.cos(pitch)*z+Math.sin(pitch)*depth)*s]};
+ if(el("gt").checked&&f.gt_xyz)skeleton(ctx,f.gt_xyz.map(project),truth,2.5);
+ skeleton(ctx,f.xyz.map(project),pred,2.1);
+ el("position").textContent="Frame "+f.index;el("seek").value=index;
+ el("time").textContent=(index/demo.fps).toFixed(2)+" / "+(frames.length/demo.fps).toFixed(2)+" s";
+}
+function pause(){playing=false;cancelAnimationFrame(animation);el("play").textContent="재생"}
+function tick(now){if(!playing)return;const next=Math.floor(Math.max(0,now-start)*demo.fps*Number(el("speed").value)/1000)%frames.length;
+ if(index!==next){index=next;render()}animation=requestAnimationFrame(tick)}
+function play(){if(playing){pause();return}playing=true;el("play").textContent="일시정지";start=performance.now()-index*1000/(demo.fps*Number(el("speed").value));animation=requestAnimationFrame(tick)}
+function seek(i){pause();index=Math.min(frames.length-1,Math.max(0,i));render()}
+el("play").onclick=play;el("prev").onclick=()=>seek(index-1);el("next").onclick=()=>seek(index+1);
+el("seek").oninput=e=>seek(Number(e.target.value));el("gt").onchange=render;
+el("speed").onchange=()=>{start=performance.now()-index*1000/(demo.fps*Number(el("speed").value))};
+el("reset").onclick=()=>{yaw=.38;pitch=.08;render()};
+el("pose").onpointerdown=e=>{drag=[e.clientX,e.clientY];e.target.setPointerCapture(e.pointerId)};
+el("pose").onpointermove=e=>{if(!drag)return;yaw+=(e.clientX-drag[0])*.012;pitch=Math.max(-1.5,Math.min(1.5,pitch+(e.clientY-drag[1])*.012));drag=[e.clientX,e.clientY];render()};
+el("pose").onlostpointercapture=()=>drag=null;
+window.addEventListener("resize",render);render();
+</script></html>
