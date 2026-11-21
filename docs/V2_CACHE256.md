@@ -32,3 +32,9 @@ VM 유실 때 검증 후 게시된 경계와 ZIP을 다시 사용한다. 정산�
 python -m scripts.build_v2_cache256 --source <v2_cpu_cache_ed98124.zip> --catalog <catalog.json> --cpu-report <invocation-hlok774l.json> --output <new-output>
 python -m unittest discover -s tests -p test_v2_cache256.py -v
 ```
+
+## 파일럿 실측
+
+2026-11-22 회수 진단 invocation-5yflyscc.json은 passed / target_reached, 3샤드·384페어, Drive 604,834,114바이트, 전체 약 101초, CPU 원장 정산 191초를 기록했다. 진단 SHA-256은 92c69a667ae23373be5e687c84bc09636d12817a54c268f2404580ea6a0f3e18이며 로컬 보관 위치는 outputs/v2_plan_inputs/cache256_pilot_5yflyscc다. 진단에 기록된 파일럿 봉인 SHA는 10b7ee0e9fdd83e45df30e095445fdaba1f0aa357eb1ff0c6c9c5960ec57eef1이다. 봉인 파일 자체와 계정 여유 공간은 별도 확인 대상이다.
+
+프레임당 실사용량을 136,011페어로 환산하면 전체 199.52GiB, 남은 135,627페어에는 198.95GiB다. 추가 220GiB를 한도 후보로 제시하며 기존 128 작업의 잔여 공간도 별도로 확보한다. 같은 벽시계 처리량의 단순 환산은 잔여 약 9.9시간이다. 파일럿만의 최종 3샤드 재검증과 고정 준비 시간이 포함되며 실제 공유 Drive 처리량은 변동한다. 한 번의 9시간 호출에서 전체 완료는 미검증이다.
