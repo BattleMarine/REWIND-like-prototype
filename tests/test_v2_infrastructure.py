@@ -23,6 +23,7 @@ from rewind_v1.runner import _read_checkpoint
 from scripts.build_v2 import notebook
 from scripts import build_v2_bulk_cache as bulk_builder, run_v2_bulk_cache as bulk
 from scripts.v2_bulk_quota import DriveQuota, METADATA_CAP
+from scripts import v2_ordered_prefetch as prefetch
 
 
 class V2Tests(TestCase):
@@ -272,6 +273,32 @@ class V2Tests(TestCase):
         self.assertEqual(report["stop_reason"], "drive_cumulative_budget")
         self.assertEqual(report["boundary_sha256"], baseline["boundary_sha256"])
         self.assertFalse(journal.path(4).exists())
+
+    def test_prefetch_bulk_failure_stays_at_existing_boundary_then_resumes_same_index(self):
+        journal = self.bulk_fixture()
+        start = self.bulk_add(journal, "existing", 2)
+        expected = start["boundary_sha256"]
+        rows = self.doc["records"][4:6]
+        first = self.root/"raw"/rows[0]["files"]["left"]["path"]
+        original = first.read_bytes()
+        first.write_bytes(b"!"*len(original))
+        work = self.root/"attempt"
+        work.mkdir()
+        report = {}
+        params = (journal, expected, 3, work, self.spec, self.cfg, self.root/"raw",
+                  self.root/"raw", self.ledger)
+        with (self.ledger.invocation("prefetch_failure"),
+              self.assertRaisesRegex(ValueError, "v2_source_sha")):
+            bulk.add_shards(*params, report, prefetch_workers=4)
+        self.assertEqual(report["boundary_sha256"], expected)
+        self.assertFalse(journal.path(2).exists())
+        self.assertGreater(report["performance"]["source_bytes"], 0)
+        first.write_bytes(original)
+        with self.ledger.invocation("prefetch_retry"), patch.object(prefetch, "decode", side_effect=self.build_frame):
+            bulk.add_shards(*params, report, prefetch_workers=4)
+        self.assertEqual(report["completed_shards"], 3)
+        self.assertEqual(report["performance"]["newly_encoded_frames"], 2)
+        self.assertTrue(journal.path(2).is_file())
 
     def test_retained_catalog_monotone_binding_and_large_prefix_progress(self):
         self.prepare(1);short=(self.root/'cache/catalog.json').read_bytes();self.prepare(2)

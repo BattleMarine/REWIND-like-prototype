@@ -22,6 +22,7 @@ from scripts.run_v2_cpu_cache import ARCHIVE_CAP, MANIFEST_CAP, MANIFEST_NAME, M
 from scripts.run_v2_gpu_cache_probe import load_catalog
 from scripts.v2_bulk_quota import BASELINE_SHA, BASELINE_SHARDS, CLOSURE, DRIVE_CAP, METADATA_CAP, TARGET_SHARDS, TIME_CAP
 from scripts.v2_bulk_quota import DriveQuota, TimeQuota, baseline_entries
+from scripts.v2_ordered_prefetch import WINDOW_BYTES, WORKERS, elapsed
 
 
 def check_layout(args):
@@ -56,27 +57,39 @@ def bootstrap(args, pins, cfg):
 
 
 def run(args, pins):
+    worker_started = time.monotonic()
+    metrics = {"requested_workers": args.prefetch_workers, "raw_window_cap_bytes": WINDOW_BYTES,
+               "notebook_pre_worker_seconds": worker_started - args.started, "newly_encoded_frames": 0,
+               "recovered_frames": 0, "source_bytes": 0, "read_and_sha_worker_seconds": 0.0,
+               "read_wait_seconds": 0.0, "decode_seconds": 0.0, "package_seconds": 0.0,
+               "publish_zip_seconds": 0.0, "publish_boundary_seconds": 0.0}
     report = {"status": "failed", "stage": "preflight", "baseline_sha256": BASELINE_SHA,
-              "target_shards": TARGET_SHARDS, "time_cap_seconds": TIME_CAP, "drive_cache_cap_bytes": DRIVE_CAP}
+              "target_shards": TARGET_SHARDS, "time_cap_seconds": TIME_CAP, "drive_cache_cap_bytes": DRIVE_CAP,
+              "performance": metrics, "prefetch_source_sha256": pins["consumer_overlay"]["scripts/v2_ordered_prefetch.py"]}
     ledger = None
     try:
         check_layout(args)
         if digest(contract.source()) != pins["consumer_source_identity"] or pins["baseline_boundary_sha256"] != BASELINE_SHA:
             raise ValueError("v2_quota_source_or_baseline_pin")
+        for name in ("v2_ordered_prefetch.py", "run_v2_bulk_cache.py"):
+            source_path = Path(__file__).with_name(name)
+            if contract.sha(_regular_read(source_path, MIB)) != pins["consumer_overlay"]["scripts/"+name]:
+                raise ValueError("v2_quota_prefetch_overlay_pin")
         raw_cfg = _regular_read(contract.ROOT / "configs/rewind_v2.json", MIB)
         if contract.sha(raw_cfg) != pins["config_sha256"]:
             raise ValueError("v2_quota_config_pin")
         cfg = json.loads(raw_cfg)
         with writer(args.bulk, args.recover_writer) as owner:
             report["stage"] = "budget"
-            baseline = baseline_entries(args.bulk)
-            drive = DriveQuota(args.bulk, baseline)
+            with elapsed(metrics, "budget_setup_seconds"):
+                baseline = baseline_entries(args.bulk)
+                drive = DriveQuota(args.bulk, baseline)
+                quota = TimeQuota(args.bulk, owner)
+                more = any(p.name not in drive.excluded for p in args.bulk.glob("boundary-*.json"))
+                history = quota.history(initialize=not more, required_tip=args.budget_tip, enforce_tip=True)
             report["drive_used_start_bytes"] = drive.used
             report["minimum_verified_shards"] = len(baseline)
             report["minimum_verified_frames"] = sum(entry["frames"] for entry in baseline)
-            quota = TimeQuota(args.bulk, owner)
-            more = any(p.name not in drive.excluded for p in args.bulk.glob("boundary-*.json"))
-            history = quota.history(initialize=not more, required_tip=args.budget_tip, enforce_tip=True)
             report["time_charged_before_seconds"] = history["charged_seconds"]
             report["unsettled_previous_calls"] = history["unsettled"]
             report["budget_tip_sha256"] = history["tip"]
@@ -95,7 +108,8 @@ def run(args, pins):
                 deadline = args.started + ticket["seconds"]
                 _atomic(args.work / "quota-grant.json", canonical({"deadline": deadline}))
                 report["stage"] = "manifest"
-                journal, spec = bootstrap(args, pins, cfg)
+                with elapsed(metrics, "manifest_setup_seconds"):
+                    journal, spec = bootstrap(args, pins, cfg)
                 ledger_cfg = {**cfg, "seconds_per_invocation": ticket["seconds"] - CLOSURE,
                               "external_timeout_seconds": ticket["seconds"]}
                 ledger = Ledger(args.work / "usage", {"bulk_binding": digest(journal.binding), "config": digest(cfg)}, ledger_cfg)
@@ -106,8 +120,10 @@ def run(args, pins):
                     with ledger.invocation("v2_bulk_cpu_budgeted"):
                         ledger.started = args.started
                         ledger.check()
-                        add_shards(journal, BASELINE_SHA, TARGET_SHARDS, args.work, spec, cfg, args.rgb, args.pose,
-                                   ledger, report, owner_check=owner, minimum_shards=BASELINE_SHARDS, drive_quota=drive)
+                        with elapsed(metrics, "append_seconds"):
+                            add_shards(journal, BASELINE_SHA, TARGET_SHARDS, args.work, spec, cfg, args.rgb, args.pose,
+                                       ledger, report, owner_check=owner, minimum_shards=BASELINE_SHARDS, drive_quota=drive,
+                                       prefetch_workers=args.prefetch_workers)
                 except TimeoutError as error:
                     if "boundary_sha256" not in report:
                         raise
@@ -135,6 +151,9 @@ def run(args, pins):
         if ledger is not None and ledger.path.is_file():
             report["usage"] = ledger.snapshot()["invocations"][-1]
         report["elapsed_before_report_seconds"] = time.monotonic() - args.started
+        if report["elapsed_before_report_seconds"] > 0:
+            metrics["newly_encoded_frames_per_hour_cell_wall"] = (
+                3600 * metrics["newly_encoded_frames"] / report["elapsed_before_report_seconds"])
         _atomic(args.work / "result.json", canonical(report))
     return report
 
@@ -146,6 +165,7 @@ def main(argv=None):
     parser.add_argument("--started", type=float, required=True)
     parser.add_argument("--recover-writer", default="")
     parser.add_argument("--budget-tip", default="")
+    parser.add_argument("--prefetch-workers", type=int, choices=WORKERS, default=4)
     args = parser.parse_args(argv)
     if not 0 <= time.monotonic() - args.started <= 240:
         parser.error("notebook start time outside the pre-reservation limit")

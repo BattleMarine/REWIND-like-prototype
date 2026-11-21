@@ -195,10 +195,23 @@ def admit(rows, ledger, cfg, *, orphan=False):
 
 
 def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, report, *,
-               frame_builder=None, recover_writer="", owner_check=None, minimum_shards=0, drive_quota=None):
+               frame_builder=None, recover_writer="", owner_check=None, minimum_shards=0, drive_quota=None,
+               prefetch_workers=None):
+    metrics = None
+    if prefetch_workers is not None:
+        from scripts import v2_ordered_prefetch as prefetch
+
+        if frame_builder is not None:
+            raise ValueError("v2_prefetch_uses_production_decoder")
+        metrics = report.setdefault("performance", {})
+
+    def measure(key):
+        return nullcontext() if metrics is None else prefetch.elapsed(metrics, key)
+
     journal.root.mkdir(parents=True, exist_ok=True)
     with (writer(journal.root, recover_writer) if owner_check is None else nullcontext(owner_check)) as owner:
-        entries = journal.scan(expected, ledger.check, allow_absent=True)
+        with measure("resume_scan_seconds"):
+            entries = journal.scan(expected, ledger.check, allow_absent=True)
         if len(entries) < minimum_shards:
             raise ValueError("v2_bulk_baseline_required")
         if not entries:
@@ -234,43 +247,53 @@ def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, re
                     orphan = orphans[0]
                     pin = {"number": index, "name": orphan.name, "bytes": orphan.stat().st_size,
                            "sha256": orphan.stem.rsplit("-", 1)[-1]}
-                    unpack(package_path(journal.root, index, pin), pin, stage, index, cfg, ledger)
-                    item = cache.receipt(stage, index, journal.binding, rows, ledger)
+                    with measure("orphan_recovery_seconds"):
+                        unpack(package_path(journal.root, index, pin), pin, stage, index, cfg, ledger)
+                        item = cache.receipt(stage, index, journal.binding, rows, ledger)
                 else:
                     ledger.cfg = {**ledger.cfg, "terminal_reserve_seconds":
                                   ledger.cfg["terminal_reserve_seconds"] + cfg["package_seconds"] + cfg["copy_seconds"]}
                     try:
-                        item = cache.publish_shard(stage, index, journal.binding, rows, spec, rgb, pose, ledger,
-                                                   frame_builder=frame_builder)
+                        with measure("shard_prepare_seconds"):
+                            if prefetch_workers is None:
+                                item = cache.publish_shard(stage, index, journal.binding, rows, spec, rgb, pose, ledger,
+                                                           frame_builder=frame_builder)
+                            else:
+                                item = prefetch.publish_shard(stage, index, journal.binding, rows, spec, rgb, pose,
+                                                              ledger, workers=prefetch_workers, metrics=metrics)
                     finally:
                         ledger.cfg = {**ledger.cfg, "terminal_reserve_seconds":
                                       ledger.cfg["terminal_reserve_seconds"] - cfg["package_seconds"] - cfg["copy_seconds"]}
-                    if cache.receipt(stage, index, journal.binding, rows, ledger) != item:
-                        raise ValueError("v2_bulk_new_receipt_pin")
+                    with measure("receipt_verify_seconds"):
+                        if cache.receipt(stage, index, journal.binding, rows, ledger) != item:
+                            raise ValueError("v2_bulk_new_receipt_pin")
                     local_zip = stage / "package.zip"
-                    pin = retention.pack_shard(stage / f"shard-{index:05d}", local_zip, ledger)
+                    with measure("package_seconds"):
+                        pin = retention.pack_shard(stage / f"shard-{index:05d}", local_zip, ledger)
                     pin.update(number=index, name=f"shard-{index:05d}-{pin['sha256']}.zip")
                     final = journal.root / pin["name"]
                     if drive_quota is not None and not drive_quota.admit(pin["bytes"]):
                         report["stop_reason"] = "drive_cumulative_budget"
                         return
-                    with tempfile.TemporaryDirectory(dir=journal.root, prefix=".incoming-") as incoming:
-                        draft = Path(incoming) / pin["name"]
-                        retention.copy_verified(local_zip, draft, pin, ledger,
-                                                ledger.clock()+min(cfg["copy_seconds"], ledger.remaining()))
-                        owner()
-                        if list(journal.root.glob(f"shard-{index:05d}-*.zip")):
-                            raise ValueError("v2_bulk_concurrent_package")
-                        draft.rename(final)
-                    ledger.reserve("read", pin["bytes"])
-                    if _hash_file(final, expected_size=pin["bytes"], check_time=ledger.check) != pin["sha256"]:
-                        raise ValueError("v2_bulk_published_package_sha")
-                    ledger.observed("read", pin["bytes"])
+                    with measure("publish_zip_seconds"):
+                        with tempfile.TemporaryDirectory(dir=journal.root, prefix=".incoming-") as incoming:
+                            draft = Path(incoming) / pin["name"]
+                            retention.copy_verified(local_zip, draft, pin, ledger,
+                                                    ledger.clock()+min(cfg["copy_seconds"], ledger.remaining()))
+                            owner()
+                            if list(journal.root.glob(f"shard-{index:05d}-*.zip")):
+                                raise ValueError("v2_bulk_concurrent_package")
+                            draft.rename(final)
+                        ledger.reserve("read", pin["bytes"])
+                        if _hash_file(final, expected_size=pin["bytes"], check_time=ledger.check) != pin["sha256"]:
+                            raise ValueError("v2_bulk_published_package_sha")
+                        ledger.observed("read", pin["bytes"])
                 if item["frames"] != len(rows):
                     raise ValueError("v2_bulk_receipt_frames")
                 pin["receipt_sha256"] = item["content_sha256"]
                 current = journal.entry(index, entries[-1]["content_sha256"], pin, digest(journal.binding))
-                journal.publish(current, owner)
+                with measure("publish_boundary_seconds"):
+                    journal.publish(current, owner)
                 if drive_quota is not None:
                     drive_quota.committed(current, orphan=bool(orphans))
             entries.append(current)
@@ -278,6 +301,9 @@ def add_shards(journal, expected, target, work, spec, cfg, rgb, pose, ledger, re
             report["completed_shards"] = len(entries)
             report["completed_frames"] += len(rows)
             report["boundary_sha256"] = current["content_sha256"]
+            if metrics is not None:
+                key = "recovered_frames" if orphans else "newly_encoded_frames"
+                metrics[key] = metrics.get(key, 0) + len(rows)
             ledger.persist()
             print(f"Retained {len(entries)} shards; boundary {current['content_sha256']}", flush=True)
         report["stop_reason"] = "target_reached"

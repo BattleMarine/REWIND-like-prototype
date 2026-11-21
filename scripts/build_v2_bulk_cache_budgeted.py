@@ -27,7 +27,8 @@ COMMAND = '''        data = project / "datasets" / "UnrealEgo2"
                    "--legacy", str(parent / "v2_cpu_cache_041837Z"), "--bulk", str(parent / "v2_bulk_cache_041837Z"),
                    "--rgb", str(data / "UnrealEgoData2_train_val_rgb"),
                    "--pose", str(data / "UnrealEgoData2_train_val_pose"),
-                   "--budget-tip", EXPECTED_BUDGET_TIP_SHA256, "--recover-writer", RECOVER_WRITER_OWNER]
+                   "--budget-tip", EXPECTED_BUDGET_TIP_SHA256, "--recover-writer", RECOVER_WRITER_OWNER,
+                   "--prefetch-workers", str(PREFETCH_WORKERS)]
 '''
 WAIT = '''            deadline = started + PRE_RESERVATION_SECONDS
             granted = False
@@ -84,7 +85,7 @@ def notebook(pins, overlay):
              "기존 4샤드 뒤부터 1,063샤드까지 같은 Drive 경계에서 재개합니다. "
              "기본 OFF인 실행 스위치를 켜면 한 번 실행합니다. 종료 후 보고서와 budget tip SHA를 회수합니다.\n")
     settings = ('RUN_APPROVED_CACHE = False\nDRIVE_PROJECT = "/content/drive/MyDrive/REWIND-like prototype"\n'
-                'EXPECTED_BUDGET_TIP_SHA256 = ""\nRECOVER_WRITER_OWNER = ""\n')
+                'EXPECTED_BUDGET_TIP_SHA256 = ""\nRECOVER_WRITER_OWNER = ""\nPREFETCH_WORKERS = 4\n')
     constants = (f"\nLIMIT = {SESSION_CAP}\nCLOSURE = {CLOSURE}\nPRE_RESERVATION_SECONDS = {PRE_RESERVATION_SECONDS}\n"
                  + REPORT_LIMIT)
     return {"nbformat": 4, "nbformat_minor": 5,
@@ -107,7 +108,7 @@ def build(source, catalog, cpu_report, resume_report, output):
     pins.update(baseline_boundary_sha256=BASELINE_SHA, resume_report_sha256=RESUME_REPORT_SHA,
                 approved_target_shards=TARGET_SHARDS, approved_time_seconds=TIME_CAP, approved_drive_bytes=DRIVE_CAP)
     repo = Path(__file__).resolve().parent.parent
-    names = (*MODULES, "scripts/run_v2_bulk_cache_budgeted.py", "scripts/v2_bulk_quota.py")
+    names = (*MODULES, "scripts/run_v2_bulk_cache_budgeted.py", "scripts/v2_bulk_quota.py", "scripts/v2_ordered_prefetch.py")
     overlay = {name: (repo / name).read_text(encoding="utf-8") for name in names}
     with tempfile.TemporaryDirectory(dir=output.parent) as temp:
         root = Path(temp) / "source"
