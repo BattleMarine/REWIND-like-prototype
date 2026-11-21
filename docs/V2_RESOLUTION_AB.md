@@ -31,3 +31,17 @@
 python -m scripts.build_v2_resolution_ab --source <v2_cpu_cache_ed98124.zip> --catalog <catalog.json> --cpu-report <invocation-hlok774l.json> --output <new-output>
 python -m unittest discover -s tests -p test_v2_resolution_ab.py -v
 ```
+
+## 실측 결과
+
+2026-11-21 독립 Colab CPU 호출에서 384페어를 검증했다. 원본 966,476,121바이트를 로컬에 준비하는 데 66.39초, 참조 검사와 결과 보관을 포함한 전체 호출에 226.26초가 걸렸다.
+
+| 시나리오 | 128 생성·포장 | 256 생성·포장 | 256/128 |
+| --- | ---: | ---: | ---: |
+| ArchVis | 11.86초 | 13.26초 | 1.118 |
+| CityPark | 11.25초 | 12.39초 | 1.101 |
+| Downtown | 11.47초 | 12.86초 | 1.121 |
+
+각 샤드 ZIP은 50,615,696바이트에서 201,610,641바이트로 늘었다. ArchVis에서 128 이미지와 정답은 운영 첫 샤드와 일치했다. 표본 PNG를 육안으로 대조한 결과 256에서 ArchVis 바닥 무늬와 손목 주변, CityPark 팔과 상의 주름, Downtown 소매와 손의 경계가 더 선명했다. 관절 오차를 평가하려면 예측과 정답을 대조하는 후속 시험이 필요하다. 이 측정은 시나리오별 한 샤드의 로컬 생성·포장 비용이며 대용량 샤드의 Drive 게시·재검증 비용은 별도다.
+
+원본 진단은 invocation-n1zws275.json (SHA-256 dddce2115a08b6fd6a15e72b3bcf0d094dfb6ed8121a9ec7c163f53534ba4d80), 결과 ZIP의 SHA-256은 7fb9e5c899fb6f6680e67dfd155649395b261224bbdf7aa8224cb3126b3d34ba다. Drive의 reports/cache/v2_resolution_ab_041837Z 및 로컬 outputs/v2_plan_inputs/resolution_ab_n1zws275에 보존했다.
