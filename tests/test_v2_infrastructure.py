@@ -7,6 +7,7 @@ import tempfile
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -22,8 +23,10 @@ from rewind_v1.run_data import FixtureData
 from rewind_v1.runner import _read_checkpoint
 from scripts.build_v2 import notebook
 from scripts import build_v2_bulk_cache as bulk_builder, run_v2_bulk_cache as bulk
-from scripts.v2_bulk_quota import DriveQuota, METADATA_CAP
+from scripts.v2_bulk_quota import CLOSURE, DriveQuota, METADATA_CAP, TimeQuota
 from scripts import v2_ordered_prefetch as prefetch
+from scripts import run_v2_bulk_cache_budgeted as budgeted
+from scripts.v2_cpu_cache_presets import NINETY_MINUTES, SESSION_90, invocation_config
 
 
 class V2Tests(TestCase):
@@ -299,6 +302,90 @@ class V2Tests(TestCase):
         self.assertEqual(report["completed_shards"], 3)
         self.assertEqual(report["performance"]["newly_encoded_frames"], 2)
         self.assertTrue(journal.path(2).is_file())
+
+    def test_90min_entry_scans_past_lower_bound_and_uses_newest_tip(self):
+        journal = self.bulk_fixture()
+        minimum = self.bulk_add(journal, "minimum", 2)
+        newest = self.bulk_add(journal, "later-8-worker", 3, minimum["boundary_sha256"])
+        quota = TimeQuota(journal.root, lambda: None)
+        old = quota.reserve(quota.history(initialize=True), 20)
+        first = quota.settle(old, 445)
+        later = quota.reserve(quota.history(required_tip=first["content_sha256"]), 20)
+        latest = quota.settle(later, 500)
+        work = self.root/"short"
+        work.mkdir()
+        args = SimpleNamespace(work=work, started=time.monotonic(), preset=NINETY_MINUTES, prefetch_workers=8,
+                               bulk=journal.root, recover_writer="", budget_tip=latest["content_sha256"],
+                               rgb=self.root/"raw", pose=self.root/"raw")
+        paths = Path(budgeted.__file__).parent
+        pins = {"frames": 8, "baseline_boundary_sha256": budgeted.BASELINE_SHA,
+                "consumer_source_identity": digest(contract.source()),
+                "config_sha256": sha((contract.ROOT/"configs/rewind_v2.json").read_bytes()),
+                "invocation_preset": NINETY_MINUTES,
+                "operating_baseline": {"completed_shards": 2, "boundary_sha256": minimum["boundary_sha256"]},
+                "consumer_overlay": {f"scripts/{name}": sha((paths/name).read_bytes())
+                                     for name in ("run_v2_bulk_cache.py", "v2_ordered_prefetch.py")}}
+        with (patch.object(budgeted, "check_layout"),
+              patch.object(budgeted, "baseline_entries", return_value=journal.scan(newest["boundary_sha256"], lambda: None)[:1]),
+              patch.object(budgeted, "bootstrap", return_value=(journal, self.spec)),
+              patch.object(budgeted, "TARGET_SHARDS", 4), patch.object(prefetch, "decode", side_effect=self.build_frame)):
+            result = budgeted.run(args, pins)
+        self.assertEqual(result["starting_shards"], 3)
+        self.assertEqual(result["completed_shards"], 4)
+        self.assertEqual(result["new_shard_cutoff_seconds_after_cell_start"], 5040)
+        self.assertEqual(result["time_reserved_seconds"], 5400)
+        self.assertEqual(result["time_charged_before_seconds"], first["seconds"]+latest["seconds"])
+        self.assertEqual(quota.read(quota.path(2, "reserve"), "reserve")["previous"], latest["content_sha256"])
+        self.assertEqual(journal.read(journal.path(3))["previous"], newest["boundary_sha256"])
+
+    def test_90min_cutoff_stops_admission_and_inflight_encoding_cannot_publish(self):
+        journal = self.bulk_fixture()
+        existing = self.bulk_add(journal, "existing", 2)
+        work = self.root/"timed"
+        work.mkdir()
+        clock = [0]
+        cfg = invocation_config(self.cfg, NINETY_MINUTES)
+        ledger = Ledger(work/"usage", self.bind,
+                        {**cfg, "seconds_per_invocation": SESSION_90-CLOSURE}, clock=lambda: clock[0])
+        rows = self.doc["records"][4:6]
+        with ledger.invocation("until-limit"):
+            clock[0] = 5039
+            self.assertIsNone(bulk.admit(rows, ledger, cfg))
+            clock[0] = 5040
+            self.assertEqual(bulk.admit(rows, ledger, cfg), "time")
+        clock[0] = 0
+
+        def expire(*args, **kwargs):
+            clock[0] = 5040
+            ledger.check()
+
+        report = {}
+        with (ledger.invocation("started"), patch.object(prefetch, "publish_shard", side_effect=expire),
+              self.assertRaises(TimeoutError)):
+            bulk.add_shards(journal, existing["boundary_sha256"], 3, work, self.spec, cfg,
+                            self.root/"raw", self.root/"raw", ledger, report, prefetch_workers=8)
+        self.assertEqual(report["boundary_sha256"], existing["boundary_sha256"])
+        self.assertFalse(journal.path(2).exists())
+
+        pack = retention.pack_shard
+
+        def pack_in_publish_reserve(*args):
+            clock[0] = 5100
+            return pack(*args)
+
+        def encode_before_cutoff(root, number, binding, rows, spec, rgb, pose, ledger, **kwargs):
+            return cache.publish_shard(root, number, binding, rows, spec, rgb, pose, ledger,
+                                       frame_builder=self.build_frame)
+
+        clock[0] = 0
+        with (ledger.invocation("finishes_before_encoding_cutoff"),
+              patch.object(prefetch, "publish_shard", side_effect=encode_before_cutoff),
+              patch.object(retention, "pack_shard", side_effect=pack_in_publish_reserve)):
+            clock[0] = 5039
+            bulk.add_shards(journal, existing["boundary_sha256"], 3, work, self.spec, cfg,
+                            self.root/"raw", self.root/"raw", ledger, report, prefetch_workers=8)
+        self.assertTrue(journal.path(2).is_file())
+        self.assertEqual(report["completed_shards"], 3)
 
     def test_retained_catalog_monotone_binding_and_large_prefix_progress(self):
         self.prepare(1);short=(self.root/'cache/catalog.json').read_bytes();self.prepare(2)

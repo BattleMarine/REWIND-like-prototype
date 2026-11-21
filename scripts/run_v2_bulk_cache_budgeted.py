@@ -20,9 +20,10 @@ from scripts.archvis_pilot_bootstrap import extract_pinned_zip
 from scripts.run_v2_bulk_cache import Journal, add_shards, writer
 from scripts.run_v2_cpu_cache import ARCHIVE_CAP, MANIFEST_CAP, MANIFEST_NAME, MIB, read_manifest
 from scripts.run_v2_gpu_cache_probe import load_catalog
-from scripts.v2_bulk_quota import BASELINE_SHA, BASELINE_SHARDS, CLOSURE, DRIVE_CAP, METADATA_CAP, TARGET_SHARDS, TIME_CAP
+from scripts.v2_bulk_quota import BASELINE_SHA, BASELINE_SHARDS, CLOSURE, DRIVE_CAP, METADATA_CAP, SESSION_CAP, TARGET_SHARDS, TIME_CAP
 from scripts.v2_bulk_quota import DriveQuota, TimeQuota, baseline_entries
 from scripts.v2_ordered_prefetch import WINDOW_BYTES, WORKERS, elapsed
+from scripts.v2_cpu_cache_presets import NINETY_MINUTES, PREFETCH_90, PRESETS, SESSION_90, STANDARD, invocation_config
 
 
 def check_layout(args):
@@ -65,12 +66,15 @@ def run(args, pins):
                "publish_zip_seconds": 0.0, "publish_boundary_seconds": 0.0}
     report = {"status": "failed", "stage": "preflight", "baseline_sha256": BASELINE_SHA,
               "target_shards": TARGET_SHARDS, "time_cap_seconds": TIME_CAP, "drive_cache_cap_bytes": DRIVE_CAP,
+              "invocation_preset": args.preset,
               "performance": metrics, "prefetch_source_sha256": pins["consumer_overlay"]["scripts/v2_ordered_prefetch.py"]}
     ledger = None
     try:
         check_layout(args)
         if digest(contract.source()) != pins["consumer_source_identity"] or pins["baseline_boundary_sha256"] != BASELINE_SHA:
             raise ValueError("v2_quota_source_or_baseline_pin")
+        if args.preset != pins.get("invocation_preset", STANDARD):
+            raise ValueError("v2_quota_invocation_preset_pin")
         for name in ("v2_ordered_prefetch.py", "run_v2_bulk_cache.py"):
             source_path = Path(__file__).with_name(name)
             if contract.sha(_regular_read(source_path, MIB)) != pins["consumer_overlay"]["scripts/"+name]:
@@ -79,10 +83,25 @@ def run(args, pins):
         if contract.sha(raw_cfg) != pins["config_sha256"]:
             raise ValueError("v2_quota_config_pin")
         cfg = json.loads(raw_cfg)
+        worker_cfg = invocation_config(cfg, args.preset)
+        short = args.preset == NINETY_MINUTES
+        if short:
+            operating = pins["operating_baseline"]
+            previous_count, previous_sha = operating["completed_shards"], operating["boundary_sha256"]
+        else:
+            previous_count, previous_sha = BASELINE_SHARDS, BASELINE_SHA
+        session_cap = SESSION_90 if short else SESSION_CAP
+        report.update(invocation_cap_seconds=session_cap, minimum_boundary_sha256=previous_sha,
+                      read_cap_bytes=worker_cfg["resources"]["read_bytes"],
+                      write_cap_bytes=worker_cfg["resources"]["write_bytes"])
         with writer(args.bulk, args.recover_writer) as owner:
             report["stage"] = "budget"
             with elapsed(metrics, "budget_setup_seconds"):
                 baseline = baseline_entries(args.bulk)
+                if short:
+                    prior = Journal.read(args.bulk / f"boundary-{previous_count-1:05d}.json")
+                    if prior["index"] != previous_count-1 or prior["content_sha256"] != previous_sha:
+                        raise ValueError("v2_quota_operating_baseline_pin")
                 drive = DriveQuota(args.bulk, baseline)
                 quota = TimeQuota(args.bulk, owner)
                 more = any(p.name not in drive.excluded for p in args.bulk.glob("boundary-*.json"))
@@ -97,7 +116,7 @@ def run(args, pins):
             if drive.used + METADATA_CAP > DRIVE_CAP:
                 report.update(status="paused", stage="budget_exhausted", stop_reason="drive_cumulative_budget")
                 return report
-            ticket = quota.reserve(history, time.monotonic() - args.started)
+            ticket = quota.reserve(history, time.monotonic() - args.started, session_cap=session_cap)
             if ticket is None:
                 report.update(status="paused", stage="budget_exhausted", stop_reason="cpu_cumulative_budget")
                 return report
@@ -110,8 +129,11 @@ def run(args, pins):
                 report["stage"] = "manifest"
                 with elapsed(metrics, "manifest_setup_seconds"):
                     journal, spec = bootstrap(args, pins, cfg)
-                ledger_cfg = {**cfg, "seconds_per_invocation": ticket["seconds"] - CLOSURE,
+                ledger_cfg = {**worker_cfg, "seconds_per_invocation": ticket["seconds"] - CLOSURE,
                               "external_timeout_seconds": ticket["seconds"]}
+                report["new_shard_cutoff_seconds_after_cell_start"] = (
+                    ledger_cfg["seconds_per_invocation"] - ledger_cfg["terminal_reserve_seconds"]
+                    - ledger_cfg["package_seconds"] - ledger_cfg["copy_seconds"])
                 ledger = Ledger(args.work / "usage", {"bulk_binding": digest(journal.binding), "config": digest(cfg)}, ledger_cfg)
                 report["runtime"] = {key: journal.binding[key] for key in ("torch", "numpy", "pillow")}
                 report["runtime"]["python"] = platform.python_version()
@@ -121,8 +143,8 @@ def run(args, pins):
                         ledger.started = args.started
                         ledger.check()
                         with elapsed(metrics, "append_seconds"):
-                            add_shards(journal, BASELINE_SHA, TARGET_SHARDS, args.work, spec, cfg, args.rgb, args.pose,
-                                       ledger, report, owner_check=owner, minimum_shards=BASELINE_SHARDS, drive_quota=drive,
+                            add_shards(journal, previous_sha, TARGET_SHARDS, args.work, spec, worker_cfg, args.rgb, args.pose,
+                                       ledger, report, owner_check=owner, minimum_shards=previous_count, drive_quota=drive,
                                        prefetch_workers=args.prefetch_workers)
                 except TimeoutError as error:
                     if "boundary_sha256" not in report:
@@ -165,7 +187,8 @@ def main(argv=None):
     parser.add_argument("--started", type=float, required=True)
     parser.add_argument("--recover-writer", default="")
     parser.add_argument("--budget-tip", default="")
-    parser.add_argument("--prefetch-workers", type=int, choices=WORKERS, default=4)
+    parser.add_argument("--prefetch-workers", type=int, choices=WORKERS)
+    parser.add_argument("--preset", choices=PRESETS, default=STANDARD)
     args = parser.parse_args(argv)
     if not 0 <= time.monotonic() - args.started <= 240:
         parser.error("notebook start time outside the pre-reservation limit")
@@ -173,6 +196,10 @@ def main(argv=None):
         parser.error("invalid writer recovery token")
     if args.budget_tip and not re.fullmatch(r"[0-9a-f]{64}", args.budget_tip):
         parser.error("invalid retained budget SHA")
+    if args.preset == NINETY_MINUTES and not args.budget_tip:
+        parser.error("the 90min preset requires the latest retained budget tip SHA")
+    if args.prefetch_workers is None:
+        args.prefetch_workers = PREFETCH_90 if args.preset == NINETY_MINUTES else 4
     run(args, json.loads(_regular_read(args.pins, 32*1024)))
 
 

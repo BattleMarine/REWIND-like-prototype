@@ -6,9 +6,11 @@ from unittest.mock import patch
 
 from rewind_archive.contracts import canonical
 from rewind_prepare.temporal_selection import seal
+from rewind_v1 import v2_contract
 from scripts import build_v2_bulk_cache_budgeted as builder
 from scripts.run_v2_bulk_cache import JOURNAL_SCHEMA
 from scripts.v2_bulk_quota import CLOSURE, METADATA_CAP, DriveQuota, TimeQuota, baseline_entries
+from scripts.v2_cpu_cache_presets import NINETY_MINUTES, SESSION_90, STANDARD, invocation_config
 
 
 class QuotaTests(unittest.TestCase):
@@ -59,6 +61,45 @@ class QuotaTests(unittest.TestCase):
         quota.root.rmdir()
         with self.assertRaisesRegex(ValueError, "history_missing"):
             quota.history(initialize=True)
+
+    def test_90min_lost_vm_keeps_previous_8hour_history_and_charges_only_5400(self):
+        first = self.quota()
+        old = first.reserve(first.history(initialize=True), 20)
+        settled_old = first.settle(old, 445.6)
+        current = self.quota()
+        prior = current.history(required_tip=settled_old["content_sha256"], enforce_tip=True)
+        self.assertEqual(prior["charged_seconds"], 536)
+        short = current.reserve(prior, 20, session_cap=SESSION_90)
+        self.assertEqual(short["seconds"], 5400)
+
+        after_loss = self.quota()
+        recovered = after_loss.history(required_tip=short["content_sha256"], enforce_tip=True)
+        self.assertEqual(recovered["charged_seconds"], 536+5400)
+        self.assertEqual(recovered["unsettled"], 1)
+        next_short = after_loss.reserve(recovered, 20, session_cap=SESSION_90)
+        settled = after_loss.settle(next_short, 5320)
+        self.assertEqual(settled["seconds"], 5400)
+        recovered = current.history(required_tip=settled["content_sha256"], enforce_tip=True)
+        self.assertEqual(recovered["charged_seconds"], 536+5400+5400)
+
+    def test_preset_keeps_standard_config_and_notebook_uses_90min_defaults(self):
+        original = v2_contract.config()
+        self.assertEqual(invocation_config(original, STANDARD)["resources"]["read_bytes"], 8*1024**3)
+        short = invocation_config(original, NINETY_MINUTES)
+        self.assertEqual(short["resources"]["read_bytes"], 112*1024**3)
+        self.assertEqual(short["resources"]["write_bytes"], 24*1024**3)
+        self.assertEqual(short["resources"]["rss_bytes"], original["resources"]["rss_bytes"])
+        self.assertEqual(short["camera"], original["camera"])
+        doc = builder.notebook({"source_name": "fixed.zip"}, {}, preset=NINETY_MINUTES)
+        scope = {}
+        with patch("builtins.print"):
+            for cell in doc["cells"]:
+                if cell["cell_type"] == "code":
+                    exec(compile("".join(cell["source"]), "<notebook>", "exec"), scope)
+        self.assertEqual(scope["LIMIT"], 5400)
+        self.assertEqual(scope["PREFETCH_WORKERS"], 8)
+        self.assertEqual(scope["EXPECTED_BUDGET_TIP_SHA256"], "")
+        self.assertIn('["--preset", "90min"]', "".join(doc["cells"][-1]["source"]))
 
     def seed_baseline(self):
         entries = []
