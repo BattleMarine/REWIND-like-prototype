@@ -23,7 +23,7 @@ from scripts.run_v2_gpu_cache_probe import load_catalog
 from scripts.v2_bulk_quota import BASELINE_SHA, BASELINE_SHARDS, CLOSURE, DRIVE_CAP, METADATA_CAP, SESSION_CAP, TARGET_SHARDS, TIME_CAP
 from scripts.v2_bulk_quota import DriveQuota, TimeQuota, baseline_entries
 from scripts.v2_ordered_prefetch import WINDOW_BYTES, WORKERS, elapsed
-from scripts.v2_cpu_cache_presets import NINETY_MINUTES, PREFETCH_90, PRESETS, SESSION_90, STANDARD, invocation_config
+from scripts.v2_cpu_cache_presets import ACCELERATED, NINETY_MINUTES, PREFETCH_ACCELERATED, PRESETS, SESSION_90, STANDARD, invocation_config
 
 
 def check_layout(args):
@@ -84,13 +84,13 @@ def run(args, pins):
             raise ValueError("v2_quota_config_pin")
         cfg = json.loads(raw_cfg)
         worker_cfg = invocation_config(cfg, args.preset)
-        short = args.preset == NINETY_MINUTES
-        if short:
+        accelerated = args.preset in ACCELERATED
+        if accelerated:
             operating = pins["operating_baseline"]
             previous_count, previous_sha = operating["completed_shards"], operating["boundary_sha256"]
         else:
             previous_count, previous_sha = BASELINE_SHARDS, BASELINE_SHA
-        session_cap = SESSION_90 if short else SESSION_CAP
+        session_cap = SESSION_90 if args.preset == NINETY_MINUTES else SESSION_CAP
         report.update(invocation_cap_seconds=session_cap, minimum_boundary_sha256=previous_sha,
                       read_cap_bytes=worker_cfg["resources"]["read_bytes"],
                       write_cap_bytes=worker_cfg["resources"]["write_bytes"])
@@ -98,7 +98,7 @@ def run(args, pins):
             report["stage"] = "budget"
             with elapsed(metrics, "budget_setup_seconds"):
                 baseline = baseline_entries(args.bulk)
-                if short:
+                if accelerated:
                     prior = Journal.read(args.bulk / f"boundary-{previous_count-1:05d}.json")
                     if prior["index"] != previous_count-1 or prior["content_sha256"] != previous_sha:
                         raise ValueError("v2_quota_operating_baseline_pin")
@@ -196,10 +196,10 @@ def main(argv=None):
         parser.error("invalid writer recovery token")
     if args.budget_tip and not re.fullmatch(r"[0-9a-f]{64}", args.budget_tip):
         parser.error("invalid retained budget SHA")
-    if args.preset == NINETY_MINUTES and not args.budget_tip:
-        parser.error("the 90min preset requires the latest retained budget tip SHA")
+    if args.preset in ACCELERATED and not args.budget_tip:
+        parser.error("the accelerated preset requires the latest retained budget tip SHA")
     if args.prefetch_workers is None:
-        args.prefetch_workers = PREFETCH_90 if args.preset == NINETY_MINUTES else 4
+        args.prefetch_workers = PREFETCH_ACCELERATED if args.preset in ACCELERATED else 4
     run(args, json.loads(_regular_read(args.pins, 32*1024)))
 
 

@@ -26,7 +26,7 @@ from scripts import build_v2_bulk_cache as bulk_builder, run_v2_bulk_cache as bu
 from scripts.v2_bulk_quota import CLOSURE, DriveQuota, METADATA_CAP, TimeQuota
 from scripts import v2_ordered_prefetch as prefetch
 from scripts import run_v2_bulk_cache_budgeted as budgeted
-from scripts.v2_cpu_cache_presets import NINETY_MINUTES, SESSION_90, invocation_config
+from scripts.v2_cpu_cache_presets import NINETY_MINUTES, OVERNIGHT, SESSION_90, invocation_config
 
 
 class V2Tests(TestCase):
@@ -304,6 +304,12 @@ class V2Tests(TestCase):
         self.assertTrue(journal.path(2).is_file())
 
     def test_90min_entry_scans_past_lower_bound_and_uses_newest_tip(self):
+        self.check_profile_entry(NINETY_MINUTES, 5040, 5400)
+
+    def test_8h_entry_scans_past_lower_bound_and_uses_newest_tip(self):
+        self.check_profile_entry(OVERNIGHT, 28440, 28800)
+
+    def check_profile_entry(self, preset, encode_cutoff, cap):
         journal = self.bulk_fixture()
         minimum = self.bulk_add(journal, "minimum", 2)
         newest = self.bulk_add(journal, "later-8-worker", 3, minimum["boundary_sha256"])
@@ -314,14 +320,14 @@ class V2Tests(TestCase):
         latest = quota.settle(later, 500)
         work = self.root/"short"
         work.mkdir()
-        args = SimpleNamespace(work=work, started=time.monotonic(), preset=NINETY_MINUTES, prefetch_workers=8,
+        args = SimpleNamespace(work=work, started=time.monotonic(), preset=preset, prefetch_workers=8,
                                bulk=journal.root, recover_writer="", budget_tip=latest["content_sha256"],
                                rgb=self.root/"raw", pose=self.root/"raw")
         paths = Path(budgeted.__file__).parent
         pins = {"frames": 8, "baseline_boundary_sha256": budgeted.BASELINE_SHA,
                 "consumer_source_identity": digest(contract.source()),
                 "config_sha256": sha((contract.ROOT/"configs/rewind_v2.json").read_bytes()),
-                "invocation_preset": NINETY_MINUTES,
+                "invocation_preset": preset,
                 "operating_baseline": {"completed_shards": 2, "boundary_sha256": minimum["boundary_sha256"]},
                 "consumer_overlay": {f"scripts/{name}": sha((paths/name).read_bytes())
                                      for name in ("run_v2_bulk_cache.py", "v2_ordered_prefetch.py")}}
@@ -332,11 +338,13 @@ class V2Tests(TestCase):
             result = budgeted.run(args, pins)
         self.assertEqual(result["starting_shards"], 3)
         self.assertEqual(result["completed_shards"], 4)
-        self.assertEqual(result["new_shard_cutoff_seconds_after_cell_start"], 5040)
-        self.assertEqual(result["time_reserved_seconds"], 5400)
+        self.assertEqual(result["new_shard_cutoff_seconds_after_cell_start"], encode_cutoff)
+        self.assertEqual(result["time_reserved_seconds"], cap)
         self.assertEqual(result["time_charged_before_seconds"], first["seconds"]+latest["seconds"])
         self.assertEqual(quota.read(quota.path(2, "reserve"), "reserve")["previous"], latest["content_sha256"])
         self.assertEqual(journal.read(journal.path(3))["previous"], newest["boundary_sha256"])
+        self.assertEqual(result["status"], "passed")
+        self.assertLess(result["time_charged_seconds"], cap)
 
     def test_90min_cutoff_stops_admission_and_inflight_encoding_cannot_publish(self):
         journal = self.bulk_fixture()

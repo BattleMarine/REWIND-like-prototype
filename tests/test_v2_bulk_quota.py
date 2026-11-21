@@ -7,10 +7,11 @@ from unittest.mock import patch
 from rewind_archive.contracts import canonical
 from rewind_prepare.temporal_selection import seal
 from rewind_v1 import v2_contract
+from rewind_v1.v2_budget import Ledger
 from scripts import build_v2_bulk_cache_budgeted as builder
-from scripts.run_v2_bulk_cache import JOURNAL_SCHEMA
+from scripts.run_v2_bulk_cache import JOURNAL_SCHEMA, admit
 from scripts.v2_bulk_quota import CLOSURE, METADATA_CAP, DriveQuota, TimeQuota, baseline_entries
-from scripts.v2_cpu_cache_presets import NINETY_MINUTES, SESSION_90, STANDARD, invocation_config
+from scripts.v2_cpu_cache_presets import NINETY_MINUTES, OVERNIGHT, SESSION_90, STANDARD, invocation_config
 
 
 class QuotaTests(unittest.TestCase):
@@ -100,6 +101,41 @@ class QuotaTests(unittest.TestCase):
         self.assertEqual(scope["PREFETCH_WORKERS"], 8)
         self.assertEqual(scope["EXPECTED_BUDGET_TIP_SHA256"], "")
         self.assertIn('["--preset", "90min"]', "".join(doc["cells"][-1]["source"]))
+
+    def test_8h_preset_caps_deadline_and_unsettled_loss(self):
+        cfg = invocation_config(v2_contract.config(), OVERNIGHT)
+        self.assertEqual(cfg["resources"]["read_bytes"], 640*1024**3)
+        self.assertEqual(cfg["resources"]["write_bytes"], 136*1024**3)
+        self.assertEqual(cfg["resources"]["rss_bytes"], v2_contract.config()["resources"]["rss_bytes"])
+        clock = [0.0]
+        ledger = Ledger(self.root/"cutoff", {}, {**cfg, "seconds_per_invocation": 28800-CLOSURE},
+                        clock=lambda: clock[0])
+        sample = [{"files": {"left": {"size_bytes": 800}}}]
+        with ledger.invocation("until-cutoff"):
+            ledger.reserve("read", 8*1024**3)
+            clock[0] = 28439
+            self.assertIsNone(admit(sample, ledger, cfg))
+            clock[0] = 28440
+            self.assertEqual(admit(sample, ledger, cfg), "time")
+        quota = self.quota()
+        short = quota.reserve(quota.history(initialize=True), 0, session_cap=5400)
+        settled = quota.settle(short, 300)
+        long = quota.reserve(quota.history(required_tip=settled["content_sha256"]), 0, session_cap=28800)
+        self.assertEqual(self.quota().history(required_tip=long["content_sha256"])["charged_seconds"], 28800+390)
+        self.assertEqual(long["seconds"], 28800)
+
+    def test_8h_notebook_default_off_with_no_copied_budget_tip(self):
+        doc = builder.notebook({"source_name": "fixed.zip"}, {}, preset=OVERNIGHT)
+        scope = {}
+        with patch("builtins.print"):
+            for cell in doc["cells"]:
+                if cell["cell_type"] == "code":
+                    exec(compile("".join(cell["source"]), "<notebook>", "exec"), scope)
+        self.assertFalse(scope["RUN_APPROVED_CACHE"])
+        self.assertEqual(scope["LIMIT"], 28800)
+        self.assertEqual(scope["PREFETCH_WORKERS"], 8)
+        self.assertEqual(scope["EXPECTED_BUDGET_TIP_SHA256"], "")
+        self.assertIn('["--preset", "8h"]', "".join(doc["cells"][-1]["source"]))
 
     def seed_baseline(self):
         entries = []
