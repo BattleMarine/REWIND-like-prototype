@@ -98,7 +98,7 @@ def part(path, ledger):
     return {"bytes": size, "sha256": _hash_file(path, expected_size=size, check_time=ledger.check)}
 
 
-def write_variant(rows, spec, stage, out, size, ledger):
+def write_variant(rows, spec, stage, out, size, ledger, *, source_roots=None, shard_identity=None):
     started = time.monotonic()
     out.mkdir()
     stats = {}
@@ -108,7 +108,8 @@ def write_variant(rows, spec, stage, out, size, ledger):
     targets = []
     sample = None
     try:
-        with ordered_sources(rows, stage/"rgb", stage/"pose", WORKERS, ledger, stats) as reader:
+        rgb, pose = source_roots if source_roots is not None else (stage/"rgb", stage/"pose")
+        with ordered_sources(rows, rgb, pose, WORKERS, ledger, stats) as reader:
             for i, (row, raw) in enumerate(zip(rows, reader, strict=True)):
                 with elapsed(stats, "transform_seconds"):
                     image, target = decode(raw, row, spec, size)
@@ -132,7 +133,7 @@ def write_variant(rows, spec, stage, out, size, ledger):
             handle.flush()
             os.fsync(handle.fileno())
         files = {name: part(out/name, ledger) for name in ("images.npy", "targets.pt")}
-        receipt = seal({"schema": "rewind_v2_resolution_ab_shard_v1", "size": size,
+        receipt = seal({"schema": "rewind_v2_resolution_ab_shard_v1", **(shard_identity or {}), "size": size,
                         "records_sha256": digest(rows), "files": files, "image_shape": list(shape),
                         "image_dtype": "float32", "targets": {n: {"shape": list(v.shape), "dtype": str(v.dtype)}
                                                               for n, v in tensors.items()}})

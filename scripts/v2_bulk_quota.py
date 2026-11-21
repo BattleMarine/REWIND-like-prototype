@@ -35,13 +35,15 @@ def publish(path, doc, owner):
 
 
 class TimeQuota:
-    def __init__(self, bulk, owner, *, cap=TIME_CAP, baseline=BASELINE_SHA):
+    def __init__(self, bulk, owner, *, cap=TIME_CAP, baseline=BASELINE_SHA, drive_cap=DRIVE_CAP,
+                 session_limit=SESSION_CAP, minimum=MINIMUM):
         self.root = bulk / ".cpu-quota-v1"
         self.marker = bulk / ".cpu-quota-origin-v1.json"
         self.started = bulk / ".cpu-quota-started-v1.json"
         self.owner = owner
         self.cap = cap
-        self.identity = digest({"baseline": baseline, "time_cap": cap, "drive_cap": DRIVE_CAP})
+        self.session_limit, self.minimum = session_limit, minimum
+        self.identity = digest({"baseline": baseline, "time_cap": cap, "drive_cap": drive_cap})
 
     def read(self, path, expected_type):
         doc = json.loads(_regular_read(path, METADATA_CAP))
@@ -75,7 +77,7 @@ class TimeQuota:
             paths.remove(reserve_path)
             reserved = reserve["seconds"]
             if (reserve["number"] != number or reserve["previous"] != tip or type(reserved) is not int
-                    or not MINIMUM < reserved <= SESSION_CAP or charged + reserved > self.cap):
+                    or not self.minimum < reserved <= self.session_limit or charged + reserved > self.cap):
                 raise ValueError("v2_quota_reservation_chain")
             tip = reserve["content_sha256"]
             seen.add(tip)
@@ -105,9 +107,10 @@ class TimeQuota:
             raise ValueError(f"v2_quota_prior_tip_required latest={tip}")
         return {"tip": tip, "charged_seconds": charged, "unsettled": unsettled, "next": number}
 
-    def reserve(self, history, elapsed, *, session_cap=SESSION_CAP):
-        seconds = min(session_cap, self.cap - history["charged_seconds"])
-        if seconds <= MINIMUM + math.ceil(elapsed):
+    def reserve(self, history, elapsed, *, session_cap=SESSION_CAP, budget_cap=None):
+        cap = self.cap if budget_cap is None else min(self.cap, budget_cap)
+        seconds = min(session_cap, self.session_limit, cap - history["charged_seconds"])
+        if seconds <= self.minimum + math.ceil(elapsed):
             return None
         ticket = seal({"schema": SCHEMA, "identity": self.identity, "kind": "reserve",
                        "number": history["next"], "previous": history["tip"], "seconds": seconds})
