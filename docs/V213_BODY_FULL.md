@@ -1,5 +1,7 @@
 # v2.1.3 · 128 A body 전체 미세조정
 
+2026-11-22 · v2.1.1~.3의 9회 validation 선별 완료. 종합 평균±표본 표준편차(mm)는 출력층 209.35±2.28, LoRA 210.05±0.41, 몸 전체 243.82±21.93이다. 몸 전체 seed 42/71/103은 각각 246.00/220.88/264.58로 모두 부모 A(219.72)보다 높다. 고정 선별기는 출력층과 LoRA를 남겼다. 세 최종 body 실물과 fit·summary·완료 진단 및 선별 출력은 `outputs/v2_plan_inputs/v213_t4_results_20261122/`에 보존했다. 그룹별 NPZ는 별도 로컬 미회수. seed 137·181 최종 비교 실행은 예산 선택과 고정본 검토 후다.
+
 2026-11-22 중간 결과 · v2.1.3 seed 42의 봉인된 첫 호출 진단에서 세 시나리오 몸·전역 손 점수를 동일 가중 평균하면 246.0021 mm다. 같은 seed의 출력층 209.2583, LoRA 210.4687 mm보다 높다. 42는 완료, 71 시작 전 쓰기 예산 정지. 세 seed 종합 판정은 보류한다. 원본은 `outputs/v2_plan_inputs/v213_r2_interim_20261122/invocation-0b9c02805bdd400b916284bd95840b79.json` (SHA-256 `01924e1c151de9b2984bdd7351fec3b72a34daa985c5395a4a31258a76e64d96`).
 
 v2-128-A의 선택 frontend e3·body e3·hand e2에서 각 seed를 독립적으로 시작한다. Body 파라미터 99개 텐서, 15,010,822개 FP32 값을 모두 학습한다. 예측 2D feature와 hand 가중치는 A를 사용하며, hand의 상체 입력은 해당 trial body에서 예측한다. Seed 42·71·103은 각각 공식 train 3,097클립·119,586페어를 1epoch, batch 1, Adam `5e-5`로 학습한다. 앞선 두 방식과 같은 clip 셔플·teacher timestep/epsilon·손실·평가 noise를 사용한다. [v2 튜닝 설계](V2_TUNING_DESIGN.md)
