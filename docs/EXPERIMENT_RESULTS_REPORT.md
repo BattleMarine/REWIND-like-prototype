@@ -1,5 +1,7 @@
 # REWIND-like prototype 실험 결과 종합 보고서
 
+2026-11-23 · [출력층·LoRA 동일 클립 CPU 비교](V2_FINAL_PAIRED_CPU.md)를 준비했다. 5개 seed 각각에서 같은 클립으로 몸과 손의 차이를 평가한다. 기존 모델 선정을 유지하고 GPU 시험과 병행한다. 실측 대기.
+
 2026-11-23 · 13회 선별 완료. 출력층은 5회 209.79±1.81 mm, LoRA는 210.69±1.24 mm(평균±표본 표준편차). 둘 다 5/5 부모 개선, 같은 seed에서 출력층 4/5 우세. 목표 판정은 pooled 좌·우 손목, 몸, 전역 손의 5회 평균을 A와 대조했다. 모두 개선됐지만 손목 기준 손가락은 A 93.72 → 출력층 95.86 / LoRA 96.64 mm였다. 공식 validation 후보는 출력층 seed 71(207.12 mm). LoRA 137·181은 L4에서 479.53초, 각 212.83·210.44 mm. 결과와 판정은 outputs/v2_plan_inputs/v212_final_results_20261123/에 보존했다. 추가 LoRA 그룹 NPZ는 로컬 미회수다. v2.1.4 결정 SHA 6399409ff04857a22bbaa1caf47d608926acfa3b09f15db97c36b883dc526e3c로 GPU 한 건을 인계했다.
 
 2026-11-23 · v2.4 Colab CPU 수식 검사가 35.32초에 완료됐다. 합성 float64 입력에서 x0와 noise 복원 최대 절대 오차는 각각 4.44e-16, DDIM 10단계 출력 차이는 0이었다. 시간 mask와 중간 head의 x0 출력도 보존됐다. 결과 원본 3개의 SHA-256을 검사해 outputs/v2_plan_inputs/v24_numerical_results_20261123/에 보존했다. result.json SHA-256은 284dbd8abb5f821102e4d611be6f0c13a5bf653b6499a95f699540e5f8549289다. GPU 학습·검증 정확도는 순차 시험 대기다.
