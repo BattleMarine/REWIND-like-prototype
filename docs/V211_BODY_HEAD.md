@@ -6,10 +6,10 @@ A의 frontend e3, body e3, hand e2를 공통 시작점으로 사용한다. 독�
 
 ## 고정 Colab과 입력
 
-발급 폴더는 `outputs/v2_plan_inputs/v211_body_head_128_A_release_20261122`다. `receipt.json`에 노트북·overlay·부모 입력 SHA가 있으며 `trial-plan.json`에 CPU 선별기와 공유하는 고정 계획이 있다. 부모 원본 source는 `outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip`이며 SHA-256은 `9a68d8e45bcf3abf6fab3004740faa6805d4ce3fda5118c3a7102011937849d8`이다. A 최종 step 9 영수증의 내용 SHA는 `7d2cf12cdaf42916d98190cf2d57e11e93a6d94165d5e753db6fc1d11c3026d4`다. 기존 Drive의 A 체크포인트 ZIP과 feature 그룹 147개를 검증해 읽는다. 검증용 128 캐시 경계는 `dc79219153d69f44020e0c42f9f3ede6cd3add179211f6c300345b2416dab511`이며 해당 경계의 메타데이터만 읽는다. 51 GiB 로컬 A 반출 ZIP은 발급기에서 입력 핀을 확인할 때 사용한다.
+CUDA 시작 수정 R2 발급 폴더는 `outputs/v2_plan_inputs/v211_body_head_128_A_cuda_startup_r2_20261122`다. `receipt.json`에 노트북·overlay·부모 입력 SHA가 있으며 `trial-plan.json`에 CPU 선별기와 공유하는 고정 계획이 있다. 부모 원본 source는 `outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip`이며 SHA-256은 `9a68d8e45bcf3abf6fab3004740faa6805d4ce3fda5118c3a7102011937849d8`이다. A 최종 step 9 영수증의 내용 SHA는 `7d2cf12cdaf42916d98190cf2d57e11e93a6d94165d5e753db6fc1d11c3026d4`다. 기존 Drive의 A 체크포인트 ZIP과 feature 그룹 147개를 검증해 읽는다. 검증용 128 캐시 경계는 `dc79219153d69f44020e0c42f9f3ede6cd3add179211f6c300345b2416dab511`이며 해당 경계의 메타데이터만 읽는다. 51 GiB 로컬 A 반출 ZIP은 발급기에서 입력 핀을 확인할 때 사용한다. [CUDA 시작 수정·이전 보관본](V2_TUNING_CUDA_STARTUP_R2.md)
 
-1. 오케스트레이션이 v2.1.0 결과를 검토해 승인된 GPU 예산으로 인계하면 `v211_body_head_128_A_cuda.ipynb`를 연다. A100·T4·L4 등 사용할 수 있는 CUDA GPU 하나를 선택한다. 비교·재개에는 같은 GPU 종류와 Torch/CUDA 환경을 우선한다.
-2. Colab `/content`에 고정 `v211_body_head_tools.zip`과 기존 `v2_gpu_training_128_v1.zip`을 올린다. 로컬 스크래치에 4 GiB 이상 여유를 둔다. `DRIVE_PROJECT`를 확인하고 `RUN_V211 = True`로 바꿔 한 번 실행한다. 설정의 기본값은 `False`다.
+1. 오케스트레이션이 승인된 GPU 예산으로 인계하면 `v211_body_head_128_A_cuda_r2.ipynb`를 연다. A100·T4·L4 등 사용할 수 있는 CUDA GPU 하나를 선택한다. 비교·재개에는 같은 GPU 종류와 Torch/CUDA 환경을 우선한다.
+2. Colab `/content`에 고정 `v211_body_head_tools_r2.zip`과 기존 `v2_gpu_training_128_v1.zip`을 올린다. 로컬 스크래치에 4 GiB 이상 여유를 둔다. `DRIVE_PROJECT`를 확인하고 `RUN_V211 = True`로 바꿔 한 번 실행한다. 설정의 기본값은 `False`다.
 3. 호출 상한은 마운트 시도부터 8시간이다. 5분을 남기고 새 학습 업데이트나 평가 clip을 시작하지 않는다. 호출 논리 읽기 8 GiB, 쓰기 2 GiB를 적용한다. A feature ZIP은 총 778,972,869바이트로 호출 중 한 번만 읽어 스크래치에 복원한다. 같은 호출의 모든 seed가 이를 공유한다. Colab의 VM 종료·회수 정책에 따라 호출 상한 전에 중단될 수 있다. 미정산 호출은 다음 Drive 원장 실행 시 `interrupted_unknown`과 예약한 28,800초를 기록한다.
 
 이 경로의 실제 CUDA 시간은 미측정이다. 기존 A100 A의 body 전체 3epoch 학습 step 구간은 약 471초, body와 hand DDIM 모델 계산은 각 약 50초/validation sweep이었다. 이를 단순 환산하면 한 seed의 학습·평가 기준은 약 4.3분, 세 seed 약 13분이다. 이 비교값에는 이번 Drive 입력 전송·체크포인트 게시·NPZ 저장·새 장치의 성능 차이가 들어 있지 않다. 실행의 각 시간은 별도로 기록된다.
@@ -32,5 +32,5 @@ A의 frontend e3, body e3, hand e2를 공통 시작점으로 사용한다. 독�
 발급은 저장소 루트에서 아래 명령을 사용한다. `--output`에는 새 폴더를 지정한다.
 
 ```powershell
-python -m scripts.v211_build --source outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip --a-bundle outputs/v2_plan_inputs/gpu128_A_portable_release/v2_128_A_final_model_and_cache.zip --output outputs/v2_plan_inputs/v211_body_head_128_A_release_20261122
+python -m scripts.v211_build --source outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip --a-bundle outputs/v2_plan_inputs/gpu128_A_portable_release/v2_128_A_final_model_and_cache.zip --previous-receipt outputs/v2_plan_inputs/v211_body_head_128_A_release_20261122/receipt.json --output outputs/v2_plan_inputs/v211_body_head_128_A_cuda_startup_r2_20261122
 ```

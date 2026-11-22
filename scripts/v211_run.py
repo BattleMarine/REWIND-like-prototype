@@ -8,6 +8,7 @@ import platform
 import shutil
 import tempfile
 import time
+import traceback
 from types import SimpleNamespace
 import uuid
 
@@ -33,6 +34,75 @@ from scripts.v2_gpu_training_storage import DriveLedger, GIB, MIB, publish_json,
 DESTINATION = "reports/v211_body_head128_a_v1"
 RUN_SCHEMA = "rewind_v211_invocation_v1"
 PLAN = "rewind_v2_tuning_cpu_trial_plan_v1"
+LEGACY_INPUTS = {
+    "v2.1.1": "b7175eb71d63127ae34b5bb28073536ad70181792828d9832ddd853c673041d9",
+    "v2.1.2": "379c80f6943427bf93ea24b0429b48ac119987a5ce56f3665fcdcf7f22597002",
+}
+
+
+def resume_pins(pins, method):
+    if "resume_modules" not in pins:
+        return pins
+    bound = {key: value for key, value in pins.items() if key != "resume_modules"}
+    bound["modules"] = pins["resume_modules"]
+    if digest(bound) != LEGACY_INPUTS[method]:
+        raise ValueError("v2_tuning_legacy_resume_inputs")
+    return bound
+
+
+def exception_details(phase, exc):
+    return {"phase": phase, "type": type(exc).__name__, "message": str(exc)[:1000],
+            "traceback": "".join(traceback.format_exception(exc))[-16384:]}
+
+
+def record_failure(report, exc):
+    report.setdefault("error", str(exc)[:1000])
+    if "failure" not in report:
+        report["failure"] = exception_details(report["phase"], exc)
+
+
+def initialize_cuda(started, report):
+    report["phase"] = "cuda_validate"
+    index = 0
+    count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    if count != 1 or not 0 <= index < count or not 0 < time.monotonic()-started < 600:
+        raise RuntimeError(f"v211_single_cuda_and_start_time (index={index}, visible={count})")
+    report["phase"] = "cuda_initialize"
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.cuda.init()
+    if torch.cuda.current_device() != index:
+        raise RuntimeError(f"v2_tuning_unexpected_cuda_current_device (expected={index})")
+    device = torch.device("cuda", index)
+    properties = torch.cuda.get_device_properties(index)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    seed_run(42)
+    report["environment"] = {"gpu": properties.name, "vram_bytes": properties.total_memory,
+                             "python": platform.python_version(), "torch": str(torch.__version__),
+                             "cuda": torch.version.cuda, "precision": "fp32", "tf32": False,
+                             "deterministic_algorithms": True}
+    report["phase"] = "cuda_allocator_probe"
+    # A real, RNG-free allocation initializes the selected CUDA allocator even
+    # when the allocator backend defers per-device setup until the first use.
+    probe = torch.empty(1, device=device, dtype=torch.float32)
+    del probe
+    try:
+        torch.cuda.reset_peak_memory_stats(index)
+    except Exception as exc:
+        report["cuda_peak"] = {"scope": "worker_lifetime",
+                               "reset_failure": exception_details("cuda_peak_reset", exc)}
+    else:
+        report["cuda_peak"] = {"scope": "after_startup_probe"}
+    return device
+
+
+def collect_peak(device, report):
+    try:
+        report["peak_gpu_bytes"] = {"allocated": torch.cuda.max_memory_allocated(device.index),
+                                   "reserved": torch.cuda.max_memory_reserved(device.index)}
+    except Exception as exc:
+        report["peak_gpu_bytes"] = None
+        report["cuda_peak"]["read_failure"] = exception_details("cuda_peak_read", exc)
 
 
 class TrialLedger(DriveLedger):
@@ -87,7 +157,8 @@ def restore_features(project, work, pins, pipeline, ledger):
     return store, allocated
 
 
-def trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy=v211_trial):
+def trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy=v211_trial,
+           *, bound_modules=None):
     plan = pins["trial_plan"]
     best = {role: info["sha256"] for role, info in pipe.progress["best"].items()}
     if best != plan["common"]["selected_model_sha256"] or pipe.cfg["teacher"]["sampling_steps"] != 10:
@@ -101,7 +172,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
         if len(ordered) != UPDATES or len(set(ordered)) != UPDATES:
             raise ValueError("v211_train_coverage")
         basis = {"method": strategy.METHOD, "seed": seed, "plan": plan["content_sha256"], "reference": FINAL,
-                 "source": pins["base"]["source_sha256"], "modules": pins["modules"], "original_model": best,
+                 "source": pins["base"]["source_sha256"], "modules": bound_modules or pins["modules"], "original_model": best,
                  "feature_identity": FEATURE, "feature_groups_sha256": digest(pins["groups"]),
                  "ordered_train_clips_sha256": digest(ordered), "trajectory": TRAJECTORY,
                  "training": TRAINING, "trainable": list(strategy.TRAINABLE), "comparison_common": plan["common"]}
@@ -140,44 +211,41 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
 
 
 def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA):
+    device = initialize_cuda(args.started, report)
     elapsed = time.monotonic()-args.started
-    if not torch.cuda.is_available() or torch.cuda.device_count() != 1 or not 0 < elapsed < 600:
-        raise RuntimeError("v211_single_cuda_and_start_time")
-    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-    device = torch.device("cuda:0")
-    torch.backends.cuda.matmul.allow_tf32 = False
-    torch.backends.cudnn.allow_tf32 = False
-    seed_run(42)
-    torch.cuda.reset_peak_memory_stats(device)
-    properties = torch.cuda.get_device_properties(device)
-    environment = {"gpu": properties.name, "vram_bytes": properties.total_memory, "python": platform.python_version(),
-                   "torch": str(torch.__version__), "cuda": torch.version.cuda, "precision": "fp32",
-                   "tf32": False, "deterministic_algorithms": True}
-    report.update(environment=environment, startup_seconds=elapsed, trials={})
+    environment = report["environment"]
+    report.update(phase="worker_input_validation", startup_seconds=elapsed, trials={})
+    print(f"CUDA worker ready on {device} ({environment['gpu']}), peak scope={report['cuda_peak']['scope']}", flush=True)
     project, work = args.project.resolve(strict=True), args.work.resolve(strict=True)
     if work.is_relative_to(project) or (project/"reports").resolve(strict=True) != project/"reports":
         raise ValueError("v211_project_or_scratch")
     for name, sha in pins["modules"].items():
         if _hash_file(Path(__file__).resolve().parent/name) != sha:
             raise ValueError("v211_overlay_sha256")
+    bound = resume_pins(pins, strategy.METHOD)
+    report["release"] = {"executed_modules": pins["modules"], "executed_inputs_sha256": digest(pins),
+                         "resume_inputs_sha256": digest(bound)}
     base = pins["base"]
     identity = identity_for("A", base)
     target = folder(project/destination)
     cfg = training_config(42)
     limits = {**cfg, "resources": {**cfg["resources"], "read_bytes": 8*GIB, "write_bytes": 2*GIB},
               "terminal_reserve_seconds": 300}
+    report["phase"] = "drive_writer"
     with writer(target, args.recover_writer) as owner:
         diag = folder(target/"diagnostics")
         usage = folder(target/"usage")
-        ledger = TrialLedger(usage, {"method": strategy.METHOD, "parent": identity, "inputs": digest(pins)}, limits, owner)
+        ledger = TrialLedger(usage, {"method": strategy.METHOD, "parent": identity, "inputs": digest(bound)}, limits, owner)
         failure = None
         try:
             with ledger.session(args.started):
+                report["phase"] = "parent_validate_inputs"
                 step, reference = inputs(project, pins, identity, strategy)
                 doc, spec, plan = load_inputs(SimpleNamespace(invocation=work, workspace=work, slot="A"), base)
                 journal, anchor, entries = read_journal(project, doc, spec, base, ledger)
                 cache = FullCache(work/"cache-metadata-only", journal, anchor, entries, spec, cfg, ledger)
                 try:
+                    report["phase"] = "parent_restore_checkpoint"
                     data = FullData(doc, spec, cfg, plan, cache, ledger, base["source_sha256"])
                     pipe = Training(cfg, data, work/"unused", device, work/"run", target, ledger, owner, identity)
                     pipe.binding["environment"] = {k: v for k, v in step["environment"].items()
@@ -191,27 +259,31 @@ def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run
                     if pipe.last != step["last"] or any(pipe.progress[k] != v for k, v in step["cursor"].items()):
                         raise ValueError("v211_A_resume_cursor")
                     report["parent_prepare_seconds"] = time.monotonic()-args.started-elapsed
-                    trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy)
+                    report["phase"] = "trials"
+                    trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy,
+                           bound_modules=bound["modules"])
                 finally:
                     cache.close()
-            report["status"] = "completed"
+            report.update(status="completed", phase="completed")
         except BaseException as exc:
             failure = exc
-            report.update(status="stopped" if isinstance(exc, KeyboardInterrupt) else
-                          "paused" if isinstance(exc, TimeoutError) else "failed", error=str(exc)[:1000])
+            report["status"] = ("stopped" if isinstance(exc, KeyboardInterrupt) else
+                                "paused" if isinstance(exc, TimeoutError) else "failed")
+            record_failure(report, exc)
             raise
         finally:
             report["elapsed_seconds"] = time.monotonic()-args.started
-            report["peak_gpu_bytes"] = {"allocated": torch.cuda.max_memory_allocated(device),
-                                       "reserved": torch.cuda.max_memory_reserved(device)}
+            collect_peak(device, report)
             try:
                 report["usage"] = ledger.snapshot()["invocations"][-1]
                 report["diagnostic"] = f"invocation-{uuid.uuid4().hex}.json"
                 publish_json(diag/report["diagnostic"], run_schema, report, owner)
                 report["diagnostic_verified"] = True
             except Exception as exc:
-                report.update(diagnostic_verified=False, diagnostic_error=str(exc)[:512])
+                report.update(diagnostic_verified=False, diagnostic_error=str(exc)[:512],
+                              diagnostic_failure=exception_details("drive_diagnostic_publish", exc))
                 if failure is None:
+                    report["phase"] = "drive_diagnostic_publish"
                     raise
 
 
@@ -222,11 +294,11 @@ def main(run_worker=run, description=__doc__):
     parser.add_argument("--started", type=float, required=True)
     parser.add_argument("--recover-writer", default="")
     args = parser.parse_args()
-    report = {"status": "failed"}
+    report = {"status": "failed", "phase": "read_worker_pins"}
     try:
         run_worker(args, json.loads(_regular_read(args.pins, 2*MIB)), report)
     except BaseException as exc:
-        report.setdefault("error", str(exc)[:1000])
+        record_failure(report, exc)
         raise
     finally:
         _atomic(args.work/"result.json", canonical(report))
