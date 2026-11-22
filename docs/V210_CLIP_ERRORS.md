@@ -40,3 +40,7 @@ python -m scripts.v210_tail_build --output <새-발급-폴더>
 ```
 
 첫 명령은 CPU 검사를 수행하고 결과 크기와 SHA를 출력한다. 둘째 명령은 새 실행을 시작하지 않고 노트북과 발급 `receipt.json`을 만든다.
+
+## Colab 재현 결과
+
+18그룹·421클립·16,425프레임 분석이 종료 코드 0으로 완료됐다. 회수한 CSV·JSON은 로컬 검산본과 바이트 단위로 일치했다. 결과 영수증은 `outputs/v2_plan_inputs/v210_tail_root_verified_20261122/colab-result.json`에 보존했다(SHA-256 `0f75637fb5e512bb9e11c6f503c6efc6942134f5f7e28bf1ba541c280d4fda2d`).
