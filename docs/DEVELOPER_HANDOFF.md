@@ -1,6 +1,6 @@
 # 디벨로퍼 공용 인계
 
-2026-11-23 · 디벨로퍼1이 만든 v2.5 평가 노트북을 검토하고 테스트 세션에 인계했다. [고정본과 영수증](../outputs/v2_plan_inputs/v25_ddim2_selected_head_128_A_retention_r2_20261123/)의 노트북 SHA-256은 `1a20252018e6ed301b6401f0ff79acb29b05e3dec29993da516cc9ca5a4c8376`이다. Drive 게시 실패 시 로컬 작업 폴더가 유지된다. GPU 결과 회수 대기. [평가 범위](EXPERIMENT_RESULTS_REPORT.md#v25-조합-평가--2026-11-23).
+2026-11-23 · 디벨로퍼1이 만든 v2.5 평가 노트북을 검토하고 테스트 세션에 인계했다. [고정본과 영수증](../outputs/v2_plan_inputs/v25_ddim2_selected_head_128_A_retention_r2_20261123/)의 노트북 SHA-256은 `1a20252018e6ed301b6401f0ff79acb29b05e3dec29993da516cc9ca5a4c8376`이다. Drive 게시 실패 시 로컬 작업 폴더가 유지된다. GPU 결과 4개를 회수하고 크기·SHA를 확인했다. 종합 오차 196.31 mm. [평가 범위](EXPERIMENT_RESULTS_REPORT.md#v25-조합-평가--2026-11-23).
 
 2026-11-23 · [v2.2 추가 seed R2](V220_FINAL_SEEDS.md)의 파일 SHA와 원장 예산 적용을 검토하고 테스트 세션에 사전 인계했다. GT 전용·혼합 각각 seed 137·181을 한 호출에 실행할 수 있도록 논리 읽기 16GiB·쓰기 8GiB를 배정했다. 기존 세 seed의 결과를 재사용한다. GPU 실행은 조건부 대기다.
 
