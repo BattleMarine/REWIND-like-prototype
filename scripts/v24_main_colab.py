@@ -152,3 +152,4 @@ def run_v24_main(project_setting, arm, seed, before, after, resume, resume_sha, 
                 print("v2.4 local recovery directory:", work, flush=True)
             elif work is not None:
                 shutil.rmtree(work)
+    return {"path": str(output / "result.json"), "status": result["status"], **pin}
