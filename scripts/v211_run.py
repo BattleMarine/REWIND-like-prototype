@@ -212,7 +212,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
 
 
 def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA, seeds=SEEDS,
-        trial_runner=trials):
+        trial_runner=trials, io_limits=None):
     device = initialize_cuda(args.started, report)
     elapsed = time.monotonic()-args.started
     environment = report["environment"]
@@ -231,13 +231,17 @@ def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run
     identity = identity_for("A", base)
     target = folder(project/destination)
     cfg = training_config(42)
-    limits = {**cfg, "resources": {**cfg["resources"], "read_bytes": 8*GIB, "write_bytes": 2*GIB},
+    limits = {**cfg, "resources": {**cfg["resources"], **({"read_bytes": 8*GIB, "write_bytes": 2*GIB}
+                                                       if io_limits is None else io_limits)},
               "terminal_reserve_seconds": 300}
+    ledger_binding = {"method": strategy.METHOD, "parent": identity, "inputs": digest(bound)}
+    if io_limits is not None:
+        ledger_binding["io_limits"] = io_limits
     report["phase"] = "drive_writer"
     with writer(target, args.recover_writer) as owner:
         diag = folder(target/"diagnostics")
         usage = folder(target/"usage")
-        ledger = TrialLedger(usage, {"method": strategy.METHOD, "parent": identity, "inputs": digest(bound)}, limits, owner)
+        ledger = TrialLedger(usage, ledger_binding, limits, owner)
         failure = None
         try:
             with ledger.session(args.started):
