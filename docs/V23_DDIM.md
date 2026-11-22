@@ -16,7 +16,7 @@ v2-128-A의 frontend e3·body e3·hand e2를 고정한다. Body와 hand의 결�
 
 ## 고정 입력과 실행
 
-동결 128 source ZIP `v2_gpu_training_128_v1.zip`의 SHA-256은 `9a68d8e45bcf3abf6fab3004740faa6805d4ce3fda5118c3a7102011937849d8`다. 작은 `v23_ddim_128_A_tools.zip`에는 고정 v2.1.0 평가 모듈과 v2.3 전용 모듈이 있다. A 전체 공유 ZIP의 업로드는 필요 없다.
+동결 128 source ZIP `v2_gpu_training_128_v1.zip`의 SHA-256은 `9a68d8e45bcf3abf6fab3004740faa6805d4ce3fda5118c3a7102011937849d8`다. 새 발급본은 `outputs/v2_plan_inputs/v23_ddim_128_A_write4g_release_20261123`에 있다. `v23_ddim_128_A_tools_write4g.zip`에는 고정 v2.1.0 평가 모듈과 v2.3 전용 모듈이 있다. 최초 2 GiB 발급본은 `outputs/v2_plan_inputs/v23_ddim_128_A_cpu_verified_release_20261122`에 보존한다.
 
 | Drive 원본 | 고정 기준 |
 | --- | --- |
@@ -24,19 +24,21 @@ v2-128-A의 frontend e3·body e3·hand e2를 고정한다. Body와 hand의 결�
 | A의 `features/9588afef53e4802089baf7c51235f18068d110d02b1cac8ca6371b8d7aa5e276/` | 129–146번 그룹 marker와 ZIP, 파일별 SHA. 129번에 포함된 train 클립은 로드한 파일 묶음에서 validation 입력과 분리한다. |
 | `reports/cache/v2_cpu_cache_041837Z/`, `reports/cache/v2_bulk_cache_041837Z/` | 캐시 catalog와 boundary marker를 읽어 원본 입력 identity의 고정 경계 `dc79219153d69f44020e0c42f9f3ede6cd3add179211f6c300345b2416dab511`를 확인한다. |
 
-1. 검토·승인 후 `v23_ddim_128_A_cuda_20261122.ipynb`를 Colab에서 열고 CUDA GPU 하나를 선택한다. source와 tools ZIP을 `/content`에 올려 발급 receipt의 SHA와 대조한다.
+1. 검토·승인 후 `v23_ddim_128_A_cuda_write4g_20261123.ipynb`를 Colab에서 열고 CUDA GPU 하나를 선택한다. source와 새 tools ZIP을 `/content`에 올려 발급 receipt의 SHA와 대조한다.
 2. `DRIVE_PROJECT`를 확인한다. 기본 OFF인 `RUN_V23`을 켜고 설정 셀과 실행 셀을 순서대로 실행한다. 새로 지정하는 GPU에서 비교 세 설정을 같은 호출로 실행한다.
-3. 출력은 `reports/v23_ddim128_a_v1/run-<UUID>/`에 새로 쓴다. 마지막에 표시되는 `result.json` 경로와 SHA-256을 회수한다. `status=completed`와 `worker-result.json`·`quality.json`·`latency.json`의 SHA와 크기를 함께 확인한다. 시간 또는 오류로 중단하면 이미 완성된 파일과 가능한 오류 기록을 별도 UUID에 보존한다. 다음 실행은 별도로 승인한다.
+3. 출력은 `reports/v23_ddim128_a_write4g_v2/run-<UUID>/`에 새로 쓴다. 마지막에 표시되는 `result.json` 경로와 SHA-256을 회수한다. `status=completed`와 `worker-result.json`·`quality.json`·`latency.json`의 SHA와 크기를 함께 확인한다. 시간 또는 오류로 중단하면 이미 완성된 파일과 가능한 오류 기록을 별도 UUID에 보존한다. 다음 실행은 별도로 승인한다.
 
 ## 비용과 중단 조건
 
 | 항목 | 계획·상한 |
 | --- | --- |
 | 시간 | 마운트 최대 120초. 전체 목표 상한 3,600초. worker는 마지막 150초를 새 평가·샘플링 시작 전에 예약한다. controller는 종료 신호와 보관을 위해 마지막 35초 전까지 기다린다. |
-| 읽기·저장 | A 복구 ZIP 435,178,624바이트와 validation 특징 ZIP 18개를 한 번씩 읽는 것이 주 payload다. 정확한 특징 합계는 발급 receipt에 있다. 그 밖에 캐시 경계 메타데이터와 작은 원본 영수증을 읽는다. worker 논리 읽기·쓰기 상한은 각각 2GiB이며 로컬 복구·보관과 Drive 결과 보관은 별도 계측한다. Drive 보고서는 파일당 2MiB, 로컬 여유 공간은 시작 시 4GiB다. |
+| 읽기·저장 | Worker 논리 읽기 2 GiB, 논리 쓰기 4 GiB. A 복구 ZIP 435,178,624 B와 validation feature ZIP 18개 합계 93,450,466 B를 읽는다. 시작 시 로컬 여유 4 GiB와 worker 결과 파일당 2 MiB 한도를 적용한다. |
 | 연산량 | 품질 평가 `421 × (10+5+2) × 2 = 14,314`회와 시간 비교 warm-up·실측 `3 × (1+5) × (10+5+2) × 2 = 612`회 denoiser forward를 계획한다. |
 
 기존 T4 v2.1.0의 10-step 품질 1회 호출(준비 포함)은 약 19.35분이었다. 같은 범위의 샘플링 1.7배를 단순 적용한 값은 약 33분이며 실제 v2.3 시간은 장치·I/O·결과 처리에 따라 달라진다. 예산·시간·해시·split·가중치·GPU 초기화 중 어느 하나라도 검증에 실패하면 성공 조건을 충족하지 않는다. VM 유실 시 `started.json`까지만 보존될 수 있다.
+
+쓰기 산정에는 A ZIP 복사 435,178,624 B, A 복원 추출 상한 1 GiB, feature ZIP 93,450,466 B, 18개 feature 그룹의 추출 상한 576 MiB, 결과와 Drive 보관 여유 32 MiB를 포함했다. 합계는 2,239,905,122 B(약 2.09 GiB)이며 4 GiB 한도에서 2,055,062,174 B(약 1.91 GiB)가 남는다. 원장은 A 복사·추출 예약을 논리 쓰기에 반영한다. Feature 임시 저장과 결과 보관은 기존 경로의 구간별 파일 상한을 적용하며, 산정표에는 여유를 위해 합산했다. 150초 worker 여유와 35초 supervisor 종료·보관 여유를 유지한다. 계산은 상한 기준이며 실제 Drive 쓰기량은 실행 후 확인한다.
 
 ## 로컬 발급
 

@@ -66,7 +66,7 @@ def run_v23_notebook(project_setting, pins, *, mock_mount=None, mock_upload=None
             pin_file.write_text(json.dumps(pins), encoding="utf-8")
             command = [sys.executable, "-u", "-m", "scripts.v23_run", "--project", str(project),
                        "--work", str(work), "--pins", str(pin_file), "--started", str(started)]
-            remaining = time_left() - 35
+            remaining = time_left() - pins["limits"].get("supervisor_reserve_seconds", 35)
             if remaining <= 0:
                 raise TimeoutError("v2.3 preparation exceeded budget")
             error = None

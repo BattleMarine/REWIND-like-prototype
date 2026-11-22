@@ -32,9 +32,10 @@ from scripts.v23_eval import STEPS, benchmark, prepare, quality
 SECONDS = 3600
 TERMINAL_RESERVE = 150
 READ_CAP = 2 * GIB
+WRITE_CAP = 4 * GIB
 WORKSPACE_FREE = 4 * GIB
 RESULT_CAP = 2 * MIB
-DESTINATION = "v23_ddim128_a_v1"
+DESTINATION = "v23_ddim128_a_write4g_v2"
 
 
 def gpu(started, report):
@@ -149,6 +150,9 @@ def run(args, pins, report):
     for name, pin in pins["modules"].items():
         if _hash_file(Path(__file__).resolve().parent / name) != pin:
             raise ValueError("v23_fixed_module_sha256")
+    fixed = pins["limits"]
+    if fixed["worker_logical_write_bytes"] not in (2 * GIB, WRITE_CAP):
+        raise ValueError("v23_fixed_worker_write_cap")
     report["phase"] = "initialize_cuda"
     device = gpu(args.started, report)
     report["phase"] = "fixed_parent_evidence"
@@ -156,7 +160,8 @@ def run(args, pins, report):
     cfg = training_config(42)
     limits = {**cfg, "seconds_per_invocation": SECONDS, "external_timeout_seconds": SECONDS,
               "terminal_reserve_seconds": TERMINAL_RESERVE,
-              "resources": {**cfg["resources"], "read_bytes": READ_CAP, "write_bytes": 2 * GIB}}
+              "resources": {**cfg["resources"], "read_bytes": READ_CAP, "write_bytes": fixed["worker_logical_write_bytes"]}}
+    report["logical_io_limits"] = {kind: limits["resources"][f"{kind}_bytes"] for kind in ("read", "write")}
     binding = {"parent": identity, "checkpoint_receipt": FINAL, "weights": reference["binding"]["model"],
                "source": pins["base"]["source_sha256"], "overlay": pins["modules"], "feature_identity": FEATURE,
                "quality_scope": "official_validation", "sampling_steps": list(STEPS), "eval_seed": 71}
