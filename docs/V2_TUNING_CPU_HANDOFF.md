@@ -87,3 +87,9 @@ Drive의 `reports/v2_tuning_cpu_20261122/run-a44c960bc16f4938ab42d69abe3806d8`�
 2026-11-22 · 309.31초, 종료 코드 0. 공식 split은 train 119,586페어, validation 16,425페어, test 0페어다. 캐시 1,063개와 특징 그룹 147개의 기록과 파일 크기를 대조했고, 각 종류의 첫 파일과 마지막 파일은 SHA-256 및 내용까지 검사했다. 원본 motion 독립성은 미검증이다.
 
 Drive 실행 ID는 `run-dc960ea39e9543b99f753d0bcb01258a`, 로컬 원본은 `outputs/v2_plan_inputs/v2_tuning_cpu_inputs_dc960ea3/`다. SHA-256은 invocation-result `7a394b93432fe7181c76390f0a1b2f6de5981548d38306891375cf1c52d821a7`, process-result `03ada87a8710c18d1c4f3d4ab87567f7e751ea9dee4b70b2026f7958caf6f4f9`, report `05de5d109cecf05e2e4f0bdaf48df7fd342bd52a90b4965b3ae0897cd58d1a50`다.
+
+## Colab trials 결과
+
+2026-11-22 · 26.7초, 종료 코드 0. A 최종 ZIP(435,178,624바이트)과 내부 8개 파일의 SHA 및 선택 가중치 strict load를 확인했다. 저장된 CUDA RNG 상태를 CPU로 읽었고 합성 AdamW 실행에서 중단 후 재개와 연속 실행이 일치했다. 9회 선별·최대 13회 비교는 합성 결과로 선정 절차를 점검한 범위다. GPU 학습 성능 및 실제 CUDA 재개 결과는 해당 시험에서 별도로 확인한다.
+
+Drive 실행 ID `run-be042cbb005a44fe8a4e7b6bfeb9092c`, 로컬 보존 위치 `outputs/v2_plan_inputs/v2_tuning_cpu_trials_be042cbb/`. invocation-result SHA-256 `eb13ab45d1676f11150f0cfc7f603ef75a9c3bb45b23113ce3273d341ea422ce`, process-result `d3dfde2db71faa8c5c707c4be0f90c6cd00c7a59b87709ed7018a8bbc5bfcf11`, report `be0858a56369450061fbdcc27e2cc268c1a6433ac29696072217c1484979bf6d`. trial-plan 파일 SHA `03f8c3dea1d825e4870580d4f0e69850d7f1a814cdbb2ac6618549583973e3ef`이며 v2.1.1 R2의 계획과 바이트 단위로 일치한다.
