@@ -1,5 +1,7 @@
 # v2.1.3 · 128 A body 전체 미세조정
 
+2026-11-22 중간 결과 · v2.1.3 seed 42의 봉인된 첫 호출 진단에서 세 시나리오 몸·전역 손 점수를 동일 가중 평균하면 246.0021 mm다. 같은 seed의 출력층 209.2583, LoRA 210.4687 mm보다 높다. 42는 완료, 71 시작 전 쓰기 예산 정지. 세 seed 종합 판정은 보류한다. 원본은 `outputs/v2_plan_inputs/v213_r2_interim_20261122/invocation-0b9c02805bdd400b916284bd95840b79.json` (SHA-256 `01924e1c151de9b2984bdd7351fec3b72a34daa985c5395a4a31258a76e64d96`).
+
 v2-128-A의 선택 frontend e3·body e3·hand e2에서 각 seed를 독립적으로 시작한다. Body 파라미터 99개 텐서, 15,010,822개 FP32 값을 모두 학습한다. 예측 2D feature와 hand 가중치는 A를 사용하며, hand의 상체 입력은 해당 trial body에서 예측한다. Seed 42·71·103은 각각 공식 train 3,097클립·119,586페어를 1epoch, batch 1, Adam `5e-5`로 학습한다. 앞선 두 방식과 같은 clip 셔플·teacher timestep/epsilon·손실·평가 noise를 사용한다. [v2 튜닝 설계](V2_TUNING_DESIGN.md)
 
 평가는 공식 validation 421클립·16,425 실제 프레임, seed 71, DDIM 10, FP32·TF32 OFF로 진행한다. 기존 분해 함수가 body·hand-global MPJPE와 A 대비 차이, 좌우 손목·상대 손가락·전역 손가락 및 교차항을 갱신한다. 세 시나리오의 body·hand-global MPJPE 6개를 동일 가중 평균한다. 예측·GT·mask·키를 평가 그룹 NPZ로 보관한다. `summary.json`의 `measurement`는 공통 CPU 선별기에 전달할 수 있다. [공식 분해와 mask](V210_EVAL.md)
