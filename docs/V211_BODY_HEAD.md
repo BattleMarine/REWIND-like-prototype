@@ -34,3 +34,18 @@ CUDA 시작 수정 R2 발급 폴더는 `outputs/v2_plan_inputs/v211_body_head_12
 ```powershell
 python -m scripts.v211_build --source outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip --a-bundle outputs/v2_plan_inputs/gpu128_A_portable_release/v2_128_A_final_model_and_cache.zip --previous-receipt outputs/v2_plan_inputs/v211_body_head_128_A_release_20261122/receipt.json --output outputs/v2_plan_inputs/v211_body_head_128_A_cuda_startup_r2_20261122
 ```
+
+## T4 전체 학습 결과
+
+2026-11-22 · R2, FP32, 세 seed 각각 3,097회 업데이트 및 421클립·16,425프레임 validation 완료. 종합은 세 환경의 body·hand-global 동일 가중 평균, 나머지는 전체 유효 관절의 pooled MPJPE(mm)다.
+
+| seed | 종합 | body | 왼손목 | 오른손목 | 전역 손가락 | 손목 기준 손가락 |
+|---|---:|---:|---:|---:|---:|---:|
+| 부모 A | 219.72 | 164.00 | 244.76 | 234.50 | 276.13 | 93.72 |
+| 42 | 209.26 | 150.27 | 227.14 | 220.44 | 267.95 | 95.70 |
+| 71 | 207.12 | 148.46 | 225.74 | 217.80 | 266.01 | 95.87 |
+| 103 | 211.68 | 150.55 | 236.48 | 218.60 | 272.05 | 94.91 |
+
+세 회차 종합 평균 209.35 mm, 표본 표준편차 2.28 mm. seed 71이 이 방식 내 validation 최저다. 다음 비교는 같은 A에서 시작하는 v2.1.2이며 세 방식 중 최종 선정은 대기 중이다. 총 1,161.06초, 부모 준비 41.49초, 147개 특징 그룹 복원 283.74초였다.
+
+원본은 `outputs/v2_plan_inputs/v211_r2_t4_results_20261122/`에 보존했다. invocation 파일 SHA-256 `60729b6e8f8221fb5b01b0cf431e79268eee0a3b59124f029c4ef027f13e5fd4`. seed 순서 42/71/103의 summary 파일 SHA는 `32d9f1f61e140003dea811663ba5e6bb6e46226159be2f4097f83e50dd0b3352`, `e88911c078a1d6d0fec3db843114f08dc84c338592dfe81bfa3d437f46e0b4f3`, `bb46ceeb2a545b4bf26f7b0c3838ceb4732ea2d7711ce0425b001ee191504507`이다. 요약 봉인과 점수가 진단과 일치한다. 최종 head·fit과 예측 그룹의 별도 회수는 진행 중이다.
