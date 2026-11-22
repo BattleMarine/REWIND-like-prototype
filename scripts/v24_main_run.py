@@ -19,7 +19,7 @@ from rewind_v1.full_data import FeatureStore
 from rewind_v1.v2_budget import Ledger
 from scripts.run_v2_gpu_training import training_config
 from scripts.v210_eval import FEATURE, FINAL, feature_group, group_keys
-from scripts.v210_metrics import aggregate
+from scripts.v210_metrics import aggregate_scores
 from scripts.v23_run import gpu, parent_evidence, restored_parent, verified_write
 from scripts.v24_body import ARMS, LEARNING_RATE, draw, model_sha, setup, update
 from scripts.v24_run import frame_probe, validate
@@ -145,7 +145,7 @@ def evaluate(context, stage, arm, hand, requested, validation, reference, group_
             scored = validate(context, stage, arm, hand, clips, keys, check)
             found.update((tuple(row["key"]), row) for row in scored["clips"])
     rows = [found[k] for k in requested]
-    metrics = aggregate([(tuple(row["key"]), row["scores"]) for row in rows], context.spec, reference)
+    metrics = aggregate_scores(((row["key"], row["scores"]) for row in rows), reference)
     real_frames = sum(row["real_frames"] for row in rows)
     if real_frames != (16425 if len(requested) == 421 else 300):
         raise ValueError("v24_main_validation_frames")

@@ -18,8 +18,8 @@ from scripts.v24_main_run import (BOOTSTRAP_AND_PUBLICATION_CAP, BOUNDARIES, GIB
 ROOT = Path(__file__).resolve().parents[1]
 PILOT_PLAN_SHA = "d2976020b429550e2868baac65ef3b22db3ee3b97044cfef0e4d462d386b9681"
 PILOT_RESULT_SHA = "c2c0f786ffd4032c98c50e1a0b557877bdfa82dde485c00419a897e616670c6d"
-NOTEBOOK = "v24_main128_A_paired_candidate_20261123.ipynb"
-TOOLKIT = "v24_main128_A_tools_candidate_20261123.zip"
+NOTEBOOK = "v24_main128_A_paired_candidate_metrics_r2.ipynb"
+TOOLKIT = "v24_main128_A_tools_metrics_r2.zip"
 
 
 def sha(raw):
@@ -65,7 +65,7 @@ def build(source, pilot, r2, output, gpu=None):
         modules = {name: archive.read(name) for name in prior["modules"]}
     if {name: sha(data) for name, data in modules.items()} != prior["modules"]:
         raise ValueError("Fixed R2 module mismatch")
-    for name in ("v24_body.py", "v24_main_run.py"):
+    for name in ("v24_body.py", "v24_main_run.py", "v210_metrics.py"):
         modules[name] = script(name).encode()
         compile(modules[name], name, "exec")
     binding = json.loads((pilot / "pilot-plan.json").read_bytes())["binding"]

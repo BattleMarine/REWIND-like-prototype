@@ -113,9 +113,13 @@ def merge(parts):
 
 
 def aggregate(segments, spec, reference):
+    return aggregate_scores(((key, sums(arrays, spec)) for key, arrays in segments), reference)
+
+
+def aggregate_scores(segments, reference):
     by_scene = defaultdict(list)
-    for key, arrays in segments:
-        by_scene[key[0].split("/",1)[0]].append(sums(arrays,spec))
+    for key, scores in segments:
+        by_scene[key[0].split("/",1)[0]].append(scores)
     scores = {name:merge(parts) for name,parts in sorted(by_scene.items())}
     def equal_weight(values):
         values = list(values)
