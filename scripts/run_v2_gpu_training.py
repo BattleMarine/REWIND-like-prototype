@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import time
+from types import SimpleNamespace
 
 import torch
 
@@ -47,7 +48,7 @@ def identity_for(mode, pins):
             "config": digest(training_config(seed))}
 
 
-def load_inputs(args, pins):
+def load_inputs(args, pins, *, config=training_config, require_full_local_cache=True):
     suite = contract.ROOT
     if digest(contract.source()) != pins["training_core_sha256"]:
         raise ValueError("v2_gpu_training_core_pin")
@@ -57,14 +58,15 @@ def load_inputs(args, pins):
     extract_pinned_zip(suite / pins["embedded_manifest"], pins["archive_sha256"], args.invocation / "manifest",
                        max_zip_bytes=ARCHIVE_CAP, max_output_bytes=MANIFEST_CAP, max_members=1)
     doc, spec = read_manifest(args.invocation / "manifest" / MANIFEST_NAME, pins, suite / "reference")
-    plan = contract.plan(doc, spec, training_config(SEEDS[args.slot]), args.workspace)
+    cfg = config(SEEDS[args.slot])
+    plan = contract.plan(doc, spec, cfg, args.workspace)
     n = plan["train_updates_per_epoch_at_batch2"]*3
     splits = {p: [r for r in plan["clips"] if r["split"] == p] for p in ("train", "validation")}
     if (n != 197961 or len(splits["train"]) != 3097 or len(splits["validation"]) != 421
             or sum(r["train"] for r in plan["counts"].values()) != 119586
             or sum(r["validation"] for r in plan["counts"].values()) != 16425
-            or plan["estimated_feature_bytes"] > RESOURCE_LIMITS["feature_bytes"]
-            or plan["estimated_cache_bytes"] > RESOURCE_LIMITS["cache_bytes"]):
+            or plan["estimated_feature_bytes"] > cfg["resources"]["feature_bytes"]
+            or require_full_local_cache and plan["estimated_cache_bytes"] > cfg["resources"]["cache_bytes"]):
         raise ValueError("v2_gpu_training_coverage_or_resources")
     return doc, spec, plan
 
@@ -87,7 +89,16 @@ def read_journal(project, doc, spec, pins, ledger):
     return journal, anchor, entries
 
 
-def run(args, pins, report):
+def open_cache128(args, project, doc, spec, pins, cfg, ledger, drive, owner):
+    journal, anchor, entries = read_journal(project, doc, spec, pins, ledger)
+    return FullCache(args.workspace / "cache", journal, anchor, entries, spec, cfg, ledger), len(entries)
+
+
+PROFILE_128 = SimpleNamespace(run_folder=RUN_FOLDER, config=training_config, identity=identity_for,
+                              load_inputs=load_inputs, open_cache=open_cache128, data=FullData)
+
+
+def run(args, pins, report, profile=PROFILE_128):
     if not 0 < args.started <= time.monotonic() or time.monotonic()-args.started >= 600:
         raise TimeoutError("v2_gpu_start_time_mount_or_bootstrap")
     if args.resume_tip and not re.fullmatch(r"[0-9a-f]{64}", args.resume_tip):
@@ -101,7 +112,7 @@ def run(args, pins, report):
     device = torch.device("cuda:0")
     torch.ones((1,), device=device).add_(1).cpu()
     project = args.project.resolve(strict=True)
-    parent = project / "reports" / RUN_FOLDER
+    parent = project / "reports" / profile.run_folder
     if not parent.parent.is_dir() or parent.parent.resolve().parent != project or parent.is_symlink():
         raise ValueError("v2_gpu_result_parent")
     parent.mkdir(exist_ok=True)
@@ -109,8 +120,8 @@ def run(args, pins, report):
     if drive.is_symlink():
         raise ValueError("v2_gpu_seed_result_link")
     drive.mkdir(exist_ok=True)
-    identity = identity_for(args.slot, pins)
-    cfg = training_config(identity["seed"])
+    identity = profile.identity(args.slot, pins)
+    cfg = profile.config(identity["seed"])
     report.update(identity=identity, drive=str(drive), environment={"device": torch.cuda.get_device_name(device),
                   "vram_bytes": torch.cuda.get_device_properties(device).total_memory, "torch": str(torch.__version__),
                   "cuda_runtime": torch.version.cuda, "precision": "fp32"})
@@ -120,14 +131,13 @@ def run(args, pins, report):
             with ledger.session(args.started):
                 if args.slot != "A":
                     report["verified_A_first_update_sha256"] = verify_first(parent / "A-seed-42" / "checkpoints",
-                                                                            args.invocation, identity_for("A", pins), ledger, cfg)
-                doc, spec, plan = load_inputs(args, pins)
-                journal, anchor, entries = read_journal(project, doc, spec, pins, ledger)
-                report.update(counts=plan["counts"], cache_shards=len(entries), plan_sha256=plan["content_sha256"],
+                                                                            args.invocation, profile.identity("A", pins), ledger, cfg)
+                doc, spec, plan = profile.load_inputs(args, pins)
+                images, count = profile.open_cache(args, project, doc, spec, pins, cfg, ledger, drive, owner)
+                report.update(counts=plan["counts"], cache_shards=count, plan_sha256=plan["content_sha256"],
                               common_clips={k: list(v) for k, v in shared_clips(plan).items()},
                               input_setup_seconds=time.monotonic()-args.started)
-                images = FullCache(args.workspace / "cache", journal, anchor, entries, spec, cfg, ledger)
-                data = FullData(doc, spec, cfg, plan, images, ledger, pins["source_sha256"])
+                data = profile.data(doc, spec, cfg, plan, images, ledger, pins["source_sha256"])
                 pipeline = Training(cfg, data, args.workspace / "features", device, args.invocation / "run", drive,
                                     ledger, owner, identity)
                 saver = Checkpoints(drive / "checkpoints", args.invocation, identity, pipeline, cfg, ledger, owner)
@@ -152,6 +162,8 @@ def run(args, pins, report):
                     report.update(status=result["status"], timing=result["timing_this_invocation"], cache_restore=images.metrics,
                                   checkpoint_cursor=result["checkpoint_cursor"], trained_updates=result["cursor"]["updates"],
                                   gpu_peak=result.get("gpu_peak_this_invocation"))
+                    if result.get("failure"):
+                        report["pause_reason"] = result["failure"]
                     if result["status"] == "completed":
                         report["checkpoint"] = saver.save()
                         report["comparison"] = export_comparison(pipeline, drive, args.invocation, ledger, owner)
@@ -190,7 +202,7 @@ def record_failure(report, exc):
     return status
 
 
-def main(argv=None):
+def main(argv=None, *, profile=PROFILE_128):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("invocation", "workspace", "project", "pins"):
         parser.add_argument("--"+name, required=True, type=Path)
@@ -201,7 +213,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     report = {"status": "failed", "slot": args.slot}
     try:
-        run(args, json.loads(_regular_read(args.pins, 128*MIB)), report)
+        run(args, json.loads(_regular_read(args.pins, 128*MIB)), report, profile)
     except BaseException as exc:
         if record_failure(report, exc) != "paused":
             raise

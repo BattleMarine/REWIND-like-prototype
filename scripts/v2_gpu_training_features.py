@@ -10,7 +10,7 @@ import zipfile
 
 import torch
 
-from rewind_archive.contracts import canonical
+from rewind_archive.contracts import canonical, digest
 from rewind_prepare.temporal_cache import _atomic, _hash_file
 from rewind_prepare.temporal_selection import seal
 from rewind_v1.full_data import FeatureMap, FeatureStore
@@ -25,8 +25,10 @@ SCHEMA = "rewind_v2_gpu_features_group_v1"
 
 
 class PersistentFeatures(FeatureStore):
-    def __init__(self, root, data, frontend_pin, drive, cfg, ledger, owner):
+    def __init__(self, root, data, frontend_pin, drive, cfg, ledger, owner, *, size=(128, 128)):
         super().__init__(root, data, frontend_pin)
+        self.binding["size"] = list(size)
+        self.identity = digest(self.binding)
         self.drive = drive / self.identity
         self.cfg, self.ledger, self.owner = cfg, ledger, owner
         self.root.mkdir(parents=True, exist_ok=True)
@@ -93,6 +95,8 @@ class PersistentFeatures(FeatureStore):
                     shutil.move(stage / folder.name, folder)
 
     def build(self, frontend, size):
+        if list(size) != self.binding["size"]:
+            raise ValueError("v2_gpu_feature_resolution_pin")
         started = time.monotonic()
         entries = [(split, key) for split, keys in self.data.clips.items() for key in keys]
         used, made = 0, 0

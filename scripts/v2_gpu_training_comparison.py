@@ -10,6 +10,8 @@ from PIL import Image, ImageDraw
 import torch
 
 from rewind_archive.contracts import canonical
+from rewind_m1.rgb_frontend_artifacts import scale_xy
+from rewind_prepare.extracted import IMAGE_SIZE
 from rewind_prepare.temporal_cache import _hash_file
 from rewind_m3.cascade import UpperCondition
 from rewind_v1.data import attach_predicted_hands, hand_clip
@@ -34,28 +36,33 @@ def draw_clip(path, images, xy, xy_gt, xy_mask, points, gt, valid, names, spec):
     low, high = np.quantile(projection, [0.02, 0.98], axis=0)
     scale = 220 / max(float((high-low).max()), 1.)
     center = (low+high)/2
+    side = images.shape[-1]
+    if side not in (128, 256) or images.shape[-2] != side:
+        raise ValueError("v2_gpu_comparison_image_size")
     frames = []
     for t in range(len(images)):
-        frame = Image.new("RGB", (512, 148), "#161b23")
+        frame = Image.new("RGB", (2*side+256, side+20), "#161b23")
         draw = ImageDraw.Draw(frame)
         draw.text((5, 4), "L | prediction / GT", fill="white")
-        draw.text((133, 4), "R | prediction / GT", fill="white")
-        draw.text((262, 4), "3D camera XY projection | prediction / GT", fill="white")
+        draw.text((side+5, 4), "R | prediction / GT", fill="white")
+        draw.text((2*side+6, 4), "3D camera XY projection | prediction / GT", fill="white")
         for view in range(2):
             rgb = (images[t, view].transpose(1, 2, 0)*255).round().astype(np.uint8)
-            frame.paste(Image.fromarray(rgb), (128*view, 20))
+            frame.paste(Image.fromarray(rgb), (side*view, 20))
             for values, mask, color in ((xy_gt[t, view], xy_mask[t, view], "#54e596"),
                                          (xy[t, view], np.ones(xy.shape[2], dtype=bool), "#ff9b55")):
                 for x, y in values[mask]:
-                    if 0 <= x < 128 and 0 <= y < 128:
-                        draw.ellipse((128*view+x-1, 19+y, 128*view+x+1, 21+y), fill=color)
+                    if 0 <= x < side and 0 <= y < side:
+                        draw.ellipse((side*view+x-1, 19+y, side*view+x+1, 21+y), fill=color)
         for values, mask, color in ((gt[t], valid[t], "#54e596"), (points[t], np.ones(len(names), dtype=bool), "#ff9b55")):
-            q = (values[:, :2]-center)*scale*0.51 + np.array([384, 83])
+            q = (values[:, :2]-center)*scale*0.51 + np.array([2*side+128, side//2+19])
             for a, b in edges:
                 if mask[a] and mask[b]:
                     draw.line((*q[a], *q[b]), fill=color)
         frames.append(frame)
     frames[0].save(path, save_all=True, append_images=frames[1:], duration=40, loop=0)
+    if side == 256:
+        frames[0].save(path.with_suffix(".png"))
 
 
 @torch.no_grad()
@@ -66,6 +73,10 @@ def export_comparison(pipeline, drive, scratch, ledger, owner):
     sample = shared_clips(data.plan)
     binding = {"experiment": pipeline.identity, "model": pins,
                "eval_seed": EVAL_SEED, "clips": {k: list(v) for k, v in sample.items()}}
+    size = pipeline.frontend_size
+    if size == [256, 256]:
+        binding["input_size"] = size
+        binding["native_image_size"] = list(IMAGE_SIZE)
     schema = "rewind_v2_gpu_comparison_v1"
     if marker.is_file():
         doc = read_sealed(marker, schema)
@@ -107,9 +118,13 @@ def export_comparison(pipeline, drive, scratch, ledger, owner):
                 xy_gt.extend(meta["xy"].numpy() for _, meta in pair)
                 xy_mask.extend(meta["xy_valid"].numpy() for _, meta in pair)
             xy, xy_gt, xy_mask = map(np.asarray, (xy, xy_gt, xy_mask))
+            native = {}
+            if size[0] == 256:
+                native = {name: scale_xy(torch.from_numpy(value), size, IMAGE_SIZE).numpy()
+                          for name, value in (("predicted_2d_native_px", xy), ("ground_truth_2d_native_px", xy_gt))}
             np.savez_compressed(root / f"{scenario}.npz", predicted_3d_mm=points, ground_truth_3d_mm=target,
                                 valid_3d=valid, joint_names=names, predicted_2d_px=xy, ground_truth_2d_px=xy_gt,
-                                valid_2d=xy_mask, seconds=clip.seconds.numpy())
+                                valid_2d=xy_mask, seconds=clip.seconds.numpy(), **native)
             draw_clip(root / f"{scenario}.gif", np.asarray(images), xy, xy_gt, xy_mask, points, target, valid, names, data.spec)
         all_metrics = {r["stage"]: r["validation"] for r in pipeline.progress["history"]
                        if r["epoch"] == pipeline.progress["best"][r["stage"]]["epoch"]}
@@ -127,7 +142,7 @@ def export_comparison(pipeline, drive, scratch, ledger, owner):
                 if file != path:
                     archive.write(file, file.name)
         pin = {"name": name, "bytes": path.stat().st_size, "sha256": _hash_file(path, check_time=ledger.check)}
-        if pin["bytes"] > 32*MIB:
+        if pin["bytes"] > (64 if size[0] == 256 else 32)*MIB:
             raise ValueError("v2_gpu_comparison_output_cap")
         owner()
         copy_verified(path, drive / name, pin, ledger, ledger.clock()+min(120, ledger.remaining()))

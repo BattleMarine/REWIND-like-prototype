@@ -49,6 +49,8 @@ class FullCache(Cache):
 
 
 class FullData(Data):
+    image_size = (128, 128)
+
     def __init__(self, doc, spec, cfg, plan, cache, ledger, source):
         self.spec, self.doc, self.cfg, self.plan, self.ledger = spec, doc, cfg, plan, ledger
         self.cache, self.budget = cache, ledger
@@ -106,6 +108,7 @@ def merge_metrics(role, rows):
 class Training(V2Pipeline):
     def __init__(self, cfg, data, features, device, output, drive, ledger, owner, identity):
         runtime = runtime_config(cfg, data.plan)
+        runtime["frontend"]["size"] = list(data.image_size)
         self.v2cfg, self.ledger, self.owner, self.drive = cfg, ledger, owner, drive
         self.feature_root, self.identity = features, identity
         Pipeline.__init__(self, runtime, digest(cfg), data, device, output, TrainingBudget(runtime["limits"], ledger))
@@ -138,7 +141,8 @@ class Training(V2Pipeline):
             frontend = self._make_frontend()
             self._load_best("frontend", frontend)
             store = PersistentFeatures(self.feature_root, self.data, frontend_fingerprint(frontend.model),
-                                       self.drive / "features", self.v2cfg, self.ledger, self.owner)
+                                       self.drive / "features", self.v2cfg, self.ledger, self.owner,
+                                       size=self.frontend_size)
             clips, stats = store.build(frontend.model, self.frontend_size)
             self.timing.update(stats)
             self.feature_store_identity = stats["feature_identity"]

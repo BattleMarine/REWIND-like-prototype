@@ -44,3 +44,7 @@ python -m unittest discover -s tests -p test_v2_cache256.py -v
 ## 첫 장시간 호출
 
 256 호출 invocation-7u4_1_h6은 23,921.656초 동안 3→907샤드를 게시했다. 116,096페어를 보관했고 다음 샤드의 쓰기 예약이 호출당 상한에 걸려 정상 중단됐다. 전체 256 예산에서 남은 시간은 19,190초, 남은 저장 공간은 53,966,499,504바이트다. 인덱스 907에서 같은 예산으로 재개한다. 진단 SHA-256은 2381a1345b66b183b5c9f9fbd540ad89a6544d0f51ec6f7261e07839551a9988이다. 병행한 128 호출 invocation-elp89e_2는 target_reached로 1,063샤드·136,011페어에 도달했다. 진단 SHA-256은 1e3aa2b19ffc9afe31b3f87c6991229c86c924a2de7b6db213a5ca67a49c3aed이다.
+
+## 전체 캐시 완료
+
+2026-11-22 재개 호출 `invocation-rbmbenj3`가 `passed / target_reached`로 종료됐다. 마지막 156샤드를 더해 1,063샤드·136,011페어에 도달했다. Drive 사용량은 214,229,436,279바이트(199.52GiB), CPU 누적 차감은 28,609초다. 최종 경계는 `2ae0b8523c89590e48d3363b26fcca9a18cf387308b6871b1a253b8b0849e33f`다. 로컬 보존 진단은 `outputs/v2_plan_inputs/cache256_completion_1063/invocation-rbmbenj3.json`이며 SHA-256은 `765c112f0dde33414da3bd1f0d730ac20ba903d4b33dddeaceee1aa95caee9fd`다. 이 경계를 256 학습 입력으로 고정한다. [256 학습 실행 가이드](V2_GPU_TRAINING_256.md)

@@ -135,15 +135,20 @@ def write_source_zip(root, path):
             archive.writestr(entry, file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=3)
 
 
-def notebook(pins):
-    info = ("# v2 GPU 학습 · 128 전체 캐시\n\n"
-            f"Colab GPU 런타임에 `{SOURCE_NAME}`을 `/content`로 올리세요. "
+def notebook(pins, *, side=128):
+    info = (f"# v2 GPU 학습 · {side} 전체 캐시\n\n"
+            f"Colab GPU 런타임에 `{pins['source_name']}`을 `/content`로 올리세요. "
             "A(seed 42)를 먼저 실행하고, A의 `first-update.json` 및 체크포인트가 Drive에 생성된 뒤 B(71)·C(103)를 실행합니다. "
             "세 슬롯은 서로 다른 GPU 런타임을 사용합니다. 실행 스위치는 기본 OFF입니다. 한 번 실행하면 최대 8시간 동안 학습하거나 재개합니다.\n\n"
             "완료 또는 중단 시 로컬 `result.json`과 각 슬롯 Drive의 최신 `checkpoints/step-*.json`을 회수하세요. "
             "완료본에는 `comparison.json`과 비교 ZIP이 추가됩니다. GPU 소프트웨어 버전·충분한 VM 디스크와 Drive 공간을 확인하세요.\n")
     bootstrap = (ROOT / "scripts/archvis_pilot_bootstrap.py").read_text(encoding="utf-8")
-    code = bootstrap + f"\nPINS = {pins!r}\n" + RUN
+    run = RUN
+    if side == 256:
+        info += "이 노트북은 256 전용입니다. A·B·C 및 모든 체크포인트는 128 실행과 분리되며, 샤드를 필요할 때 검증해 읽습니다.\n"
+        run = (run.replace("rewind_v2_gpu_training_128_v1", "rewind_v2_gpu_training_256_v1")
+               .replace('"scripts.run_v2_gpu_training"', '"scripts.run_v2_gpu_training_256"'))
+    code = bootstrap + f"\nPINS = {pins!r}\n" + run
     compile(SETTINGS, "training-settings", "exec")
     compile(code, "training-notebook", "exec")
     return {"nbformat": 4, "nbformat_minor": 5,
