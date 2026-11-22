@@ -13,6 +13,11 @@ SEEDS = (42, 71, 103)
 TRAINING = {"learning_rate": 5e-5, "batch_size": 1, "epoch": 1}
 UPDATES = 3097
 HEAD = ("final_head.weight", "final_head.bias")
+TRAINABLE = HEAD
+BRANCH = {"scope": "body_output_weight_bias", "updates": UPDATES, **TRAINING}
+ARTIFACT_PREFIX = "head"
+FIT_SCHEMA = "rewind_v211_fit_receipt_v1"
+SUMMARY_SCHEMA = "rewind_v211_validation_v1"
 TRAJECTORY = "rewind_v2_tuning_order_noise_v1"
 STATE = "rewind_v211_body_output_head_fit_v1"
 
@@ -35,12 +40,16 @@ def head(stage):
     return result
 
 
-def begin_fit(stage):
+def begin_fit(stage, seed=None):
     stage.model.requires_grad_(False)
     weights = head(stage)
     for weight in weights.values():
         weight.requires_grad_(True)
-    stage.optimizer = torch.optim.Adam(weights.values(), lr=TRAINING["learning_rate"])
+    reset_optimizer(stage, weights.values())
+
+
+def reset_optimizer(stage, parameters):
+    stage.optimizer = torch.optim.Adam(parameters, lr=TRAINING["learning_rate"])
     stage.scheduler = torch.optim.lr_scheduler.StepLR(stage.optimizer, stage.config["scheduler_step"],
                                                       stage.config["scheduler_gamma"])
     stage.scaler = torch.amp.GradScaler("cuda", enabled=False)
@@ -60,30 +69,40 @@ def update(stage, clip, seed):
 
 
 def backbone_sha(stage):
+    return tensor_digest((name, tensor) for name, tensor in stage.model.state_dict().items() if name not in HEAD)
+
+
+def tensor_digest(items):
     hasher = hashlib.sha256()
-    for name, tensor in stage.model.state_dict().items():
-        if name in HEAD:
-            continue
+    for name, tensor in items:
         hasher.update(canonical([name, list(tensor.shape), str(tensor.dtype)]))
         hasher.update(tensor.detach().cpu().contiguous().numpy().tobytes())
     return hasher.hexdigest()
 
 
 def save_state(stage, binding, path, last_loss):
-    torch.save({"schema": STATE, "binding_sha256": digest(binding), "step": stage.step,
-                "head": {name: p.detach().cpu() for name, p in head(stage).items()},
+    save_parameters(stage, binding, path, last_loss, head(stage), STATE, "head")
+
+
+def save_parameters(stage, binding, path, last_loss, parameters, schema, field):
+    torch.save({"schema": schema, "binding_sha256": digest(binding), "step": stage.step,
+                field: {name: p.detach().cpu() for name, p in parameters.items()},
                 "optimizer": stage.optimizer.state_dict(), "scheduler": stage.scheduler.state_dict(),
                 "scaler": stage.scaler.state_dict(), "rng": rng_state(), "last_loss": last_loss}, path)
 
 
 def load_state(stage, binding, raw, expected_step):
+    return load_parameters(stage, binding, raw, expected_step, head(stage), STATE, "head")
+
+
+def load_parameters(stage, binding, raw, expected_step, parameters, schema, field):
     state = torch.load(io.BytesIO(raw), map_location="cpu", weights_only=True)
-    if (state["schema"] != STATE or state["binding_sha256"] != digest(binding)
-            or state["step"] != expected_step or set(state["head"]) != set(HEAD)):
+    if (state["schema"] != schema or state["binding_sha256"] != digest(binding)
+            or state["step"] != expected_step or set(state[field]) != set(parameters)):
         raise ValueError("v211_checkpoint_identity")
     with torch.no_grad():
-        for name, weight in head(stage).items():
-            saved = state["head"][name]
+        for name, weight in parameters.items():
+            saved = state[field][name]
             if saved.shape != weight.shape or saved.dtype != torch.float32 or not torch.isfinite(saved).all():
                 raise ValueError("v211_checkpoint_head")
             weight.copy_(saved)
@@ -101,8 +120,8 @@ def scenario_scores(metrics):
             for name, entry in metrics["per_scenario"].items()}
 
 
-def measurement(plan, seed, checkpoint, metrics):
-    return {"method": METHOD, "seed": seed, "trial_plan_sha256": plan["content_sha256"],
+def measurement(plan, seed, checkpoint, metrics, method=METHOD):
+    return {"method": method, "seed": seed, "trial_plan_sha256": plan["content_sha256"],
             "status": "completed", "comparison_common": plan["common"],
             "updates": UPDATES, "training": TRAINING, "checkpoint_sha256": checkpoint,
             "scenario_scores": scenario_scores(metrics)}

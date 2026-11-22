@@ -23,8 +23,9 @@ from rewind_v1.full_data import FeatureStore
 from scripts.run_v2_bulk_cache import writer
 from scripts.run_v2_gpu_training import identity_for, load_inputs, read_journal, training_config
 from scripts.v210_eval import A, COMPARE, DIAGNOSTIC, FEATURE, FINAL, RECEIPT, feature_group, input_file, original_json, reference_scores
-from scripts.v211_progress import SUMMARY, checkpoint_raw, evaluate, fit, fit_tip, folder
-from scripts.v211_trial import HEAD, METHOD, SEEDS, TRAINING, TRAJECTORY, UPDATES, measurement, order, trajectory_seed
+from scripts import v211_trial
+from scripts.v211_progress import checkpoint_raw, evaluate, fit, fit_tip, folder
+from scripts.v211_trial import SEEDS, TRAINING, TRAJECTORY, UPDATES, measurement, order, trajectory_seed
 from scripts.v2_gpu_training_pipeline import CommonEvaluation, FullCache, FullData, Training
 from scripts.v2_gpu_training_storage import DriveLedger, GIB, MIB, publish_json, read_sealed
 
@@ -44,7 +45,7 @@ class TrialLedger(DriveLedger):
         self.current["parent_usage_receipt_sha256"] = usage["content_sha256"]
 
 
-def inputs(project, pins, identity):
+def inputs(project, pins, identity, strategy=v211_trial):
     diagnostic = original_json(project, DIAGNOSTIC, pins["evidence"][DIAGNOSTIC], "rewind_v2_gpu_invocation_v1")
     step = original_json(project, RECEIPT, pins["evidence"][RECEIPT], "rewind_v2_gpu_training_checkpoint_v1")
     comparison = original_json(project, COMPARE, pins["evidence"][COMPARE], "rewind_v2_gpu_comparison_v1")
@@ -56,7 +57,7 @@ def inputs(project, pins, identity):
             or step["cursor"] != {"stage": "hand", "epoch": 3, "batch": 0, "updates": 197961}
             or common["parent"] != identity or common["selected_model_sha256"] != comparison["binding"]["model"]
             or plan["parent_macro_mm"] != comparison["macro_score_mm"] or plan["initial_seeds"] != list(SEEDS)
-            or plan["branches"][METHOD] != {"scope": "body_output_weight_bias", "updates": UPDATES, **TRAINING}):
+            or plan["branches"][strategy.METHOD] != strategy.BRANCH):
         raise ValueError("v211_parent_or_trial_plan")
     return step, reference_scores(diagnostic, comparison)
 
@@ -86,7 +87,7 @@ def restore_features(project, work, pins, pipeline, ledger):
     return store, allocated
 
 
-def trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report):
+def trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy=v211_trial):
     plan = pins["trial_plan"]
     best = {role: info["sha256"] for role, info in pipe.progress["best"].items()}
     if best != plan["common"]["selected_model_sha256"] or pipe.cfg["teacher"]["sampling_steps"] != 10:
@@ -99,19 +100,20 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
         ordered = order(pipe.data.clips["train"], seed)
         if len(ordered) != UPDATES or len(set(ordered)) != UPDATES:
             raise ValueError("v211_train_coverage")
-        basis = {"method": METHOD, "seed": seed, "plan": plan["content_sha256"], "reference": FINAL,
+        basis = {"method": strategy.METHOD, "seed": seed, "plan": plan["content_sha256"], "reference": FINAL,
                  "source": pins["base"]["source_sha256"], "modules": pins["modules"], "original_model": best,
                  "feature_identity": FEATURE, "feature_groups_sha256": digest(pins["groups"]),
                  "ordered_train_clips_sha256": digest(ordered), "trajectory": TRAJECTORY,
-                 "training": TRAINING, "trainable": list(HEAD), "comparison_common": plan["common"]}
+                 "training": TRAINING, "trainable": list(strategy.TRAINABLE), "comparison_common": plan["common"]}
         timing = report["trials"][str(seed)] = {"status": "in_progress"}
         done = trial/"summary.json"
         if done.exists():
-            summary = read_sealed(done, SUMMARY)
-            tip = fit_tip(trial, basis)
+            summary = read_sealed(done, strategy.SUMMARY_SCHEMA)
+            tip = fit_tip(trial, basis, strategy.FIT_SCHEMA)
             if (not tip or tip["step"] != UPDATES or summary["binding"] != {**basis, "fit": tip["content_sha256"],
                     "body_sha256": tip["artifact"]["sha256"], "sampling_steps": 10}
-                    or summary["measurement"] != measurement(plan, seed, tip["artifact"]["sha256"], summary["metrics"])):
+                    or summary["measurement"] != measurement(plan, seed, tip["artifact"]["sha256"],
+                                                              summary["metrics"], strategy.METHOD)):
                 raise ValueError("v211_completed_trial_binding")
             checkpoint_raw(trial, tip, ledger)
             timing.update(status="completed_verified_summary_and_fit", summary_sha256=summary["content_sha256"],
@@ -125,17 +127,19 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
             report["features"] = {"bytes": allocated, "groups": 147, "wall_seconds": time.monotonic()-start}
         body = cascade.make("body")
         pipe._load_best("body", body)
-        tip = fit(body, ordered, trial, work, basis, store, cascade.body_idx, ledger, owner, environment, timing)
+        tip = fit(body, ordered, trial, work, basis, store, cascade.body_idx, ledger, owner, environment, timing,
+                  strategy=strategy)
         hand = cascade.make("hand", body.checkpoint_sha256)
         pipe._load_best("hand", hand)
         summary = evaluate(cascade, body, hand, store, trial, work,
                            {**basis, "fit": tip["content_sha256"], "body_sha256": body.checkpoint_sha256,
-                            "sampling_steps": 10}, plan, reference, ledger, owner, environment, timing)
+                            "sampling_steps": 10}, plan, reference, ledger, owner, environment, timing,
+                           summary_schema=strategy.SUMMARY_SCHEMA)
         timing.update(status="completed", summary_sha256=summary["content_sha256"], measurement=summary["measurement"])
         del body, hand
 
 
-def run(args, pins, report):
+def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA):
     elapsed = time.monotonic()-args.started
     if not torch.cuda.is_available() or torch.cuda.device_count() != 1 or not 0 < elapsed < 600:
         raise RuntimeError("v211_single_cuda_and_start_time")
@@ -158,18 +162,18 @@ def run(args, pins, report):
             raise ValueError("v211_overlay_sha256")
     base = pins["base"]
     identity = identity_for("A", base)
-    target = folder(project/DESTINATION)
+    target = folder(project/destination)
     cfg = training_config(42)
     limits = {**cfg, "resources": {**cfg["resources"], "read_bytes": 8*GIB, "write_bytes": 2*GIB},
               "terminal_reserve_seconds": 300}
     with writer(target, args.recover_writer) as owner:
         diag = folder(target/"diagnostics")
         usage = folder(target/"usage")
-        ledger = TrialLedger(usage, {"method": METHOD, "parent": identity, "inputs": digest(pins)}, limits, owner)
+        ledger = TrialLedger(usage, {"method": strategy.METHOD, "parent": identity, "inputs": digest(pins)}, limits, owner)
         failure = None
         try:
             with ledger.session(args.started):
-                step, reference = inputs(project, pins, identity)
+                step, reference = inputs(project, pins, identity, strategy)
                 doc, spec, plan = load_inputs(SimpleNamespace(invocation=work, workspace=work, slot="A"), base)
                 journal, anchor, entries = read_journal(project, doc, spec, base, ledger)
                 cache = FullCache(work/"cache-metadata-only", journal, anchor, entries, spec, cfg, ledger)
@@ -187,7 +191,7 @@ def run(args, pins, report):
                     if pipe.last != step["last"] or any(pipe.progress[k] != v for k, v in step["cursor"].items()):
                         raise ValueError("v211_A_resume_cursor")
                     report["parent_prepare_seconds"] = time.monotonic()-args.started-elapsed
-                    trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report)
+                    trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy)
                 finally:
                     cache.close()
             report["status"] = "completed"
@@ -203,7 +207,7 @@ def run(args, pins, report):
             try:
                 report["usage"] = ledger.snapshot()["invocations"][-1]
                 report["diagnostic"] = f"invocation-{uuid.uuid4().hex}.json"
-                publish_json(diag/report["diagnostic"], RUN_SCHEMA, report, owner)
+                publish_json(diag/report["diagnostic"], run_schema, report, owner)
                 report["diagnostic_verified"] = True
             except Exception as exc:
                 report.update(diagnostic_verified=False, diagnostic_error=str(exc)[:512])
@@ -211,8 +215,8 @@ def run(args, pins, report):
                     raise
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(run_worker=run, description=__doc__):
+    parser = argparse.ArgumentParser(description=description)
     for name in ("project", "work", "pins"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--started", type=float, required=True)
@@ -220,7 +224,7 @@ def main():
     args = parser.parse_args()
     report = {"status": "failed"}
     try:
-        run(args, json.loads(_regular_read(args.pins, 2*MIB)), report)
+        run_worker(args, json.loads(_regular_read(args.pins, 2*MIB)), report)
     except BaseException as exc:
         report.setdefault("error", str(exc)[:1000])
         raise

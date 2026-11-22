@@ -63,16 +63,29 @@ def collect_pins(source, a_bundle):
 
 
 def build(source, a_bundle, output):
-    if output.exists() or output.is_symlink() or not output.parent.is_dir():
-        raise ValueError("v211_output_exists_or_parent_missing")
     pins = collect_pins(source, a_bundle)
-    overlays = {name: (ROOT/"scripts"/name).read_text(encoding="utf-8").encode() for name in MODULES}
+    guide = ("# v2.1.1 A body 최종 head\n\n"
+             "seed 42·71·103을 독립적으로 순차 실행합니다. 각 3,097 updates, 1epoch, batch 1, Adam 5e-5, FP32. "
+             "평가 seed 71, 예측 2D·예측 상체, 공식 validation 421클립·16,425프레임, DDIM 10. "
+             "세 시나리오의 body/hand-global MPJPE를 동일 가중 평균합니다. 호출 상한은 8시간입니다. "
+             "소요 시간과 승인된 누적 GPU 예산은 오케스트레이션 인계에서 확인하세요.\n\n"
+             f"128 source ZIP `{source.name}`과 `{TOOLS}`를 Colab `/content`에 업로드합니다. "
+             f"A 모델과 feature 캐시는 기존 Drive에서 읽고 결과는 `{DESTINATION}`에 저장합니다. "
+             "CUDA GPU 하나를 선택합니다. 실행 스위치는 기본 OFF입니다.")
+    issue(output, pins, modules=MODULES, tag="v211", method="v2.1.1", notebook=NOTEBOOK, tools_name=TOOLS,
+          config=CONFIG, guide=guide, destination=DESTINATION)
+
+
+def issue(output, pins, *, modules, tag, method, notebook, tools_name, config, guide, destination):
+    if output.exists() or output.is_symlink() or not output.parent.is_dir():
+        raise ValueError("v2_tuning_output_exists_or_parent_missing")
+    overlays = {name: (ROOT/"scripts"/name).read_text(encoding="utf-8").encode() for name in modules}
     pins["modules"] = {name: sha(raw) for name, raw in overlays.items()}
     pins["cpu_selection_source_sha256"] = sha((ROOT/"scripts/v2_tuning_cpu_selection.py").read_text(encoding="utf-8").encode())
-    with tempfile.TemporaryDirectory(dir=output.parent, prefix=".v211-build-") as temporary:
+    with tempfile.TemporaryDirectory(dir=output.parent, prefix=f".{tag}-build-") as temporary:
         root = Path(temporary)/"release"
         root.mkdir()
-        tools = root/TOOLS
+        tools = root/tools_name
         with zipfile.ZipFile(tools, "x", compression=zipfile.ZIP_DEFLATED) as writer:
             for name, raw in overlays.items():
                 entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
@@ -80,29 +93,21 @@ def build(source, a_bundle, output):
                 writer.writestr(entry, raw, compress_type=zipfile.ZIP_DEFLATED)
         tool_hash = sha(tools.read_bytes())
         boot = (ROOT/"scripts/archvis_pilot_bootstrap.py").read_text(encoding="utf-8")
-        run = (RUN.replace("v210_eval", "v211_run").replace("v210", "v211").replace("V210", "V211")
-               .replace("v2.1.0", "v2.1.1").replace("max_members=2)", "max_members=len(PINS['modules']))"))
-        code = boot+f"\nPINS = {pins!r}\nTOOL_NAME = {TOOLS!r}\nTOOL_SHA = {tool_hash!r}\n"+run
-        compile(CONFIG, "settings", "exec")
-        compile(code, NOTEBOOK, "exec")
-        guide = ("# v2.1.1 A body 최종 head\n\n"
-                 "seed 42·71·103을 독립적으로 순차 실행합니다. 각 3,097 updates, 1epoch, batch 1, Adam 5e-5, FP32. "
-                 "평가 seed 71, 예측 2D·예측 상체, 공식 validation 421클립·16,425프레임, DDIM 10. "
-                 "세 시나리오의 body/hand-global MPJPE를 동일 가중 평균합니다. 호출 상한은 8시간입니다. "
-                 "소요 시간과 승인된 누적 GPU 예산은 오케스트레이션 인계에서 확인하세요.\n\n"
-                 f"128 source ZIP `{source.name}`과 `{TOOLS}`를 Colab `/content`에 업로드합니다. "
-                 f"A 모델과 feature 캐시는 기존 Drive에서 읽고 결과는 `{DESTINATION}`에 저장합니다. "
-                 "CUDA GPU 하나를 선택합니다. 실행 스위치는 기본 OFF입니다.\n\n"
-                 f"- A 체크포인트 receipt `{FINAL}`\n- source `{SOURCE_SHA}`\n"
-                 f"- manifest `{pins['base']['manifest_content_sha256']}`\n"
-                 f"- cache `{pins['base']['final_boundary_sha256']}`\n"
-                 f"- trial plan `{pins['trial_plan']['content_sha256']}`")
+        run = (RUN.replace("v210_eval", f"{tag}_run").replace("v210", tag).replace("V210", tag.upper())
+               .replace("v2.1.0", method).replace("max_members=2)", "max_members=len(PINS['modules']))"))
+        code = boot+f"\nPINS = {pins!r}\nTOOL_NAME = {tools_name!r}\nTOOL_SHA = {tool_hash!r}\n"+run
+        compile(config, "settings", "exec")
+        compile(code, notebook, "exec")
+        guide += (f"\n\n- A 체크포인트 receipt `{FINAL}`\n- source `{SOURCE_SHA}`\n"
+                  f"- manifest `{pins['base']['manifest_content_sha256']}`\n"
+                  f"- cache `{pins['base']['final_boundary_sha256']}`\n"
+                  f"- trial plan `{pins['trial_plan']['content_sha256']}`")
         raw = canonical({"nbformat": 4, "nbformat_minor": 5,
                          "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"}},
-                         "cells": [_cell("markdown", "guide", guide), _cell("code", "settings", CONFIG), _cell("code", "run", code)]})
-        (root/NOTEBOOK).write_bytes(raw)
-        (root/"receipt.json").write_bytes(canonical({"pins": pins, "notebook": NOTEBOOK, "notebook_sha256": sha(raw),
-            "tools": TOOLS, "tools_sha256": tool_hash, "default_off": True, "output_folder": DESTINATION}))
+                         "cells": [_cell("markdown", "guide", guide), _cell("code", "settings", config), _cell("code", "run", code)]})
+        (root/notebook).write_bytes(raw)
+        (root/"receipt.json").write_bytes(canonical({"pins": pins, "notebook": notebook, "notebook_sha256": sha(raw),
+            "tools": tools_name, "tools_sha256": tool_hash, "default_off": True, "output_folder": destination}))
         (root/"trial-plan.json").write_bytes(canonical(pins["trial_plan"]))
         root.rename(output)
 

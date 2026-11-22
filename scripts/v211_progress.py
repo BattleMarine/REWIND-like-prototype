@@ -13,12 +13,13 @@ from rewind_prepare.temporal_cache import _hash_file
 from rewind_v1 import v2_retention as retention
 from scripts.v210_eval import CAP, GROUP_SCHEMA, group_keys, read_group
 from scripts.v210_metrics import aggregate, rows
-from scripts.v211_trial import UPDATES, backbone_sha, begin_fit, load_state, measurement, save_state, update
+from scripts import v211_trial
+from scripts.v211_trial import UPDATES, measurement, update
 from scripts.v2_gpu_training_storage import MIB, publish_json, read_sealed
 
 
-FIT = "rewind_v211_fit_receipt_v1"
-SUMMARY = "rewind_v211_validation_v1"
+FIT = v211_trial.FIT_SCHEMA
+SUMMARY = v211_trial.SUMMARY_SCHEMA
 INTERVAL = 50
 
 
@@ -40,10 +41,10 @@ def publish_artifact(local, target, ledger, owner, cap):
     return package
 
 
-def fit_tip(target, binding):
+def fit_tip(target, binding, schema=FIT):
     previous = None
     for marker in sorted(target.glob("fit-*.json")):
-        item = read_sealed(marker, FIT)
+        item = read_sealed(marker, schema)
         step = item["step"]
         if (type(step) is not int or not (previous["step"] if previous else 0) < step <= UPDATES
                 or item["binding_sha256"] != digest(binding) or marker.name != f"fit-{step:05d}.json"
@@ -67,16 +68,17 @@ def checkpoint_raw(target, receipt, ledger):
     return raw
 
 
-def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owner, environment, timing):
+def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owner, environment, timing,
+        *, strategy=v211_trial):
     start = time.monotonic()
-    previous = fit_tip(target, binding)
-    begin_fit(stage)
-    expected_backbone = backbone_sha(stage)
+    previous = fit_tip(target, binding, strategy.FIT_SCHEMA)
+    strategy.begin_fit(stage, binding["seed"])
+    expected_backbone = strategy.backbone_sha(stage)
     last_loss = None
     if previous:
         if previous["backbone_sha256"] != expected_backbone:
             raise ValueError("v211_parent_backbone_sha256")
-        last_loss = load_state(stage, binding, checkpoint_raw(target, previous, ledger), previous["step"])
+        last_loss = strategy.load_state(stage, binding, checkpoint_raw(target, previous, ledger), previous["step"])
     timing.update(resumed_from=stage.step, training_seconds=0.0, fit_publish_seconds=0.0,
                   fit_prepare_seconds=time.monotonic()-start)
 
@@ -86,16 +88,16 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
         if stage.step <= (previous["step"] if previous else 0):
             return
         with tempfile.TemporaryDirectory(dir=work, prefix="fit-") as scratch:
-            artifact = Path(scratch)/f"head-{stage.step:05d}-{uuid.uuid4().hex}.pt"
-            save_state(stage, binding, artifact, last_loss)
+            artifact = Path(scratch)/f"{strategy.ARTIFACT_PREFIX}-{stage.step:05d}-{uuid.uuid4().hex}.pt"
+            strategy.save_state(stage, binding, artifact, last_loss)
             package = publish_artifact(artifact, target, ledger, owner, MIB)
-            previous = publish_json(target/f"fit-{stage.step:05d}.json", FIT,
+            previous = publish_json(target/f"fit-{stage.step:05d}.json", strategy.FIT_SCHEMA,
                                     {"step": stage.step, "binding_sha256": digest(binding), "artifact": package,
                                      "backbone_sha256": expected_backbone, "last_loss": last_loss,
                                      "previous": previous["content_sha256"] if previous else None,
                                      "environment": environment}, owner)
         timing["fit_publish_seconds"] += time.monotonic()-start
-        print(f"v2.1.1 seed {binding['seed']} fit {stage.step}/{UPDATES}", flush=True)
+        print(f"{strategy.METHOD} seed {binding['seed']} fit {stage.step}/{UPDATES}", flush=True)
 
     while stage.step < UPDATES:
         start = time.monotonic()
@@ -109,7 +111,7 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
         last_loss = update(stage, clip, binding["seed"])
         timing["training_seconds"] += time.monotonic()-start
         if stage.step == 1 or stage.step % INTERVAL == 0 or stage.step == UPDATES:
-            if stage.step == UPDATES and backbone_sha(stage) != expected_backbone:
+            if stage.step == UPDATES and strategy.backbone_sha(stage) != expected_backbone:
                 raise ValueError("v211_frozen_backbone_changed")
             save()
     stage.optimizer.zero_grad(set_to_none=True)
@@ -118,7 +120,8 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
     return previous
 
 
-def evaluate(cascade, body, hand, store, target, work, basis, plan, reference, ledger, owner, environment, timing):
+def evaluate(cascade, body, hand, store, target, work, basis, plan, reference, ledger, owner, environment, timing,
+             *, summary_schema=SUMMARY):
     data, names = store.data, cascade.body_names + cascade.fingers
     receipts, stream = [], []
     timing.update(validation_seconds=0.0, validation_publish_seconds=0.0, validation_verify_seconds=0.0)
@@ -150,14 +153,14 @@ def evaluate(cascade, body, hand, store, target, work, basis, plan, reference, l
             or len({(key[0], int(frame)) for key, row in stream for frame in row["frame_index"]}) != 16425):
         raise ValueError("v211_validation_coverage")
     metrics = aggregate(stream, data.spec, reference)
-    row = measurement(plan, basis["seed"], body.checkpoint_sha256, metrics)
+    row = measurement(plan, basis["seed"], body.checkpoint_sha256, metrics, basis["method"])
     final = {"binding": basis, "counts": {"clips": 421, "real_frames": 16425}, "group_receipts": receipts,
              "metrics": metrics, "measurement": row}
     marker = target/"summary.json"
     if marker.exists():
-        saved = read_sealed(marker, SUMMARY)
-        if saved["content_sha256"] != digest({"schema": SUMMARY, **final}):
+        saved = read_sealed(marker, summary_schema)
+        if saved["content_sha256"] != digest({"schema": summary_schema, **final}):
             raise ValueError("v211_summary_pin")
     else:
-        saved = publish_json(marker, SUMMARY, final, owner)
+        saved = publish_json(marker, summary_schema, final, owner)
     return saved
