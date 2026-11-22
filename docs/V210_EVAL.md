@@ -29,4 +29,4 @@ T4 FP32에서 18그룹·421클립·16,425프레임 평가를 완료했다. 전�
 
 공통 mask에서 손목 MSE가 상대 자세 MSE보다 양손 모두 크고 교차항은 양수다. 다음 v2.1.1은 body 출력층 조정 후 실제 손목과 전역 손가락 오차가 함께 줄어드는지 비교한다. 현재 결과는 가중치를 고정한 기준 평가다.
 
-로컬 원본은 `outputs/v2_plan_inputs/v210_t4_validation_20261122/`에 있다. summary.json 파일 SHA-256은 `796527609be8733fd44341e564641ff3b83314199fc55c7912418b81c2931da4`, result.json은 `642a7dcd75edaea4bd78eba1ef51f34b79b6f141c719fe9400dc381e67c03770`다. 두 결과의 summary 내용 SHA와 프레임 수를 대조했다. 그룹별 Drive NPZ 회수와 별도 CPU 재집계는 대기 중이다.
+로컬 원본은 `outputs/v2_plan_inputs/v210_t4_validation_20261122/`에 있다. summary.json 파일 SHA-256은 `796527609be8733fd44341e564641ff3b83314199fc55c7912418b81c2931da4`, result.json은 `642a7dcd75edaea4bd78eba1ef51f34b79b6f141c719fe9400dc381e67c03770`다. 두 결과의 summary 내용 SHA와 프레임 수를 대조했다. 그룹별 NPZ 18개와 영수증 18개를 회수하고 공식 validation 순서·프레임 키를 대조했다. CPU 재집계로 모든 보고 지표가 GPU 요약의 허용 오차 안에서 일치했다. 같은 로컬 폴더의 회수본 `v210_groups.zip` SHA-256은 `d47a24ffb032b3de299396827755d840d0c9c59b5fc7a9105dbf406d4caf1f0f`, `cpu-recount.json`은 `f0a4748d7c6f1eec1c680249e6b85a18b52d6595c7fde34501289db491ce1c71`이다.
