@@ -38,3 +38,17 @@ R2를 다시 발급할 때는 저장소 루트에서 아래 명령을 사용한�
 ```powershell
 python -m scripts.v212_build --source outputs/v2_plan_inputs/gpu_training_128_20261122/v2_gpu_training_128_v1.zip --a-bundle outputs/v2_plan_inputs/gpu128_A_portable_release/v2_128_A_final_model_and_cache.zip --previous-receipt outputs/v2_plan_inputs/v212_body_lora_128_A_release_20261122/receipt.json --output outputs/v2_plan_inputs/v212_body_lora_128_A_cuda_startup_r2_20261122
 ```
+
+## T4 검증 결과
+
+R2는 FP32에서 917.06초가 걸렸다. 각 seed에서 같은 부모·3,097 업데이트·공식 validation 421클립 16,425프레임을 사용했다. 종합 점수는 세 환경에 동일 가중을 주며, 몸·손 점수는 전체 유효 관절을 합쳐 구한 MPJPE(mm)다.
+
+| seed | 출력층 종합 | LoRA 종합 | LoRA 몸 | LoRA 전역 손가락 | LoRA 손목 기준 손가락 |
+|---|---:|---:|---:|---:|---:|
+| 42 | 209.26 | 210.47 | 149.04 | 270.90 | 96.36 |
+| 71 | 207.12 | 209.65 | 148.72 | 270.21 | 96.80 |
+| 103 | 211.68 | 210.05 | 149.38 | 270.25 | 96.52 |
+
+LoRA 평균 210.05 mm(표본 표준편차 0.41), 출력층 평균 209.35 mm(2.28), A 219.72 mm. 세 seed 모두 부모보다 종합 오차가 낮고 상대 손가락 오차는 높다. 두 방식의 종합 평균 차이는 0.70 mm이며, 세 번째 방식 평가 전 최종 선별은 보류한다.
+
+진단과 세 summary 및 어댑터 실물은 `outputs/v2_plan_inputs/v212_r2_t4_results_20261122/`에 보존했다. 진단 파일 SHA-256은 `120b1f70d7f84ad592456abd13cca5f5716d931c977d66ed888d4913a1d4654e`다. summary의 봉인과 가중치 해시를 진단·실물과 대조했다. 세 최종 fit 영수증도 보존했고 각각 3,097번째 step과 어댑터 SHA가 summary 및 파일 실물에 일치했다. 그룹별 좌표·영수증은 별도 회수 대기다.
