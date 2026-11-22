@@ -164,6 +164,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
     if best != plan["common"]["selected_model_sha256"] or pipe.cfg["teacher"]["sampling_steps"] != 10:
         raise ValueError("v211_selected_model_or_sampling")
     store = cascade = None
+    checkpoint_cap = getattr(strategy, "CHECKPOINT_CAP", MIB)
     for seed in SEEDS:
         ledger.check()
         seed_run(trajectory_seed(seed, "model-initialization"))
@@ -186,7 +187,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
                     or summary["measurement"] != measurement(plan, seed, tip["artifact"]["sha256"],
                                                               summary["metrics"], strategy.METHOD)):
                 raise ValueError("v211_completed_trial_binding")
-            checkpoint_raw(trial, tip, ledger)
+            checkpoint_raw(trial, tip, ledger, checkpoint_cap)
             timing.update(status="completed_verified_summary_and_fit", summary_sha256=summary["content_sha256"],
                           measurement=summary["measurement"])
             continue
@@ -205,7 +206,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
         summary = evaluate(cascade, body, hand, store, trial, work,
                            {**basis, "fit": tip["content_sha256"], "body_sha256": body.checkpoint_sha256,
                             "sampling_steps": 10}, plan, reference, ledger, owner, environment, timing,
-                           summary_schema=strategy.SUMMARY_SCHEMA)
+                           summary_schema=strategy.SUMMARY_SCHEMA, preflight_io=checkpoint_cap > MIB)
         timing.update(status="completed", summary_sha256=summary["content_sha256"], measurement=summary["measurement"])
         del body, hand
 

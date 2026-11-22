@@ -11,6 +11,7 @@ from rewind_archive.contracts import digest
 from rewind_m1.local_rgb import _regular_read
 from rewind_prepare.temporal_cache import _hash_file
 from rewind_v1 import v2_retention as retention
+from rewind_v1.v2_budget import ResourceLimit
 from scripts.v210_eval import CAP, GROUP_SCHEMA, group_keys, read_group
 from scripts.v210_metrics import aggregate, rows
 from scripts import v211_trial
@@ -32,12 +33,13 @@ def folder(path):
     return path
 
 
-def publish_artifact(local, target, ledger, owner, cap):
+def publish_artifact(local, target, ledger, owner, cap, copy_seconds=120):
     package = {"name": local.name, "bytes": local.stat().st_size, "sha256": _hash_file(local)}
     if not 0 < package["bytes"] <= cap:
         raise ValueError("v211_artifact_size")
     owner()
-    retention.copy_verified(local, target/local.name, package, ledger, ledger.clock()+min(120, ledger.remaining(terminal=True)))
+    retention.copy_verified(local, target/local.name, package, ledger,
+                            ledger.clock()+min(copy_seconds, ledger.remaining(terminal=True)))
     return package
 
 
@@ -54,18 +56,24 @@ def fit_tip(target, binding, schema=FIT):
     return previous
 
 
-def checkpoint_raw(target, receipt, ledger):
+def checkpoint_raw(target, receipt, ledger, cap=MIB):
     package = receipt["artifact"]
     name = package["name"]
     path = target/name
-    if Path(name).name != name or not 0 < package["bytes"] <= MIB or path.resolve(strict=True) != path:
+    if Path(name).name != name or not 0 < package["bytes"] <= cap or path.resolve(strict=True) != path:
         raise ValueError("v211_fit_path")
     ledger.reserve("read", package["bytes"])
-    raw = _regular_read(path, MIB, package["bytes"])
+    raw = _regular_read(path, cap, package["bytes"])
     ledger.observed("read", len(raw), persist=False)
     if hashlib.sha256(raw).hexdigest() != package["sha256"]:
         raise ValueError("v211_fit_sha256")
     return raw
+
+
+def require_io_room(ledger, *, read, write):
+    for kind, size in (("read", read), ("write", write)):
+        if ledger.current[f"{kind}_bytes_reserved"] + size > ledger.cfg["resources"][f"{kind}_bytes"]:
+            raise ResourceLimit(f"v2_tuning_{kind}_budget_pause_before_next_durable_unit")
 
 
 def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owner, environment, timing,
@@ -74,11 +82,14 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
     previous = fit_tip(target, binding, strategy.FIT_SCHEMA)
     strategy.begin_fit(stage, binding["seed"])
     expected_backbone = strategy.backbone_sha(stage)
+    cap = getattr(strategy, "CHECKPOINT_CAP", MIB)
+    interval = getattr(strategy, "CHECKPOINT_INTERVAL", INTERVAL)
+    copy_seconds = getattr(strategy, "CHECKPOINT_COPY_SECONDS", 120)
     last_loss = None
     if previous:
         if previous["backbone_sha256"] != expected_backbone:
             raise ValueError("v211_parent_backbone_sha256")
-        last_loss = strategy.load_state(stage, binding, checkpoint_raw(target, previous, ledger), previous["step"])
+        last_loss = strategy.load_state(stage, binding, checkpoint_raw(target, previous, ledger, cap), previous["step"])
     timing.update(resumed_from=stage.step, training_seconds=0.0, fit_publish_seconds=0.0,
                   fit_prepare_seconds=time.monotonic()-start)
 
@@ -90,7 +101,7 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
         with tempfile.TemporaryDirectory(dir=work, prefix="fit-") as scratch:
             artifact = Path(scratch)/f"{strategy.ARTIFACT_PREFIX}-{stage.step:05d}-{uuid.uuid4().hex}.pt"
             strategy.save_state(stage, binding, artifact, last_loss)
-            package = publish_artifact(artifact, target, ledger, owner, MIB)
+            package = publish_artifact(artifact, target, ledger, owner, cap, copy_seconds)
             previous = publish_json(target/f"fit-{stage.step:05d}.json", strategy.FIT_SCHEMA,
                                     {"step": stage.step, "binding_sha256": digest(binding), "artifact": package,
                                      "backbone_sha256": expected_backbone, "last_loss": last_loss,
@@ -101,6 +112,10 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
 
     while stage.step < UPDATES:
         start = time.monotonic()
+        if cap > MIB and stage.step == (previous["step"] if previous else 0):
+            # Only local feature reads occur until the next fit, so this room
+            # remains available for a scheduled or deadline checkpoint.
+            require_io_room(ledger, read=2*cap, write=cap)
         try:
             ledger.check()
             clip = store.load(ordered[stage.step], "train").select_joints(body_indices)
@@ -110,7 +125,7 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
             raise
         last_loss = update(stage, clip, binding["seed"])
         timing["training_seconds"] += time.monotonic()-start
-        if stage.step == 1 or stage.step % INTERVAL == 0 or stage.step == UPDATES:
+        if stage.step == 1 or stage.step % interval == 0 or stage.step == UPDATES:
             if stage.step == UPDATES and strategy.backbone_sha(stage) != expected_backbone:
                 raise ValueError("v211_frozen_backbone_changed")
             save()
@@ -121,7 +136,7 @@ def fit(stage, ordered, target, work, binding, store, body_indices, ledger, owne
 
 
 def evaluate(cascade, body, hand, store, target, work, basis, plan, reference, ledger, owner, environment, timing,
-             *, summary_schema=SUMMARY):
+             *, summary_schema=SUMMARY, preflight_io=False):
     data, names = store.data, cascade.body_names + cascade.fingers
     receipts, stream = [], []
     timing.update(validation_seconds=0.0, validation_publish_seconds=0.0, validation_verify_seconds=0.0)
@@ -131,6 +146,8 @@ def evaluate(cascade, body, hand, store, target, work, basis, plan, reference, l
         marker = target/f"group-{group:05d}.json"
         binding = {**basis, "group": group}
         if not marker.exists():
+            if preflight_io:
+                require_io_room(ledger, read=3*CAP, write=CAP)
             with tempfile.TemporaryDirectory(dir=work, prefix="eval-") as scratch:
                 start = time.monotonic()
                 batches = [rows(cascade, body, hand, store.load(key, "validation"), key, ledger) for key in keys]

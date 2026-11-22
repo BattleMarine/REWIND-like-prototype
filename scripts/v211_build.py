@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import zipfile
 
@@ -16,6 +17,11 @@ from scripts.v2_tuning_cpu_selection import plan
 
 
 MODULES = ("v210_eval.py", "v210_metrics.py", "v211_progress.py", "v211_run.py", "v211_trial.py")
+R2_REVISION = "d9971eb"
+R2_SHARED_MODULES = {
+    "v211_progress.py": "afd23a1ab6e0c1a692a39dcfcd817f960a698a745c4b51484cbd9de5dc5e57d4",
+    "v211_run.py": "b157fba2521adbf165a0cc839177b3807b3b7c18a9eaa6411a45871d56c6c54b",
+}
 NOTEBOOK = "v211_body_head_128_A_cuda_r2.ipynb"
 TOOLS = "v211_body_head_tools_r2.zip"
 CONFIG = '''RUN_V211 = False
@@ -76,12 +82,21 @@ def build(source, a_bundle, output, previous_receipt):
           config=CONFIG, guide=guide, destination=DESTINATION)
 
 
-def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, tools_name, config, guide, destination):
-    if output.exists() or output.is_symlink() or not output.parent.is_dir():
-        raise ValueError("v2_tuning_output_exists_or_parent_missing")
+def overlay_sources(pins, modules):
     overlays = {name: (ROOT/"scripts"/name).read_text(encoding="utf-8").encode() for name in modules}
     pins["modules"] = {name: sha(raw) for name, raw in overlays.items()}
     pins["cpu_selection_source_sha256"] = sha((ROOT/"scripts/v2_tuning_cpu_selection.py").read_text(encoding="utf-8").encode())
+    return overlays
+
+
+def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, tools_name, config, guide, destination):
+    overlays = overlay_sources(pins, modules)
+    for name, expected in R2_SHARED_MODULES.items():
+        if sha(overlays[name]) != expected:
+            overlays[name] = subprocess.check_output(["git", "show", f"{R2_REVISION}:scripts/{name}"], cwd=ROOT)
+        if sha(overlays[name]) != expected:
+            raise ValueError(f"v2_tuning_startup_r2_source_pin: {name}")
+        pins["modules"][name] = expected
     previous = json.loads(previous_receipt.read_bytes())["pins"]
     old_modules = previous["modules"]
     if (digest(previous) != LEGACY_INPUTS[method] or {**pins, "modules": old_modules} != previous
@@ -98,6 +113,14 @@ def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, too
     if pins["modules"] != {**old_modules, **approved_updates}:
         raise ValueError("v2_tuning_startup_release_unexpected_module_drift")
     pins["resume_modules"] = old_modules
+    pack(output, pins, overlays, tag=tag, method=method, notebook=notebook, tools_name=tools_name,
+         config=config, guide=guide, destination=destination,
+         release_fields={"release": "cuda_startup_r2", "resume_inputs_sha256": LEGACY_INPUTS[method]})
+
+
+def pack(output, pins, overlays, *, tag, method, notebook, tools_name, config, guide, destination, release_fields):
+    if output.exists() or output.is_symlink() or not output.parent.is_dir():
+        raise ValueError("v2_tuning_output_exists_or_parent_missing")
     with tempfile.TemporaryDirectory(dir=output.parent, prefix=f".{tag}-build-") as temporary:
         root = Path(temporary)/"release"
         root.mkdir()
@@ -132,7 +155,7 @@ def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, too
         (root/notebook).write_bytes(raw)
         (root/"receipt.json").write_bytes(canonical({"pins": pins, "notebook": notebook, "notebook_sha256": sha(raw),
             "tools": tools_name, "tools_sha256": tool_hash, "default_off": True, "output_folder": destination,
-            "release": "cuda_startup_r2", "resume_inputs_sha256": LEGACY_INPUTS[method]}))
+            **release_fields}))
         (root/"trial-plan.json").write_bytes(canonical(pins["trial_plan"]))
         root.rename(output)
 
