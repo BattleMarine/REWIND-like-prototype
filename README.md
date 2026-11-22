@@ -10,7 +10,7 @@
 
 2026-11-22 기준, **v2 128×128과 256×256 캐시가 각각 1,063샤드·136,011페어로 완성됐다.** [실험 종합 보고서](docs/EXPERIMENT_RESULTS_REPORT.md) · [256 재개 가이드](docs/V2_CACHE256.md)
 
-**v2 GPU 학습**은 같은 세 시나리오를 해상도별로 세 seed씩 독립 학습합니다. A에서 첫 업데이트를 Drive에 보관한 뒤 B와 C를 시작합니다. GPU 호출당 상한은 8시간이며 실제 학습 결과는 대기 중입니다. [128 학습](docs/V2_GPU_TRAINING_128.md) · [256 학습](docs/V2_GPU_TRAINING_256.md) · [v2 계획](docs/V2_PLAN.md)
+**v2 GPU 학습**은 세 시나리오에서 해상도별로 세 seed를 비교합니다. 128×128 A(seed 42)는 197,961회 업데이트를 완료했습니다. 재현에 사용하는 가중치는 2D frontend 3epoch, 3D body 3epoch, hand 2epoch입니다. [A 모델 재현·튜닝 가이드](docs/V2_GPU128_A_PORTABLE_BUNDLE.md) · [128 학습](docs/V2_GPU_TRAINING_128.md) · [256 학습](docs/V2_GPU_TRAINING_256.md) · [v2 계획](docs/V2_PLAN.md)
 
 **실험 결과는 [계속 갱신하는 종합 보고서](docs/EXPERIMENT_RESULTS_REPORT.md)에서 확인할 수 있습니다.** 버전별 목적·수치·판정·남은 문제와 결과 파일 위치를 정리합니다.
 
