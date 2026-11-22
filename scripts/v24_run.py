@@ -26,16 +26,12 @@ from scripts.v23_eval import score_arrays
 from scripts.v23_run import gpu, parent_evidence, restored_parent, verified_write
 from scripts.v24_body import (ARMS, EVAL_UPDATES, LEARNING_RATE, SEED, TRAJECTORY, UPDATES,
                               X0View, draw, model_sha, numerical, sample, setup, tensor_sha, update)
+from scripts.v24_budget import (PILOT_SECONDS, READ_CAP, STATE_CAP, WORKER_RESERVE_SECONDS,
+                                WORKER_WRITE_CAP, limits as release_limits, write_budget)
 from scripts.v2_gpu_training_pipeline import CommonEvaluation
 from scripts.v2_gpu_training_storage import GIB, MIB
 
 
-SECONDS = 2700
-RESERVE = 300
-STATE_CAP = 192 * MIB
-READ_CAP = 2 * GIB
-WRITE_CAP = 3 * GIB
-DESTINATION = "v24_diffusion_pilot128_a_v1"
 SCOPE = "pilot_validation_subset"
 TENSOR_FIELDS = ("features", "camera", "target_mm", "target_valid", "time_valid", "seconds")
 
@@ -222,6 +218,8 @@ def pilot(project, work, pins, pipe, reference, ledger, report):
 
 def run(args, pins, report):
     project, work = args.project.resolve(strict=True), args.work.resolve(strict=True)
+    if pins["limits"] != release_limits():
+        raise ValueError("v24_budget_pin")
     minimum_free = 4 * GIB if args.pilot else 256 * MIB
     if work.is_relative_to(project) or shutil.disk_usage(work).free < minimum_free:
         raise ValueError("v24_input_or_scratch")
@@ -237,9 +235,13 @@ def run(args, pins, report):
     device = gpu(args.started, report)
     identity, step, reference = parent_evidence(project, pins)
     cfg = training_config(42)
-    limits = {**cfg, "seconds_per_invocation": SECONDS, "external_timeout_seconds": SECONDS,
-              "terminal_reserve_seconds": RESERVE,
-              "resources": {**cfg["resources"], "read_bytes": READ_CAP, "write_bytes": WRITE_CAP}}
+    plan = pins["write_budget"]
+    if plan != write_budget(step["archive"]["bytes"], cfg["resources"]["archive_bytes"], plan["observed_cpu_state_bytes"]):
+        raise ValueError("v24_runtime_write_budget_drift")
+    report["write_budget"] = plan
+    limits = {**cfg, "seconds_per_invocation": PILOT_SECONDS, "external_timeout_seconds": PILOT_SECONDS,
+              "terminal_reserve_seconds": WORKER_RESERVE_SECONDS,
+              "resources": {**cfg["resources"], "read_bytes": READ_CAP, "write_bytes": WORKER_WRITE_CAP}}
     ledger = Ledger(work / "usage", identity, limits)
     with ledger.invocation("v24_pilot"):
         ledger.started = args.started

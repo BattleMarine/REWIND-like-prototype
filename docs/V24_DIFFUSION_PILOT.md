@@ -1,6 +1,10 @@
 # v2.4 · x0/v 수치 검사와 짧은 학습 파일럿
 
+2026-11-23 · A → v2.4 GPU 파일럿 완료. L4 FP32에서 seed 42, x0/v 각 24회 업데이트와 여섯 validation 클립(300프레임) 평가까지 65.70초였다. 0·12·24회 몸 오차(mm)는 x0 662.35 → 245.84 → 363.51, v 493.23 → 415.15 → 440.40이다. 두 조건의 학습 noise 일치를 확인했다. 두 곡선 모두 12회 이후 반등해 본시험 우열은 미정이다. 원본 아홉 파일과 실측을 첨부한 계획 초안은 `outputs/v2_plan_inputs/v24_gpu_pilot_results_20261123/`에 보존했다.
+
 2026-11-23 · v2.4 Colab CPU 수식 검사가 35.32초에 완료됐다. 합성 float64 입력에서 x0와 noise 복원 최대 절대 오차는 각각 4.44e-16, DDIM 10단계 출력 차이는 0이었다. 시간 mask와 중간 head의 x0 출력도 보존됐다. 결과 원본 3개의 SHA-256을 검사해 outputs/v2_plan_inputs/v24_numerical_results_20261123/에 보존했다. result.json SHA-256은 284dbd8abb5f821102e4d611be6f0c13a5bf653b6499a95f699540e5f8549289다. GPU 학습·검증 정확도는 순차 시험 대기다.
+
+2026-11-23 · GPU 파일럿용 R2는 호출당 논리 쓰기 상한 4GiB와 Drive 게시 여유 360초를 적용한다. 기존 CPU 수식 결과의 증거는 위 결과를 따른다.
 
 고정 v2-128-A를 부모로 사용한다. 첫 파일럿은 seed 42에서 x0와 v 두 arm을 각각 24회 업데이트한다. 이 값은 구현 경로·수렴 초기 신호·실제 비용을 확인하는 제한이다. 본 비교의 seed별 학습량과 예산은 파일럿을 검토한 뒤 따로 고정한다. [v2 튜닝 설계](V2_TUNING_DESIGN.md)
 
@@ -26,9 +30,9 @@
 
 동결 source ZIP `v2_gpu_training_128_v1.zip` SHA-256 `9a68d8e45bcf3abf6fab3004740faa6805d4ce3fda5118c3a7102011937849d8`. A 최종 step 9의 receipt content SHA `7d2cf12cdaf42916d98190cf2d57e11e93a6d94165d5e753db6fc1d11c3026d4`, 캐시 경계 `dc79219153d69f44020e0c42f9f3ede6cd3add179211f6c300345b2416dab511`. 기존 Drive의 A 결과·경계 메타데이터와 선택 특징 그룹을 읽는다. 이전 발급본의 helper는 코드 SHA를 고정해 사용한다. v2.3 GPU 산출물은 입력에 포함되지 않는다.
 
-1. 검토 후 Colab에서 `v24_diffusion_pilot_128_A_20261122.ipynb`를 열고 source ZIP과 `v24_diffusion_pilot_tools.zip`을 `/content`에 올린다. 발급 `receipt.json`에서 크기와 SHA를 확인한다.
-2. 기본 실행 스위치는 `RUN_V24 = False`다. CPU 수치 검사는 `MODE = "numerical"`, 짧은 학습은 CUDA GPU 한 대에서 `MODE = "pilot"`으로 실행한다. 승인된 호출에서 `DRIVE_PROJECT`를 확인하고 스위치를 켠 뒤 설정 셀과 실행 셀을 순서대로 실행한다.
-3. 결과는 `reports/v24_diffusion_pilot128_a_v1/run-<mode>-<UUID>/`의 새 경로에 보관한다. 마지막에 출력된 `result.json`의 경로와 SHA를 회수한다.
+1. 검토 후 Colab에서 `v24_diffusion_pilot_128_A_r2_20261123.ipynb`를 열고 source ZIP과 `v24_diffusion_pilot_tools_r2.zip`을 `/content`에 올린다. 발급 `receipt.json`에서 크기와 SHA를 확인한다.
+2. 기본 실행 스위치는 `RUN_V24 = False`다. R2의 기본 모드는 `MODE = "pilot"`이다. 승인된 호출에서 CUDA GPU 한 대와 `DRIVE_PROJECT`를 확인하고 스위치를 켠 뒤 두 코드 셀을 실행한다. Worker는 파일럿 시작 전에 수식 검사를 같은 호출에서 확인한다.
+3. 결과는 `reports/v24_diffusion_pilot128_a_r2/run-<mode>-<UUID>/`의 새 경로에 보관한다. 마지막에 출력된 `result.json`의 경로와 SHA를 회수한다.
 
 | 파일 | 내용 |
 | --- | --- |
@@ -42,9 +46,23 @@
 
 ## 비용과 예산 근거
 
-- Numerical 호출 300초, pilot 호출 2,700초(45분)다. 마운트 최대 120초를 포함한다. Pilot worker는 마지막 300초에 새 작업을 시작하지 않고 controller는 마지막 225초 전까지 기다린다. 남은 시간에는 종료 처리·Drive 복사·readback을 시도한다.
+- Pilot 호출은 이전과 같은 2,700초(45분)이며 마운트 최대 120초를 포함한다. Worker는 마지막 480초에 새 작업을 시작하지 않는다. Controller는 마지막 360초 전까지 기다리므로 worker의 전체 종료 처리를 위해 120초가 먼저 있다. 강제 종료 신호가 필요한 경우 최대 25초를 이 360초 안에서 사용한다. 나머지는 Drive 복사·SHA readback을 시도한다. Numerical 모드의 상한은 300초다.
 - 총 48 body 업데이트와 `2 arm × 3평가점 × 6클립 × DDIM10 × body/hand = 720` denoiser forward를 계획한다. 기존 T4 공식 validation 1회는 421클립·8,420 forward·준비 포함 약 19.35분이었다. 파일럿 forward 수는 약 8.6%이며 부모 복구, 업데이트, 최종 상태 두 개 보관 비용은 같은 비율로 줄지 않는다.
-- 주요 입력은 A 복구 ZIP 435,178,624바이트와 선택 특징 그룹 최대 30개다. 안전 입력 상한은 receipt에 있다. Worker 논리 읽기 2GiB, 쓰기 3GiB, 로컬 여유 4GiB다. 최종 상태는 각각 최대 192MiB, JSON은 파일당 최대 2MiB이며 Drive 복사 후 크기·SHA를 재확인한다.
+- 주요 읽기 입력은 A 복구 ZIP과 선택 특징 그룹 최대 30개다. Worker 논리 읽기 상한 2GiB와 로컬 여유 4GiB를 적용한다. 로컬 특징 스크래치와 Drive의 물리 I/O는 논리 쓰기 예약과 별도로 본다.
+
+### R2 쓰기 예약
+
+| 예약에 포함하는 쓰기 | 상한 |
+| --- | ---: |
+| A 복구 ZIP 로컬 사본 | 435,178,624바이트 |
+| 복구 ZIP 풀기 | 1GiB |
+| x0·v 최종 상태 두 개를 로컬에 저장 | 384MiB |
+| 로컬 JSON 최대 여섯 개 | 12MiB |
+| Drive 최종 상태 사본 두 개와 JSON·영수증·오류 로그 | 415,399,936바이트 |
+| 전체 계획 합계 | 2,339,556,480바이트 |
+| 호출당 논리 쓰기 상한 | **4,294,967,296바이트(4GiB)** |
+
+로컬 CPU에서 실제 직렬화한 상태는 arm당 180,257,563바이트였다. GPU 파일은 상태당 192MiB를 예약한다. Drive 사본 두 개의 SHA readback은 최대 384MiB의 **읽기**이며, 보고서 readback도 각 보고서 크기로 제한한다. ZIP 복구 시에도 사본 검증은 읽기로 계산한다. Worker ledger의 쓰기 상한은 로컬 보고서와 Drive 게시 예약을 뺀 3,866,984,448바이트다. 전체 계획 대비 여유는 1,955,410,816바이트다. 발급 영수증이 A의 체크포인트 핀과 기존 CPU 상태 크기 근거를 보존하고, worker가 실행 전에 이 산식을 다시 확인한다.
 
 ## 로컬 발급
 

@@ -1,6 +1,10 @@
 # REWIND-like prototype 실험 결과 종합 보고서
 
+2026-11-23 · A → v2.4 GPU 파일럿 완료. L4 FP32에서 seed 42, x0/v 각 24회 업데이트와 여섯 validation 클립(300프레임) 평가까지 65.70초였다. 0·12·24회 몸 오차(mm)는 x0 662.35 → 245.84 → 363.51, v 493.23 → 415.15 → 440.40이다. 두 조건의 학습 noise 일치를 확인했다. 두 곡선 모두 12회 이후 반등해 본시험 우열은 미정이다. 원본 아홉 파일과 실측을 첨부한 계획 초안은 `outputs/v2_plan_inputs/v24_gpu_pilot_results_20261123/`에 보존했다.
+
 2026-11-23 · v2 128 A → v2.3 완료. 동일 가중치와 초기 noise로 DDIM 10·5·2단계를 비교했다. 공식 validation 421클립·16,425프레임 종합 오차는 각각 219.72·214.82·202.20 mm였다. L4 FP32에서 GPU 적재 특징부터 몸·손 출력까지 150프레임 묶음의 중앙 시간은 프레임당 4.889·2.412·0.984 ms로 환산됐다. 세 시나리오 모두 2단계에서 몸·전역 손·손목 기준 손가락 오차가 감소했다. 원본 네 파일은 `outputs/v2_plan_inputs/v23_l4_results_20261123/`에 보관했다.
+
+2026-11-23 · v2.4 GPU 파일럿 R2 고정본을 로컬 검증했다. 호출당 쓰기 상한 4GiB와 Drive 게시 여유 360초를 고정했다. GPU 실측은 순차 시험 대기다. 본시험 초안의 초기 3개 seed 쌍과 조건부 2개 seed 쌍은 같은 공식 validation을 사용하며, 학습량·입력·예산은 파일럿 회수 후 결정한다. [파일럿 및 고정본](V24_DIFFUSION_PILOT.md) · [본시험 초안과 회수 절차](V24_DIFFUSION_MAIN_PLAN.md)
 
 2026-11-23 · v2 128 A → [v2.2 손 모델 상체 조건 비교](V220_HAND_UPPER.md) 완료. 예측 상체로 평가한 세 seed 모두에서 혼합 학습이 GT 전용 재학습보다 개선됐다. 평균 차이는 전역 손 −6.86 mm, 손목 기준 손가락 −5.85 mm, 몸·손 종합 −3.43 mm다. 혼합 최고 220.91 mm(seed 103)로 기존 A 219.72 mm를 넘어서지는 못했다.
 
@@ -92,7 +96,9 @@ v0 — 1,000페어 2D 학습 [완료, 정확도 개선 필요]
    │              └─ v1.5.3 — 예측2D 단일클립 학습 [T4 각5,000update 완료, 형태 복원·일반화 미검증]
    └─ v1.3 — 다른 시나리오 혼합 학습 [v2로 확대·이관]
       └─ v2 — 세 시나리오 전체 train 통합 학습 [128 A·B·C 완료 · 128 베이스 A 선정]
-         ├─ v2.1.0 기준 평가 및 v2.1.1~.3 1차 9회 완료 / 최종 후보 4회·v2.1.4·v2.2~.4 미실행
+         ├─ v2.1.0 기준 평가 및 v2.1.1~.3 1차 9회·최종 후보 4회 완료 / v2.1.4·v2.2 완료
+         ├─ v2.3 DDIM 단계 비교 [GPU 시험 진행 중]
+         ├─ v2.4 x0/v [CPU 수식 검사 완료 · R2 GPU 파일럿 대기 · 본시험 초안]
          └─ CPU 캐시 128페어 [보관 확인] → 동일 샤드 A100 한 배치 읽기 [통과] → 정식 복원 및 한 배치 읽기 [Colab 통과]
             └─ 다중 샤드 CPU 캐싱 → 재개 → GPU 경계 배치 [4샤드·512프레임, Colab 통과]
                ├─ 전체 manifest 128 캐싱 [1,063샤드·136,011페어 완료]
@@ -310,6 +316,7 @@ v1.3 혼합학습은 보류이며 새 대규모 학습은 이 보고서 작성�
 
 | 실행 | 원본·시각화·검토 자료 |
 | --- | --- |
+| v2.4 준비본 | [GPU 파일럿 R2](../outputs/v2_plan_inputs/v24_diffusion_pilot_r2_20261123/) · [본시험 CPU 계획 템플릿](../outputs/v2_plan_inputs/v24_main_template_20261123/) · [기존 CPU 수식 결과](../outputs/v2_plan_inputs/v24_numerical_results_20261123/) |
 | v0 | [.local-archive/20261111_outputs/outputs/archvis_v0_20261109/](../.local-archive/20261111_outputs/outputs/archvis_v0_20261109/) |
 | v1 | [outputs/archvis_v1_diagnostic_001/user_test/](../outputs/archvis_v1_diagnostic_001/user_test/) |
 | v1.1 T4 | [outputs/v11_rerun_20261110/user_test/cuda_70accf2/](../outputs/v11_rerun_20261110/user_test/cuda_70accf2/) |

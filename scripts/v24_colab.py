@@ -83,6 +83,8 @@ def run_v24_notebook(project_setting, mode, pins, *, mock_mount=None, mock_uploa
     result = {"schema": "rewind_v24_invocation_v1", "status": "running", "mode": mode, "files": {},
               "seconds_reserved": seconds, "limits": limits, "path": str(output),
               "source_sha256": pins["base"]["source_sha256"], "kit_sha256": pins["toolkit"]["sha256"]}
+    if mode == "pilot":
+        result["write_budget"] = pins["write_budget"]
     result["start"] = publish_tail_json(output / "started.json", result)
     print("Drive v2.4 result:", output, flush=True)
     try:
@@ -105,7 +107,8 @@ def run_v24_notebook(project_setting, mode, pins, *, mock_mount=None, mock_uploa
                    "--pins", str(pin_file), "--started", str(start)]
             if mode == "pilot":
                 cmd.append("--pilot")
-            window = remaining() - (225 if mode == "pilot" else 30)
+            reserve = limits["pilot_publish_reserve_seconds"] if mode == "pilot" else limits["numerical_publish_reserve_seconds"]
+            window = remaining() - reserve
             if window <= 0:
                 raise TimeoutError("No worker time remains before publication reservation")
             process_error = None

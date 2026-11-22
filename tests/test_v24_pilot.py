@@ -10,10 +10,22 @@ import torch
 
 from rewind_m2.diffusion import DiffusionSchedule
 from scripts import v24_body as pilot
+from scripts import v24_budget as budget
 from scripts.v24_colab import stream_v24_state
 
 
 class V24PilotTests(TestCase):
+    def test_r2_write_reservations_cover_both_states_and_drive_publication(self):
+        plan = budget.write_budget(435178624, budget.GIB, {"x0": 180257563, "v": 180257563})
+        self.assertEqual(plan["total_planned_reservation_bytes"], 2339556480)
+        self.assertLess(plan["total_planned_reservation_bytes"], budget.WRITE_CAP)
+        self.assertEqual(plan["drive_max_state_readback_bytes"], 2 * budget.STATE_CAP)
+        self.assertEqual(budget.WORKER_WRITE_CAP + budget.LOCAL_REPORT_RESERVE + budget.DRIVE_WRITE_RESERVE,
+                         budget.WRITE_CAP)
+        self.assertGreater(budget.WORKER_RESERVE_SECONDS - budget.PUBLISH_RESERVE_SECONDS, 25)
+        with self.assertRaisesRegex(ValueError, "reservation"):
+            budget.write_budget(435178624, budget.GIB, {"x0": budget.STATE_CAP + 1, "v": 180257563})
+
     def test_x0_v_numerical_contract_and_frame_passthrough(self):
         proof = pilot.numerical()
         self.assertTrue(proof["frame_x0_passthrough"] and proof["time_mask_preserved"])
