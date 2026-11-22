@@ -502,3 +502,5 @@ ArchVis body197.34mm·hand global293.29mm/local82.15mm이며 body 평균 뼈 길
 2026-11-22 · 128 A가 197,961 업데이트를 완료했다. ArchVis 2D는 78.29px로 v1.2의 89.97px보다 낮고 3D 평가 클립 수는 59개와 29개로 다르다. 세 시나리오의 손 global 오차와 예측 손가락 뼈 길이 축소가 남아 있다. B/C 완료 후 같은 검증 조건에서 비교한다. [최종 점수](EXPERIMENT_RESULTS_REPORT.md)
 
 2026-11-22 · 128 A/B/C 각 3 epoch가 완료됐다. 공식 validation 종합 MPJPE는 A 219.72, C 227.95, B 274.70mm였다. 추가 epoch 없이 A를 튜닝 베이스로 선정했다. C의 ArchVis·CityPark 몸 오차 우위는 시나리오별로 보존하며, 256 결과가 회수되면 같은 seed끼리 해상도를 비교한다. [판정과 원본](EXPERIMENT_RESULTS_REPORT.md#v2-128-베이스-모델-선정)
+
+2026-11-22 · 128 A/B/C의 기존 예측으로 손 전역 오차를 분해했다. 전체 validation에서 손목 기준 손가락 오차는 세 환경 모두 C가 가장 낮았다. 저장 클립 3개의 손목 위치 오차는 A가 C보다 낮았으며, ArchVis 클립의 손 전역 순위는 전체와 달랐다. A를 통합 베이스로 유지하고 C는 상대 자세 비교에 활용한다. [손목·손가락 분석](EXPERIMENT_RESULTS_REPORT.md#손목-위치와-손가락-자세-분해)
