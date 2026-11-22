@@ -1,5 +1,7 @@
 # v2 GPU 학습 · 256 전체 캐시
 
+2026-11-23 · 이미 진행 중인 256 A/B 학습은 [병렬 입력 교체 노트북](V2_GPU_TRAINING_256_PARALLEL.md)에서 슬롯별 최신 Drive 체크포인트로 이어갈 수 있다. 아래 내용은 기존 순차 로더에 적용한다.
+
 2026-11-22 기준. 128 고정본 `b7a2d00`과 같은 공식 manifest·split을 사용한다. 세 슬롯은 seed A(42)·B(71)·C(103)로 새로 초기화한다. 슬롯당 frontend·body·hand 각각 3 epoch, frontend batch 2와 body/hand batch 1, 합계 197,961 updates를 고정한다. 순서는 128과 같은 seed별 셔플이다. Train 119,586페어·3,097클립과 validation 16,425페어·421클립을 사용한다. 손 모델은 학습에서 GT 상체, 검증과 시각화에서 best body의 예측 상체를 입력받는다. 평가 clip·노이즈 seed 71·body/hand offset 100/200·순위 산식은 128과 같다. [128 기준 실행](V2_GPU_TRAINING_128.md) · [v2 계획](V2_PLAN.md)
 
 ## 실행 순서와 보관
