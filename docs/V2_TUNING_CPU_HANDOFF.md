@@ -75,3 +75,9 @@ python -m scripts.v2_tuning_cpu_build --a-bundle <로컬-A-묶음.zip> --output 
 ```
 
 생성기는 A ZIP에서 고정 인덱스와 작은 소스·도구 멤버만 읽는다. 발급한 노트북·kit·가이드와 내부 멤버의 크기 및 SHA-256은 발급 폴더의 `receipt.json`에 저장한다.
+
+## Colab reference 결과
+
+2026-11-22 · 고정본 `b68a2d3`의 CPU reference 호출이 종료 코드 0으로 통과했다. 세 시나리오별 보존 클립 하나씩 총 150프레임의 NPZ와 손목 벡터 분해, 합성 입력의 x0/v/epsilon 왕복과 DDIM timestep을 확인했다. 화면 밖 유효 2D 표점 수는 ArchVis 147, CityPark 187, Downtown 1,715다. 이 표본 수로 시나리오 전체의 화면 밖 비율을 추정하지 않는다.
+
+Drive의 `reports/v2_tuning_cpu_20261122/run-a44c960bc16f4938ab42d69abe3806d8`에서 회수했다. 로컬 보존 폴더는 `outputs/v2_plan_inputs/v2_tuning_cpu_reference_a44c960b`다. invocation-result SHA-256은 `eb5e193280e83a5629aeb03694b86ea57eed97867c1f14a191df517d02a1f25d`, process-result는 `64ac51df89d564dc81735df814fe90f347094371ac06433150fe2da7aa057e50`, report는 `212e28a591c3b21bbcdae2c3fc1e6ece74bfc5d76b1e5d973b06e87cbffc8445`다.
