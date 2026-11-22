@@ -211,7 +211,8 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
         del body, hand
 
 
-def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA, seeds=SEEDS):
+def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA, seeds=SEEDS,
+        trial_runner=trials):
     device = initialize_cuda(args.started, report)
     elapsed = time.monotonic()-args.started
     environment = report["environment"]
@@ -261,8 +262,8 @@ def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run
                         raise ValueError("v211_A_resume_cursor")
                     report["parent_prepare_seconds"] = time.monotonic()-args.started-elapsed
                     report["phase"] = "trials"
-                    trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy,
-                           bound_modules=bound["modules"], seeds=seeds)
+                    trial_runner(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy,
+                                 bound_modules=bound["modules"], seeds=seeds)
                 finally:
                     cache.close()
             report.update(status="completed", phase="completed")

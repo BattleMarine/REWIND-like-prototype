@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from rewind_archive.contracts import canonical, digest
-from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack, sha
+from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack, sha, use_pinned_modules
 from scripts.v2_tuning_final_run import DESTINATIONS, SEEDS, STRATEGIES, scope
 from scripts.v2_tuning_final_selection import screening_rows
 
@@ -27,6 +27,8 @@ def build(source, a_bundle, output, method, screening_dirs, screening_report):
                      "screening_sha256": sha(raw)}
     scope(pins)
     overlays = overlay_sources(pins, (*MODULES, "v212_lora.py", "v2_tuning_final_run.py"))
+    use_pinned_modules(pins, overlays, "d926d25",
+                       {"v211_run.py": "cd877c233a7d4f57be699b2387cf3d0c399f5a790f9343d9fd83388b21b55384"})
     notebook = f"{method.replace('.', '')}_final_seeds_137_181_cuda.ipynb"
     destination = DESTINATIONS[method]
     guide = (f"# {method} 최종 비교 · 추가 seed 137·181\n\n"

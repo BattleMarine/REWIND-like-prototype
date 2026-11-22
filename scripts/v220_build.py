@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from rewind_archive.contracts import digest
-from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack
+from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack, use_pinned_modules
 from scripts.v220_hand import BRANCH, METHOD
 from scripts.v220_run import CONTRACT, DESTINATION
 
@@ -23,6 +23,8 @@ def build(source, a_bundle, output):
         raise ValueError("v220_cpu_trial_plan_branch")
     pins["v220"] = CONTRACT
     overlays = overlay_sources(pins, (*MODULES, "v220_upper.py", "v220_hand.py", "v220_eval.py", "v220_run.py"))
+    use_pinned_modules(pins, overlays, "d926d25",
+                       {"v211_run.py": "cd877c233a7d4f57be699b2387cf3d0c399f5a790f9343d9fd83388b21b55384"})
     guide = ("# v2.2 A hand · GT와 예측 상체 조건 비교\n\n"
              "GT:예측 상체 100:0 대 50:50, 각 seed 42·71·103, 각 1epoch 3,097 updates·batch 1·Adam 5e-5. "
              "A frontend/body 고정. 같은 seed는 clip·학습 noise를 공유합니다. 예측 상체를 검증 보관하고 재사용합니다. "
