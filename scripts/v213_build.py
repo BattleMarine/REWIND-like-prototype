@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from rewind_archive.contracts import digest
-from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack
+from scripts.v211_build import MODULES, collect_pins, overlay_sources, pack, use_pinned_modules
 from scripts.v213_body import BRANCH, METHOD
 from scripts.v213_run import DESTINATION
 
@@ -22,6 +22,8 @@ def build(source, a_bundle, output):
     if pins["trial_plan"]["branches"][METHOD] != BRANCH:
         raise ValueError("v213_cpu_trial_plan_branch")
     overlays = overlay_sources(pins, (*MODULES, "v213_body.py", "v213_run.py"))
+    use_pinned_modules(pins, overlays, "792ee76",
+                       {"v211_run.py": "f3a5b217845887caaf89a65639683e8ef6ac20294d11b16919e9d2b610177327"})
     guide = ("# v2.1.3 A body 전체 미세조정\n\n"
              "A에서 독립 시작합니다. Seed 42·71·103 각 3,097 updates, 1epoch, batch 1, Adam 5e-5, FP32. "
              "평가 seed 71, 예측 2D·예측 상체, 공식 validation 421클립·16,425프레임, DDIM 10. "

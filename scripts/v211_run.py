@@ -158,14 +158,14 @@ def restore_features(project, work, pins, pipeline, ledger):
 
 
 def trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy=v211_trial,
-           *, bound_modules=None):
+           *, bound_modules=None, seeds=SEEDS):
     plan = pins["trial_plan"]
     best = {role: info["sha256"] for role, info in pipe.progress["best"].items()}
     if best != plan["common"]["selected_model_sha256"] or pipe.cfg["teacher"]["sampling_steps"] != 10:
         raise ValueError("v211_selected_model_or_sampling")
     store = cascade = None
     checkpoint_cap = getattr(strategy, "CHECKPOINT_CAP", MIB)
-    for seed in SEEDS:
+    for seed in seeds:
         ledger.check()
         seed_run(trajectory_seed(seed, "model-initialization"))
         trial = folder(target/f"seed-{seed}")
@@ -211,7 +211,7 @@ def trials(project, work, target, pins, reference, pipe, ledger, owner, environm
         del body, hand
 
 
-def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA):
+def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run_schema=RUN_SCHEMA, seeds=SEEDS):
     device = initialize_cuda(args.started, report)
     elapsed = time.monotonic()-args.started
     environment = report["environment"]
@@ -262,7 +262,7 @@ def run(args, pins, report, *, strategy=v211_trial, destination=DESTINATION, run
                     report["parent_prepare_seconds"] = time.monotonic()-args.started-elapsed
                     report["phase"] = "trials"
                     trials(project, work, target, pins, reference, pipe, ledger, owner, environment, report, strategy,
-                           bound_modules=bound["modules"])
+                           bound_modules=bound["modules"], seeds=seeds)
                 finally:
                     cache.close()
             report.update(status="completed", phase="completed")

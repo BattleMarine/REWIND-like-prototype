@@ -89,14 +89,18 @@ def overlay_sources(pins, modules):
     return overlays
 
 
+def use_pinned_modules(pins, overlays, revision, expected_modules):
+    for name, expected in expected_modules.items():
+        if sha(overlays[name]) != expected:
+            overlays[name] = subprocess.check_output(["git", "show", f"{revision}:scripts/{name}"], cwd=ROOT)
+        if sha(overlays[name]) != expected:
+            raise ValueError(f"v2_tuning_release_source_pin: {name}")
+        pins["modules"][name] = expected
+
+
 def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, tools_name, config, guide, destination):
     overlays = overlay_sources(pins, modules)
-    for name, expected in R2_SHARED_MODULES.items():
-        if sha(overlays[name]) != expected:
-            overlays[name] = subprocess.check_output(["git", "show", f"{R2_REVISION}:scripts/{name}"], cwd=ROOT)
-        if sha(overlays[name]) != expected:
-            raise ValueError(f"v2_tuning_startup_r2_source_pin: {name}")
-        pins["modules"][name] = expected
+    use_pinned_modules(pins, overlays, R2_REVISION, R2_SHARED_MODULES)
     previous = json.loads(previous_receipt.read_bytes())["pins"]
     old_modules = previous["modules"]
     if (digest(previous) != LEGACY_INPUTS[method] or {**pins, "modules": old_modules} != previous
@@ -118,7 +122,8 @@ def issue(output, pins, previous_receipt, *, modules, tag, method, notebook, too
          release_fields={"release": "cuda_startup_r2", "resume_inputs_sha256": LEGACY_INPUTS[method]})
 
 
-def pack(output, pins, overlays, *, tag, method, notebook, tools_name, config, guide, destination, release_fields):
+def pack(output, pins, overlays, *, tag, method, notebook, tools_name, config, guide, destination, release_fields,
+         extra_files=()):
     if output.exists() or output.is_symlink() or not output.parent.is_dir():
         raise ValueError("v2_tuning_output_exists_or_parent_missing")
     with tempfile.TemporaryDirectory(dir=output.parent, prefix=f".{tag}-build-") as temporary:
@@ -157,6 +162,9 @@ def pack(output, pins, overlays, *, tag, method, notebook, tools_name, config, g
             "tools": tools_name, "tools_sha256": tool_hash, "default_off": True, "output_folder": destination,
             **release_fields}))
         (root/"trial-plan.json").write_bytes(canonical(pins["trial_plan"]))
+        for name, value in extra_files:
+            with (root/name).open("xb") as stream:
+                stream.write(value)
         root.rename(output)
 
 
