@@ -1,6 +1,6 @@
 # REWIND-like prototype 실험 결과 종합 보고서
 
-2026-11-22 · v2 파생 CPU 검사 3개 중 `reference`가 Colab에서 통과했다. 세 시나리오에서 보존한 150프레임의 좌표·마스크와 손목 분해를 확인했다. `inputs`와 `trials`는 사용자 실행 대기다. [원본과 검사 범위](V2_TUNING_CPU_HANDOFF.md#colab-reference-결과)
+2026-11-22 · v2 파생 CPU 검사 3개 중 `reference`가 Colab에서 통과했다. 세 시나리오에서 보존한 150프레임의 좌표·마스크와 손목 분해를 확인했다. [inputs](V2_TUNING_CPU_HANDOFF.md#colab-inputs-결과)도 통과해 3건 중 2건을 완료했다. `trials`는 실행 중이다. [원본과 검사 범위](V2_TUNING_CPU_HANDOFF.md#colab-reference-결과)
 
 2026-11-22 · v2.1.1 초기 고정본은 T4에서 두 차례 환경 정보 기록 전에 종료됐다. GPU 한 대가 인식됐고 실패 문구는 `Invalid device argument`였다. 원래 실패 라인은 미확인이다. CUDA 초기화와 메모리 계측을 보완한 R2로 v2.1.1 한 건만 재검증하며 v2.1.2 R2는 대기한다. [실행 기록](V211_BODY_HEAD.md)
 

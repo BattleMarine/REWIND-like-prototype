@@ -81,3 +81,9 @@ python -m scripts.v2_tuning_cpu_build --a-bundle <로컬-A-묶음.zip> --output 
 2026-11-22 · 고정본 `b68a2d3`의 CPU reference 호출이 종료 코드 0으로 통과했다. 세 시나리오별 보존 클립 하나씩 총 150프레임의 NPZ와 손목 벡터 분해, 합성 입력의 x0/v/epsilon 왕복과 DDIM timestep을 확인했다. 화면 밖 유효 2D 표점 수는 ArchVis 147, CityPark 187, Downtown 1,715다. 이 표본 수로 시나리오 전체의 화면 밖 비율을 추정하지 않는다.
 
 Drive의 `reports/v2_tuning_cpu_20261122/run-a44c960bc16f4938ab42d69abe3806d8`에서 회수했다. 로컬 보존 폴더는 `outputs/v2_plan_inputs/v2_tuning_cpu_reference_a44c960b`다. invocation-result SHA-256은 `eb5e193280e83a5629aeb03694b86ea57eed97867c1f14a191df517d02a1f25d`, process-result는 `64ac51df89d564dc81735df814fe90f347094371ac06433150fe2da7aa057e50`, report는 `212e28a591c3b21bbcdae2c3fc1e6ece74bfc5d76b1e5d973b06e87cbffc8445`다.
+
+## Colab inputs 결과
+
+2026-11-22 · 309.31초, 종료 코드 0. 공식 split은 train 119,586페어, validation 16,425페어, test 0페어다. 캐시 1,063개와 특징 그룹 147개의 기록과 파일 크기를 대조했고, 각 종류의 첫 파일과 마지막 파일은 SHA-256 및 내용까지 검사했다. 원본 motion 독립성은 미검증이다.
+
+Drive 실행 ID는 `run-dc960ea39e9543b99f753d0bcb01258a`, 로컬 원본은 `outputs/v2_plan_inputs/v2_tuning_cpu_inputs_dc960ea3/`다. SHA-256은 invocation-result `7a394b93432fe7181c76390f0a1b2f6de5981548d38306891375cf1c52d821a7`, process-result `03ada87a8710c18d1c4f3d4ab87567f7e751ea9dee4b70b2026f7958caf6f4f9`, report `05de5d109cecf05e2e4f0bdaf48df7fd342bd52a90b4965b3ae0897cd58d1a50`다.
