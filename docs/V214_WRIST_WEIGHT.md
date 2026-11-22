@@ -1,5 +1,7 @@
 # v2.1.4 · 손목 위치 손실 가중치 2
 
+2026-11-23 · v2.1.4 L4 3회 완료(677초). 같은 seed 42·71·103에서 출력층 손목 위치 손실의 가중치 2−1 차이는 세 시나리오 동일 가중 평균에서 왼손목 −1.76, 오른손목 −1.18, 전역 손 −1.63, 손목 기준 손가락 −0.24, 손목 제외 몸 +0.67 mm였다. 다섯 지표 각각 세 seed에서 같은 방향이었다. 원본 요약·fit·head·비교·진단은 outputs/v2_plan_inputs/v214_l4_results_20261123/에 보존했고 그룹 NPZ는 로컬 미회수다. 독립 분기인 v2.2는 기존 A를 부모로 테스트 세션에 인계했다.
+
 v2.1 최종 비교에서 head 또는 LoRA가 선정되면, 해당 방식으로 A의 원래 가중치에서 다시 시작한다. 선정된 trial의 학습된 가중치는 대조군 결과와 연결하는 데 사용한다. 새 학습은 seed 42·71·103, 각 3,097클립·1epoch·batch 1·Adam `5e-5`이며, 기존 weight 1과 같은 클립 순서와 teacher timestep·epsilon stream을 적용한다. 확장 seed는 결과 검토 후 별도로 결정한다. [튜닝 설계](V2_TUNING_DESIGN.md)
 
 최종 body의 위치 손실은 `sum(w × normalized XYZ squared error) / (3 × sum(w))`로 계산한다. 유효한 좌우 손목엔 `w=2`, 그 밖의 유효한 관절엔 `w=1`을 준다. Padding 및 불완전 GT는 가중합·분모에서 제외한다. 보조 frame 손실, pose 단위·mask, 동결 A frontend와 hand 가중치, DDIM 및 optimizer는 기존 경로를 유지한다. Hand에는 해당 trial body의 예측 상체를 넘긴다.
