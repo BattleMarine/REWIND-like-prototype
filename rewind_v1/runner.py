@@ -301,6 +301,13 @@ class Pipeline:
         """Optional experiment-specific artifact hook after the durable cursor candidate advances."""
         pass
 
+    def _validate_epoch(self, role, stage):
+        if role == "frontend":
+            return evaluate_frontend(stage, self.data, self.cfg["frontend"], self.budget, self.timing,
+                                     diagnostics=self.epoch_expansion)
+        return self.cascade.evaluate(role, stage, self.budget, self.timing, self.frozen_body,
+                                     diagnostics=self.epoch_expansion)
+
     def _epoch(self, role, stage, stop_at):
         p = self.progress
         size = self.batch_sizes[role]
@@ -329,12 +336,7 @@ class Pipeline:
                 self._save_last(stage)
         start = time.monotonic()
         with preserve_rng():
-            if role == "frontend":
-                metrics = evaluate_frontend(stage, self.data, self.cfg["frontend"], self.budget, self.timing,
-                                            diagnostics=self.epoch_expansion)
-            else:
-                metrics = self.cascade.evaluate(role, stage, self.budget, self.timing, self.frozen_body,
-                                                diagnostics=self.epoch_expansion)
+            metrics = self._validate_epoch(role, stage)
         accumulate(self.timing, {role + "_validation_wall_seconds": time.monotonic()-start})
         self._save_epoch_model(role, stage, metrics)
         p["history"].append({"stage": role, "epoch": p["epoch"]+1, "updates": p["updates"],
